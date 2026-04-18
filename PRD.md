@@ -159,6 +159,24 @@ Twitter 的密度：高（信息流）
 | **对象存储** | MinIO | 兼容 S3 API |
 | **部署** | Docker Compose / K8s | 本地/生产双模式 |
 
+### 4.1.1 技术栈选型原则
+
+> **原则：能力 > 工具名称。** 有偏好的说明理由后可用平替。
+
+| 能力需求 | 首选 | 可平替 | 关键要求 |
+|----------|------|--------|----------|
+| **ReAct 推理框架** | 自研 Go | 任何多步推理+工具调用框架 | Agent 思考-行动-观察循环 |
+| **MCP 协议** | 自研 | gRPC / HTTP / OpenAPI | 标准化接口 |
+| **LLM 框架** | 轻量抽象层 | LangChain / LlamaIndex | 多模型切换、RAG |
+| **向量数据库** | pgvector | Milvus / Pinecone / Weaviate | 768维、Cosine、可扩展 |
+| **可观测性** | Prometheus + OTel | StatsD + Zipkin / Jaeger | Metrics/Tracing/Logging |
+
+**选型理由：**
+- **自研 ReAct / MCP**：本项目 Agent 逻辑相对轻量（自动标签、RAG 问答），自研可保持代码简洁可控，避免引入过重的外部框架依赖。
+- **轻量 LLM 抽象层**：仅需要多模型切换和基础 RAG 能力，LangChain 过于庞大，自研 200 行代码即可满足。
+- **pgvector**：与 PostgreSQL 同一数据库，减少运维复杂度；IVFFlat 索引在万级数据量下性能足够。
+- **Prometheus + OTel**：云原生标准栈，Go 生态支持成熟，社区仪表盘模板丰富。
+
 ### 4.2 微服务划分（Phase 1 简化版）
 
 ```
@@ -535,6 +553,55 @@ kubectl apply -f k8s/
 
 ---
 
+## 10.1 Go 可观测性技术栈
+
+> Sprint 5 前必须接入可观测性三件套。
+
+### Metrics
+
+- **工具**：Prometheus Counter / Histogram / Gauge
+- **暴露**：每个 Go 服务提供 `/metrics` 端点
+- **关键指标**：
+  - `http_requests_total`（按方法、路径、状态码分桶）
+  - `http_request_duration_seconds`（Histogram，P50/P95/P99）
+  - `memory_processing_status`（按状态计数：pending/processing/completed/failed）
+  - `llm_requests_total`（按 provider、状态分桶）
+  - `vector_embedding_duration_seconds`
+
+### Tracing
+
+- **工具**：OpenTelemetry + Jaeger
+- **要求**：
+  - Gateway 生成 `trace_id`，透传到所有下游服务
+  - 每个 HTTP/gRPC 调用生成 Span
+  - Redis Stream 消费也记录 Span
+- **数据**：`trace_id` / `span_id` / `parent_span_id` 写入日志
+
+### Logging
+
+- **工具**：Zap 结构化日志（Go 标准）
+- **格式**：JSON，字段统一
+- **必含字段**：`timestamp` / `level` / `service` / `trace_id` / `span_id` / `message` / `context`
+- **级别**：DEBUG（开发）/ INFO（默认）/ WARN / ERROR
+
+### 可视化
+
+- **工具**：Grafana 仪表盘
+- **预设面板**：
+  - 服务 QPS / 延迟 / 错误率
+  - Redis Stream 队列深度
+  - PostgreSQL 连接数 / 慢查询
+  - LLM 调用成功率 / 延迟
+
+### 部署
+
+| 环境 | 方式 |
+|------|------|
+| 本地 | Docker Compose（Prometheus + Jaeger + Grafana） |
+| 生产 | K8s（Sidecar 模式或 DaemonSet） |
+
+---
+
 ## 11. 给 Claude Code 的启动指令
 
 ```markdown
@@ -546,13 +613,16 @@ kubectl apply -f k8s/
 
 **核心要求：**
 1. **严格遵循** 文档中的技术栈、目录结构、API 定义
-2. **Windows 兼容**：代码必须在 Windows (WSL2/Docker) 下可运行
-3. **创建 .gitattributes** 强制 LF 换行符
-4. **提供 Windows 启动脚本** (dev-start.ps1)
-5. 先实现 Sprint 0（Docker Compose 基础设施）
-6. 每个 Sprint 结束必须有可运行的版本
-7. 代码简洁、有注释、可测试
-8. 设计美观、暗黑模式、细腻动效
+2. **技术栈选型原则**：能力 > 工具名称，可用平替（Prometheus→StatsD, OTel→Zipkin），关键能力必须满足
+3. **关键能力必须满足**：可观测性三件套（Metrics/Tracing/Logging）、向量数据库、LLM 多提供商
+4. **Windows 兼容**：代码必须在 Windows (WSL2/Docker) 下可运行
+5. **创建 .gitattributes** 强制 LF 换行符
+6. **提供 Windows 启动脚本** (dev-start.ps1)
+7. 先实现 Sprint 0（Docker Compose 基础设施）
+8. 每个 Sprint 结束必须有可运行的版本
+9. **Sprint 5 前必须接入可观测性**：Prometheus Metrics + OpenTelemetry Tracing + Zap 结构化日志
+10. 代码简洁、有注释、可测试
+11. 设计美观、暗黑模式、细腻动效
 
 **命名约定（技术标识统一为 Echoes）：**
 - **GitHub 仓库：** `Echoes`
