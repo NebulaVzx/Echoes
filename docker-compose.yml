@@ -1,0 +1,199 @@
+# Echoes (拾忆) - Local Development Environment
+# Version: 1.0.0
+# Usage: docker-compose up -d
+
+version: "3.8"
+
+services:
+  # PostgreSQL 15 with pgvector extension
+  postgres:
+    image: ankane/pgvector:v0.5.1
+    container_name: echoes-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: echoes
+      POSTGRES_USER: echoes_user
+      POSTGRES_PASSWORD: echoes_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./shared/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U echoes_user -d echoes"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - echoes-network
+
+  # Redis 7
+  redis:
+    image: redis:7-alpine
+    container_name: echoes-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - echoes-network
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: echoes-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: echoes_minio
+      MINIO_ROOT_PASSWORD: echoes_minio_secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - echoes-network
+
+  # Gateway Service (Go + Gin)
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    container_name: echoes-gateway
+    restart: unless-stopped
+    environment:
+      - PORT=8080
+      - USER_SERVICE_URL=http://user-service:8001
+      - MEMORY_SERVICE_URL=http://memory-service:8002
+      - JWT_SECRET=echoes_dev_secret_key_change_in_production
+      - ENV=development
+    ports:
+      - "8088:8080"
+    depends_on:
+      user-service:
+        condition: service_started
+      memory-service:
+        condition: service_started
+    networks:
+      - echoes-network
+
+  # User Service (Go + GORM)
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: echoes-user-service
+    restart: unless-stopped
+    environment:
+      - PORT=8001
+      - DATABASE_URL=postgres://echoes_user:echoes_password@postgres:5432/echoes?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=echoes_dev_secret_key_change_in_production
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - ENV=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - echoes-network
+
+  # Memory Service (Go + GORM)
+  memory-service:
+    build:
+      context: ./services/memory-service
+      dockerfile: Dockerfile
+    container_name: echoes-memory-service
+    restart: unless-stopped
+    environment:
+      - PORT=8002
+      - DATABASE_URL=postgres://echoes_user:echoes_password@postgres:5432/echoes?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+      - VECTORIZER_SERVICE_URL=http://vectorizer-service:8004
+      - PROCESSOR_SERVICE_URL=http://processor-service:8003
+      - ENV=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - echoes-network
+
+  # Processor Service (Python + FastAPI)
+  processor-service:
+    build:
+      context: ./services/processor-service
+      dockerfile: Dockerfile
+    container_name: echoes-processor
+    restart: unless-stopped
+    environment:
+      - PORT=8003
+      - REDIS_URL=redis://redis:6379/0
+      - ENV=development
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - echoes-network
+
+  # Vectorizer Service (Python + FastAPI + BGE-M3)
+  vectorizer-service:
+    build:
+      context: ./services/vectorizer-service
+      dockerfile: Dockerfile
+    container_name: echoes-vectorizer
+    restart: unless-stopped
+    environment:
+      - PORT=8004
+      - REDIS_URL=redis://redis:6379/0
+      - ENV=development
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - echoes-network
+
+  # Next.js Web App
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: development
+    container_name: echoes-web
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - API_URL=http://gateway:8080
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    depends_on:
+      - gateway
+    networks:
+      - echoes-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  echoes-network:
+    driver: bridge

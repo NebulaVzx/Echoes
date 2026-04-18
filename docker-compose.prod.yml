@@ -1,0 +1,169 @@
+# Echoes (拾忆) - Production Environment
+# Usage: docker-compose -f docker-compose.prod.yml up -d
+
+version: "3.8"
+
+services:
+  postgres:
+    image: ankane/pgvector:v0.5.1
+    container_name: echoes-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: echoes
+      POSTGRES_USER: echoes_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./shared/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - echoes-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: echoes-redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - echoes-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: echoes-minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - echoes-network
+
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+      target: production
+    container_name: echoes-gateway
+    restart: always
+    environment:
+      - PORT=8080
+      - USER_SERVICE_URL=http://user-service:8001
+      - MEMORY_SERVICE_URL=http://memory-service:8002
+      - JWT_SECRET=${JWT_SECRET}
+      - ENV=production
+    ports:
+      - "8080:8080"
+    depends_on:
+      - user-service
+      - memory-service
+    networks:
+      - echoes-network
+
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: echoes-user-service
+    restart: always
+    environment:
+      - PORT=8001
+      - DATABASE_URL=postgres://echoes_user:${POSTGRES_PASSWORD}@postgres:5432/echoes?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - JWT_SECRET=${JWT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - ENV=production
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - echoes-network
+
+  memory-service:
+    build:
+      context: ./services/memory-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: echoes-memory-service
+    restart: always
+    environment:
+      - PORT=8002
+      - DATABASE_URL=postgres://echoes_user:${POSTGRES_PASSWORD}@postgres:5432/echoes?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - VECTORIZER_SERVICE_URL=http://vectorizer-service:8004
+      - PROCESSOR_SERVICE_URL=http://processor-service:8003
+      - ENV=production
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - echoes-network
+
+  processor-service:
+    build:
+      context: ./services/processor-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: echoes-processor
+    restart: always
+    environment:
+      - PORT=8003
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - ENV=production
+    depends_on:
+      - redis
+    networks:
+      - echoes-network
+
+  vectorizer-service:
+    build:
+      context: ./services/vectorizer-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: echoes-vectorizer
+    restart: always
+    environment:
+      - PORT=8004
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - ENV=production
+    depends_on:
+      - redis
+    networks:
+      - echoes-network
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: production
+    container_name: echoes-web
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - API_URL=http://gateway:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+    networks:
+      - echoes-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  echoes-network:
+    driver: bridge

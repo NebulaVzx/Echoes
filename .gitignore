@@ -1,0 +1,35 @@
+### Windows
+# Windows thumbnail cache files
+Thumbs.db
+
+# Folder config file
+[Dd]esktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows shortcuts
+*.lnk
+
+### Claude Code
+.claude/
+
+### Next.js
+web/.next/
+web/node_modules/
+web/out/
+
+### Go
+services/*/vendor/
+
+### Python
+services/*/__pycache__/
+services/*/.venv/
+services/*/.env
+
+### IDE
+.vscode/
+.idea/
+
+### OS
+.DS_Store
