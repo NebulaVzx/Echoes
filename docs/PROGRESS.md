@@ -82,6 +82,8 @@
 
 ## Sprint 1：认证体系 (Week 2: 2026-04-26 ~ 2026-05-02)
 
+### 状态：进行中（2026-04-19 启动）
+
 ### 目标
 - [ ] User Service - 用户注册/登录 API
 - [ ] User Service - JWT Token 体系
@@ -92,7 +94,34 @@
 - [ ] 前端 - 注册页面
 - [ ] 前端 - 路由保护
 
-### 状态：未开始
+### Day 1 (2026-04-19)
+
+- 创建 `develop` 分支，Sprint 1 启动
+- 更新 PRD.md 第10章开发计划（详细任务分解）
+- 完成 User Service 实现：
+  - [x] 用户模型（domain/user.go, domain/auth.go）
+  - [x] 数据库连接配置（internal/config/database.go）
+  - [x] Repository 层（GORM + 重复检测）
+  - [x] Service 层（bcrypt 密码哈希 + JWT Token 体系）
+  - [x] HTTP Handler 层（注册/登录/刷新/登出/获取用户）
+- 完成 Gateway Service 实现：
+  - [x] JWT 认证中间件（Bearer Token 验证 + 公开路由白名单）
+  - [x] 反向代理到 User Service
+  - [x] 路由配置（/api/v1/auth/* → User Service）
+- 完成前端登录/注册页面：
+  - [x] API 客户端封装（lib/api.ts）
+  - [x] 登录页面（app/(auth)/login/page.tsx）
+  - [x] 注册页面（app/(auth)/register/page.tsx）
+  - [x] 表单验证 + 错误提示
+  - [x] 登录后跳转首页
+- 测试验证：
+  - [x] 注册成功 → 返回 JWT Token + 用户信息
+  - [x] 登录成功 → 返回新 Token
+  - [x] 获取当前用户 → 返回用户信息
+  - [x] 重复注册 → 返回 USER_EXISTS (409)
+  - [x] 错误密码 → 返回 INVALID_CREDENTIALS (401)
+  - [x] 无 Token 访问 → 返回 UNAUTHORIZED (401)
+- Go 版本升级：1.22 → 1.23（解决依赖兼容问题）
 
 ## Sprint 2：记忆捕获 (Week 3: 2026-05-03 ~ 2026-05-09)
 

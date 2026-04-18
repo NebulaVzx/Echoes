@@ -2,7 +2,7 @@
 # Multi-stage build for Go + GORM memory management service
 
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ EXPOSE 8002
 CMD ["./memory-service"]
 
 # Development stage
-FROM golang:1.22-alpine AS development
+FROM golang:1.23-alpine AS development
 
 WORKDIR /app
 
