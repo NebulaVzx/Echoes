@@ -97,23 +97,36 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
   - 相似内容推荐
   - 异步任务发布（Redis Stream）
 
+#### LLM Provider（共享模块）
+- **职责**：抽象 LLM 调用，支持多提供商切换
+- **实现位置**：`services/processor-service/app/llm_provider/`
+- **核心设计**：
+  - 接口 `LLMProvider`：`GenerateTags(content string) ([]string, error)`
+  - `OpenAIProvider`：调用 GPT-3.5/4 API
+  - `AnthropicProvider`：调用 Claude API
+  - 工厂函数 `NewLLMProvider(provider string) LLMProvider`
+- **配置**：环境变量 `LLM_PROVIDER`（`openai` / `anthropic`）
+- **降级策略**：LLM 失败时使用本地 TF-IDF 关键词提取
+
 #### Processor Service
 - **职责**：内容处理与增强
 - **端口**：8003
+- **依赖**：LLM Provider（自动标签）
 - **核心功能**：
   - 链接抓取（HTTP 请求 + HTML 解析）
   - 内容摘要生成
-  - 自动标签生成
+  - 自动标签生成（调用 LLM Provider，含 fallback）
   - 消费 Redis Stream 任务
 
 #### Vectorizer Service
 - **职责**：文本向量化
 - **端口**：8004
-- **模型**：BGE-M3（768 维向量）
+- **模型**：BGE-M3（768 维向量，中文优化）
 - **核心功能**：
   - 文本编码为向量
   - 消费 Redis Stream 任务
-  - 模型热加载
+  - 启动时预加载模型，避免请求时重复加载
+  - CPU/GPU 自动检测（优先 GPU，回退 CPU）
 
 ## 3. 数据流
 
@@ -143,9 +156,9 @@ User → Gateway → Memory Service
                     ↓
               Vectorizer Service (query → vector)
                     ↓
-              PostgreSQL pgvector (cosine similarity)
+              PostgreSQL pgvector (cosine similarity, threshold ≥ 0.75)
                     ↓
-              User ← Results
+              User ← Results (含 similarity 分数)
 ```
 
 ### 3.4 链接保存流程

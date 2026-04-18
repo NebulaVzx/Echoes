@@ -84,8 +84,32 @@ Twitter 的密度：高（信息流）
 | **搜索** | 自然语言语义搜索 | P0 |
 | | 相似内容推荐 | P0 |
 | | 标签筛选 | P1 |
+| **AI 能力** | LLM 抽象层（OpenAI/Anthropic 可切换） | P1 |
+| | 自动标签生成（LLM + fallback） | P1 |
+| | 文本向量化（BGE-M3） | P0 |
+| | 语义搜索（pgvector cosine） | P0 |
 
-### 3.2 Phase 2 规划（Echo Assistant）
+### 3.2 关键约束
+
+**LLM 提供商配置：**
+- 必须支持 OpenAI 和 Anthropic 两种提供商
+- 通过环境变量 `LLM_PROVIDER` 切换（`openai` / `anthropic`）
+- 工厂模式创建对应 Provider 实例
+- 接口统一：`GenerateTags(content string) ([]string, error)`
+
+**异步与降级：**
+- 所有 LLM 调用必须异步，不阻塞用户操作
+- LLM 失败时必须降级：使用本地关键词提取逻辑（TF-IDF / 简单分词）
+- 重试机制：最多 3 次，指数退避
+
+**向量检索：**
+- 向量模型必须中文优化：BGE-M3（768 维）
+- 相似度计算使用余弦距离（cosine similarity）
+- 搜索阈值：0.75（低于阈值的结果过滤）
+- 向量启动时预加载，避免请求时重复加载
+- CPU/GPU 自动检测
+
+### 3.3 Phase 2 规划（Echo Assistant）
 
 **后台 AI（MVP 已包含）：**
 - 自动标签生成（调用 LLM）
@@ -96,10 +120,11 @@ Twitter 的密度：高（信息流）
 - **能力：**
   - 基于 RAG 回答关于用户记忆的问题
   - 示例："我上周存的关于 Go 协程的文章有哪些？" "总结我关于 AI 的所有收藏"
-- **技术：** Memory Service 搜索结果 + LLM 生成回答
+- **技术：** Memory Service 搜索结果 + LLM Provider 生成回答（复用 Sprint 3 的 LLMProvider）
+- **引用来源展示：** LLM 回答中标注引用的记忆来源（标题 + 链接）
 - **开发量：** 1-2 周（Chat UI + RAG 逻辑）
 
-### 3.3 Phase 3 预留（Agent 平台架构）
+### 3.4 Phase 3 预留（Agent 平台架构）
 
 **架构预留，当前不实现，但设计时考虑扩展性：**
 
@@ -130,7 +155,7 @@ Twitter 的密度：高（信息流）
 | **缓存/队列** | Redis 7 | Stream 用于消息队列 |
 | **向量服务** | Python + FastAPI | BGE-M3 向量化 |
 | **处理服务** | Python + FastAPI | 链接抓取、自动标签（调用 LLM） |
-| **LLM 服务** | OpenAI API (GPT-3.5/4) | 自动标签生成，可降级本地模型 |
+| **LLM Provider** | OpenAI API / Anthropic API | 工厂模式切换，环境变量 `LLM_PROVIDER` |
 | **对象存储** | MinIO | 兼容 S3 API |
 | **部署** | Docker Compose / K8s | 本地/生产双模式 |
 
@@ -167,9 +192,10 @@ Twitter 的密度：高（信息流）
 ```
 
 **说明：**
-- Phase 1 先实现 Gateway + User + Memory + Processor + Vectorizer
+- Phase 1 先实现 Gateway + User + Memory + Processor + Vectorizer + LLM Provider
 - Search 功能先放在 Memory Service 内
 - 后期搜索量大时，再拆独立 Search Service
+- LLM Provider 作为共享模块，被 Processor Service 调用（自动标签）
 
 ### 4.3 目录结构（强制遵循）
 
@@ -496,8 +522,8 @@ kubectl apply -f k8s/
 | 0 | 1 | 基础设施 | Docker Compose、数据库、目录结构 |
 | 1 | 2 | 认证体系 | User Service、Gateway、OAuth、前端登录页 |
 | 2 | 3 | 记忆捕获 | Memory Service、文字/链接捕获、时间轴 |
-| 3 | 4 | 处理能力 | Processor、Vectorizer、自动标签、异步队列 |
-| 4 | 5 | 搜索能力 | 语义搜索、相似推荐、暗黑模式 |
+| 3 | 4 | AI 处理层 | LLM Provider 抽象层、Processor 自动标签、Vectorizer BGE-M3 向量化、异步队列 |
+| 4 | 5 | 搜索能力 | 语义搜索（pgvector cosine）、相似推荐、暗黑模式 |
 | 5 | 6 | 打磨上线 | 动效、响应式、错误处理、自我测试 |
 
 ### Phase 2 扩展（可选）

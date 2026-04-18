@@ -16,8 +16,8 @@
 - [x] 创建各服务基础 Dockerfile 和入口文件
 - [x] 创建 Next.js 前端基础配置
 - [x] 创建项目文档（README, PROGRESS, ARCHITECTURE, CHANGELOG, API）
-- [ ] 测试 Docker Compose 启动所有服务
-- [ ] 第一次提交并推送
+- [x] 测试 Docker Compose 启动所有服务
+- [x] 第一次提交并推送
 
 ### 完成情况
 
@@ -61,11 +61,24 @@
   - docs/API.md
   - CHANGELOG.md
 
+### Day 2 补充 (2026-04-19)
+
+- Docker Compose 启动测试成功
+  - 基础设施服务（PostgreSQL, Redis, MinIO）全部 healthy
+  - Gateway / User / Memory 服务运行正常
+  - Processor Service 运行正常
+  - Web 前端运行正常（端口 3000）
+  - Vectorizer Service 构建就绪（PyTorch 依赖构建较慢，Sprint 3 再验证）
+- 修复问题：
+  - Go 服务 Dockerfile 移除 `go.sum` 依赖（使用 `go mod tidy`）
+  - Web 前端 CSS 变量修复（移除未定义的 Tailwind 类）
+  - 网关端口 8080 被占用，切换至 8088
+- 第一次提交并推送至 GitHub：`feat: Sprint 0 基础设施搭建`
+
 ### 待解决问题
-- [ ] Docker Compose 启动测试（需要 Docker 环境）
-- [ ] Go 模块依赖下载（`go mod tidy`）
-- [ ] Next.js 依赖安装（`npm install`）
-- [ ] Python 依赖版本兼容性检查
+- [ ] Vectorizer Service 完整构建（PyTorch + BGE-M3，Sprint 3 处理）
+- [ ] 数据库迁移手动执行（`make migrate` 待验证）
+- [ ] K8s 部署配置待创建（Sprint 5）
 
 ## Sprint 1：认证体系 (Week 2: 2026-04-26 ~ 2026-05-02)
 
