@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Echoes - 拾忆',
   description: '个人语义搜索引擎 - 拾起遗落的记忆',
+  icons: {
+    icon: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({

@@ -2,8 +2,8 @@
 
 > 个人语义搜索引擎 - 拾起遗落的记忆
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
-[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)](https://golang.org)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue)](CHANGELOG.md)
+[![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://golang.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14.2-000?logo=next.js)](https://nextjs.org)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?logo=postgresql)](https://postgresql.org)
@@ -21,15 +21,17 @@
 
 | 层级 | 技术 | 说明 |
 |------|------|------|
-| 前端 | Next.js 14 + Tailwind CSS | App Router, React Server Components |
-| API 网关 | Go + Gin | 路由、认证、限流 |
-| 用户服务 | Go + GORM | 注册/登录/OAuth/JWT |
-| 记忆服务 | Go + GORM | CRUD、标签、搜索 |
-| 处理服务 | Python + FastAPI | 链接抓取、自动标签 |
+| 前端 | Next.js 14 + Tailwind CSS + shadcn/ui | App Router, RSC, Framer Motion |
+| API 网关 | Go + Gin | 路由、JWT 认证、限流 |
+| 用户服务 | Go + GORM | 注册/登录/GitHub OAuth/JWT |
+| 记忆服务 | Go + GORM | CRUD、标签、语义搜索 |
+| 处理服务 | Python + FastAPI | 链接抓取、自动标签（LLM） |
 | 向量服务 | Python + FastAPI | BGE-M3 向量化 |
+| LLM Provider | OpenAI / Anthropic | 工厂模式切换 |
 | 数据库 | PostgreSQL 15 + pgvector | 向量相似度搜索 |
 | 缓存/队列 | Redis 7 | Stream 消息队列 |
 | 对象存储 | MinIO | S3 兼容 |
+| 可观测性 | Prometheus + OTel + Zap | Metrics/Tracing/Logging |
 
 ## 快速开始
 
@@ -61,7 +63,7 @@ make dev-start
 | 服务 | 地址 |
 |------|------|
 | Web 前端 | http://localhost:3000 |
-| API 网关 | http://localhost:8080 |
+| API 网关 | http://localhost:8088 |
 | PostgreSQL | localhost:5432 |
 | Redis | localhost:6379 |
 | MinIO 控制台 | http://localhost:9001 |
@@ -138,12 +140,12 @@ make fmt-web
 
 | Sprint | 周 | 目标 | 状态 |
 |--------|----|------|------|
-| 0 | 1 | 基础设施 - Docker Compose、数据库、目录结构 | 进行中 |
-| 1 | 2 | 认证体系 - User Service、Gateway、OAuth | 未开始 |
+| 0 | 1 | 基础设施 - Docker Compose、数据库、目录结构 | 已完成 |
+| 1 | 2 | 认证体系 - User Service、Gateway、OAuth、Zod验证 | 已完成 |
 | 2 | 3 | 记忆捕获 - Memory Service、文字/链接、时间轴 | 未开始 |
 | 3 | 4 | 处理能力 - Processor、Vectorizer、自动标签 | 未开始 |
 | 4 | 5 | 搜索能力 - 语义搜索、相似推荐、暗黑模式 | 未开始 |
-| 5 | 6 | 打磨上线 - 动效、响应式、错误处理 | 未开始 |
+| 5 | 6 | 可观测性 + 打磨上线 - Prometheus/OTel/Zap | 未开始 |
 
 ## 文档
 

@@ -46,7 +46,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-50 mb-2">
+          <img src="/logo.svg" alt="Echoes" className="w-16 h-16 mx-auto mb-3 dark:invert-[0.85]" />
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50 mb-1">
             Echoes
           </h1>
           <p className="text-gray-500 dark:text-gray-400">登录你的账户</p>

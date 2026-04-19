@@ -68,7 +68,7 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
 
 #### Gateway Service
 - **职责**：统一入口，路由分发，认证鉴权
-- **端口**：8080
+- **端口**：8080（容器内），对外映射 8088
 - **路由规则**：
   - `/api/v1/auth/*` → User Service
   - `/api/v1/memories/*` → Memory Service
@@ -111,7 +111,7 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
 #### Processor Service
 - **职责**：内容处理与增强
 - **端口**：8003
-- **依赖**：LLM Provider（自动标签）
+- **依赖**：LLM Provider（自动标签）、Redis Stream
 - **核心功能**：
   - 链接抓取（HTTP 请求 + HTML 解析）
   - 内容摘要生成
@@ -121,6 +121,7 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
 #### Vectorizer Service
 - **职责**：文本向量化
 - **端口**：8004
+- **依赖**：Redis Stream
 - **模型**：BGE-M3（768 维向量，中文优化）
 - **核心功能**：
   - 文本编码为向量
@@ -281,7 +282,7 @@ USING ivfflat (vector vector_cosine_ops);
 - JWT Token（HS256 签名）
 - Access Token：15 分钟有效期
 - Refresh Token：7 天有效期
-- Token 存储：HttpOnly Cookie
+- Token 存储：localStorage（开发）/ HttpOnly Cookie（生产预留）
 
 ### 6.2 密码存储
 - bcrypt 算法（cost factor 12）
@@ -289,8 +290,9 @@ USING ivfflat (vector vector_cosine_ops);
 
 ### 6.3 OAuth
 - GitHub OAuth 2.0
-- State 参数防止 CSRF
-- 仅请求必要权限（read:user, user:email）
+- State 参数防止 CSRF（10分钟过期，单次使用）
+- 仅请求必要权限（user:email）
+- 邮箱冲突自动关联（已有邮箱注册后OAuth登录自动绑定）
 
 ### 6.4 API 安全
 - Gateway 层限流（Rate Limiting）
