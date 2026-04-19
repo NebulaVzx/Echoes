@@ -4,6 +4,7 @@ Generates BGE-M3 embeddings for text content.
 Consumes vectorization tasks from Redis Streams.
 """
 
+import logging
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -12,6 +13,8 @@ from app.config import settings
 from app.services.embedder import BGEM3Embedder
 from app.clients.memory_client import MemoryServiceClient
 from app.consumers.vectorize_consumer import VectorizeConsumer
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
 @asynccontextmanager

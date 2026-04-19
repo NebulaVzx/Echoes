@@ -6,10 +6,24 @@ from anthropic import RateLimitError as AnthropicRateLimitError
 from .base import LLMProvider
 
 
+def _normalize_base_url(base_url: str | None) -> str | None:
+    """Strip /v1 suffix if present; AsyncAnthropic appends it internally."""
+    if not base_url:
+        return None
+    base_url = base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        base_url = base_url[:-3]
+    return base_url or None
+
+
 class AnthropicProvider(LLMProvider):
-    def __init__(self, model: str = "claude-sonnet-4-20250514", api_key: str = None, temperature: float = 0.7):
+    def __init__(self, model: str = "claude-sonnet-4-20250514", api_key: str = None, temperature: float = 0.7, base_url: str = None):
         super().__init__(model=model, temperature=temperature)
-        self.client = AsyncAnthropic(api_key=api_key or os.getenv("ANTHROPIC_API_KEY"))
+        client_kwargs = {"api_key": api_key or os.getenv("ANTHROPIC_API_KEY")}
+        normalized = _normalize_base_url(base_url)
+        if normalized:
+            client_kwargs["base_url"] = normalized
+        self.client = AsyncAnthropic(**client_kwargs)
 
     async def generate(self, prompt: str, temperature: float = None, max_tokens: int = 500) -> str:
         temp = temperature if temperature is not None else self.temperature

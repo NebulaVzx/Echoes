@@ -23,7 +23,7 @@ web/out/
 services/*/vendor/
 
 ### Python
-services/*/__pycache__/
+**/__pycache__/
 services/*/.venv/
 services/*/.env
 

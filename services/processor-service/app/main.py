@@ -4,9 +4,12 @@ Handles link scraping, content extraction, and auto-tag generation.
 Consumes tasks from Redis Streams.
 """
 
+import logging
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 import redis.asyncio as redis
 from app.config import settings
 from app.clients.memory_client import MemoryServiceClient

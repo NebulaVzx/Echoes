@@ -75,14 +75,14 @@ func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID,
 	return memories, total, nil
 }
 
-// Update modifies an existing memory's tags and note.
+// Update modifies an existing memory.
 func (r *GormMemoryRepository) Update(ctx context.Context, memory *domain.Memory) error {
 	return r.db.WithContext(ctx).Save(memory).Error
 }
 
 // UpdateVector updates the vector field for a memory using pgvector syntax.
 func (r *GormMemoryRepository) UpdateVector(ctx context.Context, id uuid.UUID, vector string) error {
-	result := r.db.WithContext(ctx).Model(&domain.Memory{}).Where("id = ?", id).Update("vector", gorm.Expr("?::vector", vector))
+	result := r.db.WithContext(ctx).Table("memories").Where("id = ?", id).Update("vector", gorm.Expr("?::vector", vector))
 	if result.Error != nil {
 		return result.Error
 	}

@@ -121,6 +121,7 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 		LinkURL:          req.LinkURL,
 		Tags:             pq.StringArray(tags),
 		Note:             note,
+		Metadata:         "{}",
 		ProcessingStatus: "pending",
 		Visibility:       "private",
 	}
@@ -142,23 +143,29 @@ func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) 
 	if err != nil {
 		return nil, err
 	}
-	if len(user.Settings) == 0 || string(user.Settings) == "{}" || string(user.Settings) == "null" {
+	settingsStr := user.Settings.String()
+	if len(user.Settings) == 0 || settingsStr == "{}" || settingsStr == "null" {
 		return nil, nil
 	}
 
 	var settings struct {
 		LLMProvider    string  `json:"llm_provider"`
+		LLMProtocol    string  `json:"llm_protocol"`
 		LLMModel       string  `json:"llm_model"`
 		LLMTemperature float64 `json:"llm_temperature"`
 		APIKey         string  `json:"api_key"`
+		BaseURL        string  `json:"base_url"`
 	}
-	if err := json.Unmarshal(user.Settings, &settings); err != nil {
+	if err := json.Unmarshal([]byte(settingsStr), &settings); err != nil {
 		return nil, err
 	}
 
 	config := make(map[string]interface{})
 	if settings.LLMProvider != "" {
 		config["llm_provider"] = settings.LLMProvider
+	}
+	if settings.LLMProtocol != "" {
+		config["llm_protocol"] = settings.LLMProtocol
 	}
 	if settings.LLMModel != "" {
 		config["llm_model"] = settings.LLMModel
@@ -168,6 +175,9 @@ func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) 
 	}
 	if settings.APIKey != "" {
 		config["api_key"] = settings.APIKey
+	}
+	if settings.BaseURL != "" {
+		config["base_url"] = settings.BaseURL
 	}
 	return config, nil
 }
@@ -369,6 +379,8 @@ func (s *MemoryService) UpdateTaskStatus(ctx context.Context, memoryID uuid.UUID
 				if err := s.repo.UpdateVector(ctx, memoryID, vectorLiteral); err != nil {
 					return fmt.Errorf("failed to update vector: %w", err)
 				}
+			} else {
+				return fmt.Errorf("vector result has unexpected type: %T", update.Result["vector"])
 			}
 		}
 	}

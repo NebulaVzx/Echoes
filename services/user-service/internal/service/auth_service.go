@@ -129,11 +129,15 @@ func (s *AuthService) GetUserSettings(ctx context.Context, id uuid.UUID) (*domai
 	}
 
 	var settings domain.LLMSettings
-	if len(user.Settings) > 0 && string(user.Settings) != "{}" && string(user.Settings) != "null" {
-		if err := json.Unmarshal(user.Settings, &settings); err != nil {
+	settingsStr := user.Settings.String()
+	if len(user.Settings) > 0 && settingsStr != "{}" && settingsStr != "null" {
+		if err := json.Unmarshal([]byte(settingsStr), &settings); err != nil {
 			return &domain.LLMSettings{}, nil
 		}
 	}
+
+	// Normalize temperature to float64 for consistent API response
+	settings.Temperature = settings.GetTemperature()
 
 	// Decrypt and mask API key for display
 	if settings.APIKey != "" {
@@ -159,9 +163,13 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 
 	// Parse existing settings to preserve API key if masked in request
 	var existing domain.LLMSettings
-	if len(user.Settings) > 0 && string(user.Settings) != "{}" && string(user.Settings) != "null" {
-		_ = json.Unmarshal(user.Settings, &existing)
+	settingsStr := user.Settings.String()
+	if len(user.Settings) > 0 && settingsStr != "{}" && settingsStr != "null" {
+		_ = json.Unmarshal([]byte(settingsStr), &existing)
 	}
+
+	// Normalize temperature to float64 before storage
+	req.LLM.Temperature = req.LLM.GetTemperature()
 
 	// Handle API key: if masked or empty, preserve existing encrypted key
 	newKey := req.LLM.APIKey
@@ -197,47 +205,81 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 	return &resp, nil
 }
 
+// GetUserAPIKeyForTesting retrieves and decrypts the user's stored API key for LLM connection testing.
+func (s *AuthService) GetUserAPIKeyForTesting(ctx context.Context, id uuid.UUID) (string, error) {
+	user, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	var settings domain.LLMSettings
+	settingsStr := user.Settings.String()
+	if len(user.Settings) > 0 && settingsStr != "{}" && settingsStr != "null" {
+		_ = json.Unmarshal([]byte(settingsStr), &settings)
+	}
+	if settings.APIKey == "" {
+		return "", nil
+	}
+	decrypted, err := crypto.Decrypt(settings.APIKey)
+	if err != nil {
+		return "", err
+	}
+	return decrypted, nil
+}
+
 // TestLLMConnection attempts to connect to the specified LLM provider with the given config.
+// Protocol determines the API format (openai/anthropic), allowing custom providers like DeepSeek, Kimi, etc.
 func (s *AuthService) TestLLMConnection(ctx context.Context, llm domain.LLMSettings) error {
-	provider := strings.ToLower(llm.Provider)
-	if provider == "" {
-		provider = "openai"
+	protocol := strings.ToLower(llm.Protocol)
+	if protocol == "" {
+		// Backward compatibility: infer from provider name
+		protocol = strings.ToLower(llm.Provider)
+	}
+	if protocol == "" {
+		protocol = "openai"
 	}
 
 	apiKey := llm.APIKey
 	if strings.Contains(apiKey, "***") {
-		// Masked key means "keep existing" — fetch user's actual key for test
-		// This should be handled by the caller (handler) providing the decrypted key
 		apiKey = ""
 	}
 
-	switch provider {
+	switch protocol {
 	case "openai":
-		return testOpenAI(ctx, llm.Model, apiKey)
+		return testOpenAI(ctx, llm.Model, apiKey, llm.BaseURL)
 	case "anthropic":
-		return testAnthropic(ctx, llm.Model, apiKey)
+		return testAnthropic(ctx, llm.Model, apiKey, llm.BaseURL)
 	default:
-		return fmt.Errorf("unsupported provider: %s", provider)
+		return fmt.Errorf("不支持的协议: %s，请选择 openai 或 anthropic", protocol)
 	}
 }
 
-func testOpenAI(ctx context.Context, model, apiKey string) error {
+func testOpenAI(ctx context.Context, model, apiKey, baseURL string) error {
 	if apiKey == "" {
 		apiKey = os.Getenv("OPENAI_API_KEY")
 	}
 	if apiKey == "" {
-		return errors.New("OpenAI API Key 未配置")
+		return errors.New("API Key 未配置")
 	}
 	if model == "" {
 		model = "gpt-4o-mini"
 	}
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
 
 	body, _ := json.Marshal(map[string]interface{}{
-		"model":       model,
-		"messages":    []map[string]string{{"role": "user", "content": "hi"}},
-		"max_tokens":  1,
+		"model":      model,
+		"messages":   []map[string]string{{"role": "user", "content": "hi"}},
+		"max_tokens": 1,
 	})
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(body))
+	// Ensure baseURL has proper API version prefix for OpenAI protocol
+	base := strings.TrimSuffix(baseURL, "/")
+	if !strings.HasSuffix(base, "/v1") {
+		base = base + "/v1"
+	}
+	reqURL := base + "/chat/completions"
+	log.Printf("[LLM Test] OpenAI protocol request URL: %s, model: %s", reqURL, model)
+	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -265,15 +307,18 @@ func testOpenAI(ctx context.Context, model, apiKey string) error {
 	return nil
 }
 
-func testAnthropic(ctx context.Context, model, apiKey string) error {
+func testAnthropic(ctx context.Context, model, apiKey, baseURL string) error {
 	if apiKey == "" {
 		apiKey = os.Getenv("ANTHROPIC_API_KEY")
 	}
 	if apiKey == "" {
-		return errors.New("Anthropic API Key 未配置")
+		return errors.New("API Key 未配置")
 	}
 	if model == "" {
 		model = "claude-sonnet-4-20250514"
+	}
+	if baseURL == "" {
+		baseURL = "https://api.anthropic.com/v1"
 	}
 
 	body, _ := json.Marshal(map[string]interface{}{
@@ -281,7 +326,14 @@ func testAnthropic(ctx context.Context, model, apiKey string) error {
 		"max_tokens": 1,
 		"messages":   []map[string]string{{"role": "user", "content": "hi"}},
 	})
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewReader(body))
+	// Ensure baseURL has proper API version prefix for Anthropic protocol
+	base := strings.TrimSuffix(baseURL, "/")
+	if !strings.HasSuffix(base, "/v1") {
+		base = base + "/v1"
+	}
+	reqURL := base + "/messages"
+	log.Printf("[LLM Test] Anthropic protocol request URL: %s, model: %s", reqURL, model)
+	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}

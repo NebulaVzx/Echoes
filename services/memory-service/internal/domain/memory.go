@@ -24,7 +24,7 @@ type Memory struct {
 	Vector           string    `gorm:"type:vector(1024);->:false;<-:false" json:"-"` // exclude from JSON, handled separately
 	Tags             pq.StringArray `gorm:"type:varchar(50)[]" json:"tags"`
 	Note             string    `gorm:"type:text" json:"note,omitempty"`
-	Metadata         string    `gorm:"type:jsonb;->:false;<-:false" json:"metadata,omitempty"`
+	Metadata         string    `gorm:"type:jsonb" json:"metadata,omitempty"`
 	ProcessingStatus string    `gorm:"type:varchar(20);default:'pending'" json:"processing_status"`
 	Visibility       string    `gorm:"type:varchar(20);default:'private'" json:"visibility"`
 	CreatedAt        time.Time `json:"created_at"`

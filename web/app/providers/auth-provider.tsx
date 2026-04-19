@@ -1,13 +1,13 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { api, User } from '@/lib/api'
+import { api, User, TokenPair } from '@/lib/api'
 
 interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
-  login: (token: string, user: User) => void
+  login: (tokens: TokenPair, user: User) => void
   logout: () => void
 }
 
@@ -53,13 +53,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth()
   }, [])
 
-  const login = (token: string, userData: User) => {
-    api.setToken(token)
+  const login = (tokens: TokenPair, userData: User) => {
+    api.setToken(tokens.access_token)
+    localStorage.setItem('echoes_refresh_token', tokens.refresh_token)
     setUser(userData)
   }
 
   const logout = () => {
     api.logout()
+    localStorage.removeItem('echoes_refresh_token')
     setUser(null)
     window.location.href = '/login'
   }

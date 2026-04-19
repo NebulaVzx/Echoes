@@ -9,7 +9,7 @@ from app.crypto import decrypt
 
 def _create_llm(fields: dict):
     """Create LLM provider with per-message overrides, decrypting API key if present."""
-    provider = fields.get("llm_provider") or settings.llm_provider
+    protocol = fields.get("llm_protocol") or fields.get("llm_provider") or settings.llm_provider
     model = fields.get("llm_model") or settings.llm_model
     temp_raw = fields.get("llm_temperature")
     temperature = float(temp_raw) if temp_raw is not None else settings.llm_temperature
@@ -17,13 +17,14 @@ def _create_llm(fields: dict):
     encrypted_key = fields.get("api_key")
     if encrypted_key:
         api_key = decrypt(encrypted_key)
-    return LLMFactory.create(provider=provider, model=model, temperature=temperature, api_key=api_key)
+    base_url = fields.get("base_url")
+    return LLMFactory.create(protocol=protocol, model=model, temperature=temperature, api_key=api_key, base_url=base_url)
 
 
 def _extract_llm_fields(fields: dict) -> dict:
     """Extract LLM config fields from message for propagation to derived tasks."""
     result = {}
-    for key in ["llm_provider", "llm_model", "llm_temperature", "api_key"]:
+    for key in ["llm_protocol", "llm_provider", "llm_model", "llm_temperature", "api_key", "base_url"]:
         if key in fields:
             result[key] = fields[key]
     return result

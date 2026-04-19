@@ -11,10 +11,12 @@ class LLMFactory:
     }
 
     @classmethod
-    def create(cls, provider: str = None, model: str = None, temperature: float = None, api_key: str = None, **kwargs) -> LLMProvider:
-        provider = (provider or os.getenv("LLM_PROVIDER", "openai")).lower()
+    def create(cls, protocol: str = None, provider: str = None, model: str = None, temperature: float = None, api_key: str = None, base_url: str = None, **kwargs) -> LLMProvider:
+        # protocol determines the API format (openai/anthropic)
+        # provider is the display name (openai, deepseek, moonshot, etc.)
+        protocol = (protocol or provider or os.getenv("LLM_PROVIDER", "openai")).lower()
         model = model or os.getenv("LLM_MODEL", "gpt-4o-mini")
         temperature = temperature if temperature is not None else float(os.getenv("LLM_TEMPERATURE", "0.7"))
-        if provider not in cls._providers:
-            raise ValueError(f"Unknown LLM provider: {provider}")
-        return cls._providers[provider](model=model, temperature=temperature, api_key=api_key, **kwargs)
+        if protocol not in cls._providers:
+            raise ValueError(f"Unknown LLM protocol: {protocol}")
+        return cls._providers[protocol](model=model, temperature=temperature, api_key=api_key, base_url=base_url, **kwargs)

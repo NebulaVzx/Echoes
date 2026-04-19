@@ -40,7 +40,7 @@ export default function RegisterPage() {
     try {
       const response = await api.register(data.email, data.password, data.username)
       if (response.success && response.data) {
-        login(response.data.token.access_token, response.data.user)
+        login(response.data.token, response.data.user)
         window.location.href = '/'
       } else {
         setServerError(response.error?.message || '注册失败')

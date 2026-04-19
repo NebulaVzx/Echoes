@@ -1,8 +1,11 @@
 import asyncio
+import logging
 import redis.asyncio as redis
 from abc import ABC, abstractmethod
 from typing import Optional
 from app.clients.memory_client import MemoryServiceClient
+
+logger = logging.getLogger(__name__)
 
 
 class RedisStreamConsumer(ABC):
@@ -63,7 +66,8 @@ class RedisStreamConsumer(ABC):
                         await self._process_with_retry(msg_id, fields)
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except Exception as e:
+                logger.error(f"Unexpected error in consumer loop for {self.stream}: {e}", exc_info=True)
                 await asyncio.sleep(1)
 
     async def _process_with_retry(self, msg_id: str, fields: dict):
@@ -75,30 +79,26 @@ class RedisStreamConsumer(ABC):
             await self.memory_client.update_task_status(
                 memory_id, self.stream, "processing"
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to report processing status for {memory_id}: {e}")
 
         for attempt in range(retry_count, self.max_retries):
             try:
                 await self.process_message(msg_id, fields)
                 await self.redis.xack(self.stream, self.group, msg_id)
-                # Report completed status
-                try:
-                    await self.memory_client.update_task_status(
-                        memory_id, self.stream, "completed"
-                    )
-                except Exception:
-                    pass
+                logger.info(f"Successfully processed {self.stream} for memory {memory_id}")
                 return
             except Exception as e:
+                logger.error(f"Error processing {self.stream} for memory {memory_id} (attempt {attempt + 1}/{self.max_retries}): {e}")
                 if attempt == self.max_retries - 1:
                     # Report failure — do NOT ack, keep in pending for manual retry
                     try:
                         await self.memory_client.update_task_status(
                             memory_id, self.stream, "failed", error=str(e)
                         )
-                    except Exception:
-                        pass
+                        logger.info(f"Reported failure for {self.stream} memory {memory_id}")
+                    except Exception as report_err:
+                        logger.error(f"Failed to report failure status for {memory_id}: {report_err}")
                     return
                 wait = 2 ** attempt  # 1, 2, 4 seconds
                 await asyncio.sleep(wait)

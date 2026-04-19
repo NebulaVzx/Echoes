@@ -6,9 +6,12 @@ from .base import LLMProvider
 
 
 class OpenAIProvider(LLMProvider):
-    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None, temperature: float = 0.7):
+    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None, temperature: float = 0.7, base_url: str = None):
         super().__init__(model=model, temperature=temperature)
-        self.client = AsyncOpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+        client_kwargs = {"api_key": api_key or os.getenv("OPENAI_API_KEY")}
+        if base_url:
+            client_kwargs["base_url"] = base_url.rstrip("/")
+        self.client = AsyncOpenAI(**client_kwargs)
 
     async def generate(self, prompt: str, temperature: float = None, max_tokens: int = 500) -> str:
         temp = temperature if temperature is not None else self.temperature

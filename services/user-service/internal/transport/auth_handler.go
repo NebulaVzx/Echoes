@@ -333,9 +333,9 @@ func (h *AuthHandler) TestSettings(c *gin.Context) {
 
 	// If API key is masked, use the user's stored key for testing
 	if strings.Contains(req.LLM.APIKey, "***") {
-		stored, err := h.authService.GetUserSettings(c.Request.Context(), userIDUUID)
-		if err == nil && stored != nil && stored.APIKey != "" {
-			req.LLM.APIKey = stored.APIKey
+		decryptedKey, err := h.authService.GetUserAPIKeyForTesting(c.Request.Context(), userIDUUID)
+		if err == nil && decryptedKey != "" {
+			req.LLM.APIKey = decryptedKey
 		} else {
 			req.LLM.APIKey = ""
 		}
