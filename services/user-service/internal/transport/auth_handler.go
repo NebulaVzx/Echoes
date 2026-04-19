@@ -197,30 +197,12 @@ func (h *AuthHandler) GitHubCallback(c *gin.Context) {
 		return
 	}
 
-	// Return an HTML page that sets the token in localStorage + cookie, then redirects to frontend
+	// Redirect to frontend with token in URL hash (localStorage is port-isolated,
+	// so the backend cannot set it directly for the frontend on a different port).
 	frontendURL := "http://localhost:3000"
-	c.Header("Content-Type", "text/html; charset=utf-8")
-	c.String(http.StatusOK, `<!DOCTYPE html>
-<html>
-<head><title>Login Success</title></head>
-<body>
-<script>
-(function() {
-  var token = '`+resp.Token.AccessToken+`';
-  var refreshToken = '`+resp.Token.RefreshToken+`';
-  // Client-side storage for API client
-  localStorage.setItem('echoes_token', token);
-  localStorage.setItem('echoes_refresh_token', refreshToken);
-  // Cookie for Next.js middleware (15 min expiry matching access token)
-  var maxAge = 900;
-  document.cookie = 'echoes_token=' + encodeURIComponent(token) + '; path=/; max-age=' + maxAge + '; SameSite=Lax';
-  document.cookie = 'echoes_refresh_token=' + encodeURIComponent(refreshToken) + '; path=/; max-age=604800; SameSite=Lax';
-  window.location.href = '`+frontendURL+`';
-})();
-</script>
-<p>登录成功，正在跳转...</p>
-</body>
-</html>`)
+	c.Redirect(http.StatusFound,
+		frontendURL+"#token="+resp.Token.AccessToken+
+			"&refresh_token="+resp.Token.RefreshToken)
 }
 
 // getUserID extracts user ID from Gin context (direct calls) or X-User-ID header (Gateway proxy).

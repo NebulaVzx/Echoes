@@ -19,6 +19,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
+      // Check for OAuth callback token in URL hash (backend redirects here with #token=...)
+      const hash = window.location.hash
+      if (hash) {
+        const params = new URLSearchParams(hash.slice(1))
+        const tokenFromHash = params.get('token')
+        const refreshFromHash = params.get('refresh_token')
+        if (tokenFromHash) {
+          api.setToken(tokenFromHash)
+          if (refreshFromHash) {
+            localStorage.setItem('echoes_refresh_token', refreshFromHash)
+          }
+          // Clean hash from URL without reloading
+          window.history.replaceState({}, '', window.location.pathname + window.location.search)
+        }
+      }
+
       const token = api.getToken()
       if (token) {
         try {
