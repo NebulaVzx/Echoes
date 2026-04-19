@@ -41,18 +41,19 @@ type: state
 
 ### Sprint 3：AI 处理层（讨论完成，待规划）
 - [x] Phase 3 上下文讨论完成（见 `03-CONTEXT.md`）
+- [x] 修复 Critical 安全问题 C1-C5 + M7
 - [ ] LLM Provider 抽象层（OpenAI / Anthropic）
 - [ ] Processor Service：Redis Consumer Group + 链接抓取 + 标签生成
 - [ ] Vectorizer Service：BGE-M3 模型 + 向量生成
 - [ ] 状态流转管理 + 子任务级重试
-- [ ] 修复 Critical 安全问题（C1-C5）
 
-### 技术债务（Sprint 3 前需处理）
-- [ ] 移除硬编码 JWT Secret（安全）
-- [ ] 从 Git 移除 .env（安全）
-- [ ] 修复 CORS 白名单（安全）
-- [ ] 添加限流中间件（安全）
-- [ ] 输入内容 XSS 过滤（安全）
+### 技术债务（已修复）
+- [x] 移除硬编码 JWT Secret（C1）
+- [x] .env 安全模板（C2）
+- [x] 修复 CORS 白名单（C3）
+- [x] 添加限流中间件（C4）
+- [x] 输入内容 XSS 过滤（C5）
+- [x] isPublicRoute HasPrefix 绕过（M7）
 
 ---
 
@@ -71,7 +72,7 @@ type: state
 - [x] Sprint 0 里程碑验证通过
 - [x] Sprint 1 里程碑验证通过
 - [x] Sprint 2 里程碑验证通过
-- [ ] Sprint 3 前需修复 Critical 安全问题
+- [x] Sprint 3 前 Critical 安全问题已修复（2026-04-19）
 
 ---
 
