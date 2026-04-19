@@ -5,6 +5,7 @@ import { useAuth } from '@/app/providers/auth-provider'
 import { useTheme } from '@/app/providers/theme-provider'
 import { api, Memory } from '@/lib/api'
 import Logo from '@/components/logo'
+import Link from 'next/link'
 import CreateMemoryForm from '@/components/memory/create-memory-form'
 import MemoryCard from '@/components/memory/memory-card'
 
@@ -76,6 +77,12 @@ export default function HomePage() {
             <ThemeToggle />
             {user && (
               <div className="flex items-center gap-3">
+                <Link
+                  href="/settings"
+                  className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                >
+                  设置
+                </Link>
                 <span className="text-sm text-gray-600 dark:text-gray-300 hidden sm:inline">
                   {user.username || user.email}
                 </span>

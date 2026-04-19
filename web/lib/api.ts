@@ -28,6 +28,17 @@ export interface User {
   created_at: string
 }
 
+export interface LLMSettings {
+  llm_provider: string
+  llm_model: string
+  llm_temperature: number
+  api_key?: string
+}
+
+export interface UpdateSettingsRequest {
+  llm: LLMSettings
+}
+
 export interface AuthResponse {
   user: User
   token: TokenPair
@@ -150,6 +161,15 @@ class ApiClient {
 
   async getMe(): Promise<ApiResponse<User>> {
     return this.request<User>('GET', '/api/v1/auth/me')
+  }
+
+  // Settings endpoints
+  async getSettings(): Promise<ApiResponse<LLMSettings>> {
+    return this.request<LLMSettings>('GET', '/api/v1/auth/me/settings')
+  }
+
+  async updateSettings(settings: UpdateSettingsRequest): Promise<ApiResponse<LLMSettings>> {
+    return this.request<LLMSettings>('PUT', '/api/v1/auth/me/settings', settings)
   }
 
   // Memory endpoints
