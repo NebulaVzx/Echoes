@@ -1,0 +1,19 @@
+{
+  "project": "Echoes",
+  "language": "zh",
+  "default_branch": "develop",
+  "main_branch": "main",
+  "commit_style": "conventional",
+  "test_required": true,
+  "quality_checks": {
+    "e2e_verify": true,
+    "auth_flow_test": true,
+    "no_sensitive_data": true
+  },
+  "output_language": "zh",
+  "workflow_preferences": {
+    "plan_before_code": true,
+    "test_before_done": true,
+    "chinese_default": true
+  }
+}

@@ -1,58 +1,58 @@
-# Coding Conventions
+# 编码规范
 
-**Analysis Date:** 2026-04-19
+**分析日期：** 2026-04-19
 
-## Naming Patterns
+## 命名模式
 
-**Go Files:**
-- Package directories use lowercase with hyphens for service names: `user-service/`, `memory-service/`
-- Go files use snake_case: `auth_handler.go`, `memory_service.go`, `user_repository.go`
-- Internal packages follow Clean Architecture layers: `domain/`, `repository/`, `service/`, `transport/`, `config/`
+**Go 文件：**
+- 包目录使用小写加连字符作为服务名：`user-service/`、`memory-service/`
+- Go 文件使用 snake_case：`auth_handler.go`、`memory_service.go`、`user_repository.go`
+- 内部包遵循整洁架构分层：`domain/`、`repository/`、`service/`、`transport/`、`config/`
 
-**React/TypeScript Files:**
-- Components use PascalCase: `MemoryCard.tsx`, `CreateMemoryForm.tsx`, `Logo.tsx`
-- Hooks and utilities use camelCase: `useAuth.ts` (convention, though `useAuth` is in `auth-provider.tsx`)
-- Page files use lowercase: `page.tsx`, `layout.tsx`
-- Route groups use parentheses: `(auth)/`, `(main)/`
+**React/TypeScript 文件：**
+- 组件使用 PascalCase：`MemoryCard.tsx`、`CreateMemoryForm.tsx`、`Logo.tsx`
+- Hooks 和工具使用 camelCase：`useAuth.ts`（约定如此，尽管 `useAuth` 在 `auth-provider.tsx` 中）
+- 页面文件使用小写：`page.tsx`、`layout.tsx`
+- 路由组使用括号：`(auth)/`、`(main)/`
 
-**Functions:**
-- Go: PascalCase for exported, camelCase for unexported
-  - Exported: `NewAuthService`, `RegisterRoutes`, `SafeResponse`
-  - Unexported: `generateState`, `validateState`, `extractContent`, `publishTasks`
-- TypeScript: camelCase for all functions
-  - `login`, `logout`, `loadMemories`, `handleDelete`
+**函数：**
+- Go：导出用 PascalCase，未导出用 camelCase
+  - 导出：`NewAuthService`、`RegisterRoutes`、`SafeResponse`
+  - 未导出：`generateState`、`validateState`、`extractContent`、`publishTasks`
+- TypeScript：所有函数使用 camelCase
+  - `login`、`logout`、`loadMemories`、`handleDelete`
 
-**Variables:**
-- Go: camelCase for local variables, PascalCase for exported struct fields
-- TypeScript: camelCase for variables, PascalCase for types/interfaces
+**变量：**
+- Go：局部变量用 camelCase，导出结构体字段用 PascalCase
+- TypeScript：变量用 camelCase，类型/接口用 PascalCase
 
-**Types:**
-- Go: PascalCase structs with descriptive names: `AuthResponse`, `TokenPair`, `CreateMemoryRequest`
-- TypeScript: PascalCase interfaces in `web/lib/api.ts`: `ApiResponse<T>`, `Memory`, `User`
+**类型：**
+- Go：PascalCase 结构体，描述性名称：`AuthResponse`、`TokenPair`、`CreateMemoryRequest`
+- TypeScript：`web/lib/api.ts` 中的 PascalCase 接口：`ApiResponse<T>`、`Memory`、`User`
 
-## Code Style
+## 代码风格
 
-**Formatting:**
-- Go: `gofmt` enforced via Makefile (`make fmt-go`)
-- TypeScript: ESLint via Next.js config (`next lint`, `next lint --fix`)
-- No Prettier config detected; relies on Next.js defaults
+**格式化：**
+- Go：通过 Makefile 强制使用 `gofmt`（`make fmt-go`）
+- TypeScript：通过 Next.js 配置使用 ESLint（`next lint`、`next lint --fix`）
+- 未检测到 Prettier 配置；依赖 Next.js 默认值
 
-**Linting:**
-- Web: `eslint-config-next` (ESLint 8.57.0)
-- Go: No explicit linter config; `gofmt` is the standard
-- Python: No linting config detected
+**Lint：**
+- Web：`eslint-config-next`（ESLint 8.57.0）
+- Go：无显式 linter 配置；`gofmt` 是标准
+- Python：未检测到 linting 配置
 
-**Line Endings:**
-- LF enforced via `.gitattributes`
+**换行符：**
+- 通过 `.gitattributes` 强制使用 LF
 
-## Import Organization
+## 导入组织
 
-**Go Import Order:**
-1. Standard library
-2. Third-party packages
-3. Internal project packages
+**Go 导入顺序：**
+1. 标准库
+2. 第三方包
+3. 内部项目包
 
-Example from `services/user-service/internal/transport/auth_handler.go`:
+示例（来自 `services/user-service/internal/transport/auth_handler.go`）：
 ```go
 import (
     "crypto/rand"           // stdlib
@@ -63,46 +63,46 @@ import (
     "sync"
     "time"
 
-    "github.com/gin-gonic/gin"      // third-party
+    "github.com/gin-gonic/gin"      // 第三方
     "github.com/google/uuid"
 
-    "github.com/NebulaVzx/Echoes/services/user-service/internal/domain"       // internal
+    "github.com/NebulaVzx/Echoes/services/user-service/internal/domain"       // 内部
     "github.com/NebulaVzx/Echoes/services/user-service/internal/service"
 )
 ```
 
-**TypeScript Import Order:**
-1. React/core libraries
-2. Third-party packages (zod, framer-motion, etc.)
-3. Internal project imports (`@/lib/api`, `@/components/*`, `@/app/providers/*`)
+**TypeScript 导入顺序：**
+1. React/核心库
+2. 第三方包（zod、framer-motion 等）
+3. 内部项目导入（`@/lib/api`、`@/components/*`、`@/app/providers/*`）
 
-## Go Clean Architecture Layers
+## Go 整洁架构分层
 
-Each Go service follows a consistent 4-layer structure:
+每个 Go 服务遵循一致的 4 层结构：
 
 ```
 services/{service}/
-├── cmd/main.go              # Entry point, dependency injection
+├── cmd/main.go              # 入口点，依赖注入
 ├── internal/
-│   ├── config/              # Database/config initialization
-│   ├── domain/              # Business entities, request/response structs
-│   ├── repository/          # Data access layer (GORM)
-│   ├── service/             # Business logic layer
-│   └── transport/           # HTTP handlers (Gin)
+│   ├── config/              # 数据库/配置初始化
+│   ├── domain/              # 业务实体、请求/响应结构体
+│   ├── repository/          # 数据访问层（GORM）
+│   ├── service/             # 业务逻辑层
+│   └── transport/           # HTTP 处理器（Gin）
 ```
 
-**Dependency Rule:** `transport` -> `service` -> `repository` -> `domain`
-- `domain` has no external dependencies
-- `repository` depends only on `domain` and GORM
-- `service` depends on `domain` and `repository` interfaces
-- `transport` depends on `domain` and `service`
+**依赖规则：** `transport` -> `service` -> `repository` -> `domain`
+- `domain` 无外部依赖
+- `repository` 仅依赖 `domain` 和 GORM
+- `service` 依赖 `domain` 和 repository 接口
+- `transport` 依赖 `domain` 和 `service`
 
-**Interface Pattern:**
-- Repository interfaces defined in `repository/` package
-- Service structs accept repository interfaces, not concrete types
-- Enables testability (though no tests exist yet)
+**接口模式：**
+- Repository 接口定义在 `repository/` 包中
+- Service 结构体接收 repository 接口，而非具体类型
+- 支持可测试性（尽管目前尚无测试）
 
-Example from `services/user-service/internal/repository/user_repository.go`:
+示例（来自 `services/user-service/internal/repository/user_repository.go`）：
 ```go
 type UserRepository interface {
     Create(ctx context.Context, user *domain.User) error
@@ -113,30 +113,30 @@ type UserRepository interface {
 }
 ```
 
-## API Response Format
+## API 响应格式
 
-**Unified JSON Response Structure (all services):**
+**所有服务的统一 JSON 响应结构：**
 ```go
 gin.H{
     "success": true/false,
-    "data":    <payload>,           // on success
-    "error":   gin.H{"code": "...", "message": "..."},  // on error
-    "message": "...",               // optional simple message
+    "data":    <payload>,           // 成功时
+    "error":   gin.H{"code": "...", "message": "..."},  // 错误时
+    "message": "...",               // 可选简单消息
 }
 ```
 
-**Error Code Conventions:**
-- `VALIDATION_ERROR` - 400, malformed request
-- `UNAUTHORIZED` - 401, missing/invalid auth
-- `TOKEN_EXPIRED` - 401, expired JWT
-- `FORBIDDEN` - 403, access denied (wrong user)
-- `NOT_FOUND` - 404, resource not found
-- `USER_EXISTS` - 409, duplicate email
-- `INTERNAL_ERROR` - 500, server error
-- `OAUTH_NOT_CONFIGURED` - 503, missing OAuth env vars
-- `OAUTH_ERROR` - 500, OAuth flow failure
+**错误码约定：**
+- `VALIDATION_ERROR` - 400，请求格式错误
+- `UNAUTHORIZED` - 401，认证缺失/无效
+- `TOKEN_EXPIRED` - 401，JWT 已过期
+- `FORBIDDEN` - 403，访问被拒绝（错误用户）
+- `NOT_FOUND` - 404，资源未找到
+- `USER_EXISTS` - 409，邮箱重复
+- `INTERNAL_ERROR` - 500，服务器错误
+- `OAUTH_NOT_CONFIGURED` - 503，缺少 OAuth 环境变量
+- `OAUTH_ERROR` - 500，OAuth 流程失败
 
-**TypeScript API Client mirrors this structure:**
+**TypeScript API 客户端镜像此结构：**
 ```typescript
 export interface ApiResponse<T> {
   success: boolean
@@ -146,10 +146,10 @@ export interface ApiResponse<T> {
 }
 ```
 
-## Error Handling
+## 错误处理
 
-**Go Patterns:**
-- Sentinel errors in service and repository layers:
+**Go 模式：**
+- 服务和仓库层中的哨兵错误：
   ```go
   var (
       ErrInvalidCredentials = errors.New("invalid email or password")
@@ -157,43 +157,43 @@ export interface ApiResponse<T> {
       ErrMemoryNotFound     = errors.New("memory not found")
   )
   ```
-- Error wrapping with `fmt.Errorf("...: %w", err)` for context
-- `errors.Is()` for sentinel comparison across layers
-- Handler layer maps errors to HTTP status codes via switch
+- 使用 `fmt.Errorf("...: %w", err)` 进行错误包装以添加上下文
+- 使用 `errors.Is()` 进行跨层的哨兵比较
+- 处理器层通过 switch 将错误映射到 HTTP 状态码
 
-**TypeScript Patterns:**
-- Try/catch with `err instanceof Error ? err.message : 'default'`
-- Server errors displayed in UI alert boxes
-- Form validation errors from Zod displayed inline
+**TypeScript 模式：**
+- Try/catch，使用 `err instanceof Error ? err.message : 'default'`
+- UI 弹窗中显示服务器错误
+- Zod 的表单验证错误以内联方式显示
 
-## Logging
+## 日志
 
-**Go:**
-- `log.Printf` for startup messages in `cmd/main.go`
-- `fmt.Printf` for development warnings (OAuth state validation)
-- Zap imported in gateway (`go.uber.org/zap`) but not actively used
-- No structured logging configuration
+**Go：**
+- `cmd/main.go` 中使用 `log.Printf` 输出启动消息
+- 开发警告使用 `fmt.Printf`（OAuth state 验证）
+- Gateway 中导入 Zap（`go.uber.org/zap`）但未主动使用
+- 无结构化日志配置
 
-**Python:**
-- `print()` statements in lifespan handlers
-- No logging framework configured
+**Python：**
+- lifespan 处理器中使用 `print()` 语句
+- 未配置日志框架
 
-**TypeScript:**
-- No logging framework; console output not used in production code
+**TypeScript：**
+- 无日志框架；生产代码中不使用 console 输出
 
-## Configuration Management
+## 配置管理
 
-**Environment Variables (all services):**
-- `PORT` - service port (defaults: gateway 8080, user 8001, memory 8002)
+**环境变量（所有服务）：**
+- `PORT` - 服务端口（默认值：gateway 8080、user 8001、memory 8002）
 - `DATABASE_URL` - PostgreSQL DSN
-- `REDIS_URL` - Redis connection string
-- `JWT_SECRET` - shared secret for token signing
-- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` - OAuth credentials
-- `USER_SERVICE_URL` / `MEMORY_SERVICE_URL` - internal service URLs
-- `ENV` - `development` or `production`
+- `REDIS_URL` - Redis 连接字符串
+- `JWT_SECRET` - Token 签名的共享密钥
+- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` - OAuth 凭据
+- `USER_SERVICE_URL` / `MEMORY_SERVICE_URL` - 内部服务 URL
+- `ENV` - `development` 或 `production`
 
-**Defaults Pattern:**
-All services use `os.Getenv()` with hardcoded development defaults:
+**默认值模式：**
+所有服务使用 `os.Getenv()` 并带有硬编码开发默认值：
 ```go
 port := os.Getenv("PORT")
 if port == "" {
@@ -201,106 +201,106 @@ if port == "" {
 }
 ```
 
-**Security Note:** `JWT_SECRET` has a hardcoded development fallback (`echoes_dev_secret_key_change_in_production`) in both gateway and user-service.
+**安全注意：** `JWT_SECRET` 在 gateway 和 user-service 中都有硬编码开发回退值（`echoes_dev_secret_key_change_in_production`）。
 
-## Type Safety
+## 类型安全
 
-**Go:**
-- Go 1.22-1.23 with generics (GORM uses them)
-- UUID types from `github.com/google/uuid` throughout
-- GORM struct tags for DB mapping: `gorm:"type:uuid;primary_key"`
-- JSON struct tags for API serialization: `json:"email"`
-- Gin binding tags for validation: `binding:"required,email"`
+**Go：**
+- Go 1.22-1.23 含泛型（GORM 使用泛型）
+- 全程使用 `github.com/google/uuid` 的 UUID 类型
+- GORM 结构体标签用于 DB 映射：`gorm:"type:uuid;primary_key"`
+- JSON 结构体标签用于 API 序列化：`json:"email"`
+- Gin 绑定标签用于验证：`binding:"required,email"`
 
-**TypeScript:**
-- Strict mode enabled in `tsconfig.json` (`"strict": true`)
-- Zod schemas for form validation with type inference
-- Explicit interface definitions in `web/lib/api.ts`
-- Path alias `@/*` mapped to `./*`
+**TypeScript：**
+- `tsconfig.json` 中启用严格模式（`"strict": true`）
+- Zod schema 用于表单验证和类型推断
+- `web/lib/api.ts` 中的显式接口定义
+- 路径别名 `@/*` 映射到 `./*`
 
-**Python:**
-- FastAPI with Pydantic v2
-- Type hints in lifespan functions
-- No Pydantic models defined yet (services are stubs)
+**Python：**
+- FastAPI 配合 Pydantic v2
+- lifespan 函数中的类型提示
+- 尚未定义 Pydantic 模型（服务是桩）
 
-## Git Conventions
+## Git 约定
 
-**Branch Strategy:**
-- `main` - stable, merged at sprint end
-- `develop` - daily development
-- `feature/*` - single feature branches
+**分支策略：**
+- `main` - 稳定版，Sprint 结束时合并
+- `develop` - 日常开发
+- `feature/*` - 单功能分支
 
-**Commit Format:** Conventional Commits
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation update
-- `refactor:` Code refactoring
-- `test:` Test-related changes
-- `chore:` Build/config changes
+**提交格式：** Conventional Commits
+- `feat:` 新功能
+- `fix:` Bug 修复
+- `docs:` 文档更新
+- `refactor:` 代码重构
+- `test:` 测试相关变更
+- `chore:` 构建/配置变更
 
-**Recent commit examples:**
+**近期提交示例：**
 ```
 fix(auth): OAuth callback redirect to /login to preserve URL hash
 feat(memory): Sprint 2 - memory capture and timeline
 fix(auth): sync token between localStorage and cookie for middleware compatibility
 ```
 
-## Comments
+## 注释
 
-**Go:**
-- Package-level comments explain purpose: `// Package transport provides HTTP handlers...`
-- Exported items have doc comments
-- Unexported items rarely commented
-- Inline comments for non-obvious logic
+**Go：**
+- 包级注释解释用途：`// Package transport provides HTTP handlers...`
+- 导出项有文档注释
+- 未导出项很少注释
+- 非显而易见逻辑的行内注释
 
-**TypeScript:**
-- Minimal commenting
-- Component files have no JSDoc
-- Complex logic occasionally commented inline
+**TypeScript：**
+- 注释最少
+- 组件文件无 JSDoc
+- 复杂逻辑偶尔有行内注释
 
-## Function Design
+## 函数设计
 
-**Go:**
-- Handlers accept `*gin.Context` as first parameter
-- Service methods accept `context.Context` as first parameter
-- Repository methods follow same pattern
-- Constructor functions: `New{Type}({dependencies})`
+**Go：**
+- 处理器接收 `*gin.Context` 作为第一个参数
+- 服务方法接收 `context.Context` 作为第一个参数
+- 仓库方法遵循相同模式
+- 构造函数：`New{类型}({依赖})`
 
-**TypeScript/React:**
-- Components are default exports
-- Props interfaces defined inline or in component file
-- Custom hooks use `use` prefix (though `useAuth` is in provider file)
-- Event handlers prefixed with `handle`: `handleSubmit`, `handleDelete`
+**TypeScript/React：**
+- 组件为默认导出
+- Props 接口在组件文件中内联定义或单独定义
+- 自定义 Hooks 使用 `use` 前缀（尽管 `useAuth` 在 provider 文件中）
+- 事件处理器以 `handle` 为前缀：`handleSubmit`、`handleDelete`
 
-## Module Design
+## 模块设计
 
-**Go:**
-- No barrel files; each package is imported directly
-- Service `cmd/main.go` performs manual dependency injection
-- No DI framework used
+**Go：**
+- 无 barrel 文件；每个包直接导入
+- 服务 `cmd/main.go` 执行手动依赖注入
+- 未使用 DI 框架
 
-**TypeScript:**
-- `web/lib/api.ts` exports singleton `api` instance and all types
-- Providers exported from individual files
-- Components exported as default from their files
+**TypeScript：**
+- `web/lib/api.ts` 导出单例 `api` 实例和所有类型
+- Providers 从单独文件导出
+- 组件作为默认导出从其文件导出
 
-## Security Conventions
+## 安全约定
 
-**Password Handling:**
-- Bcrypt with cost 12: `bcrypt.GenerateFromPassword([]byte(req.Password), 12)`
-- Password hash excluded from JSON: `json:"-"`
+**密码处理：**
+- Bcrypt cost 12：`bcrypt.GenerateFromPassword([]byte(req.Password), 12)`
+- 密码哈希从 JSON 中排除：`json:"-"`
 
-**JWT:**
-- Access token: 15 minutes
-- Refresh token: 7 days
-- HS256 signing method
-- Tokens delivered via URL hash for OAuth callback (to avoid middleware interception)
+**JWT：**
+- Access token：15 分钟
+- Refresh token：7 天
+- HS256 签名方法
+- OAuth 回调通过 URL hash 传递 Token（避免中间件拦截）
 
-**OAuth State:**
-- In-memory map with mutex (production should use Redis with TTL)
-- 10-minute expiration
-- Relaxed validation in development mode
+**OAuth State：**
+- 内存 map + 互斥锁（生产应使用 Redis + TTL）
+- 10 分钟过期
+- 开发模式下放宽验证
 
 ---
 
-*Convention analysis: 2026-04-19*
+*规范分析：2026-04-19*

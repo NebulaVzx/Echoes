@@ -1,0 +1,119 @@
+---
+name: Echoes Requirements
+description: 拾忆产品需求规格，基于 PRD.md 提炼的已确认需求
+type: requirements
+---
+
+# 需求规格
+
+## 1. 认证体系
+
+### 1.1 邮箱注册/登录 (P0)
+- **R1.1** 用户可通过邮箱和密码注册账号
+- **R1.2** 密码使用 bcrypt 哈希（cost=12）
+- **R1.3** 登录成功后返回 JWT Token 对（Access 15分钟 + Refresh 7天）
+- **R1.4** 支持 Token 刷新机制
+
+### 1.2 GitHub OAuth (P0)
+- **R1.5** 支持 GitHub 第三方登录
+- **R1.6** OAuth 回调通过 URL hash 传递 token 给前端
+- **R1.7** 首次 OAuth 登录自动创建用户并绑定
+
+### 1.3 JWT 认证链路 (P0)
+- **R1.8** Gateway 统一验证 JWT，向 downstream 服务注入 `X-User-ID`
+- **R1.9** Next.js middleware 通过 cookie 检查登录状态
+- **R1.10** 前端 API 客户端自动注入 `Authorization: Bearer` 头
+
+## 2. 记忆捕获
+
+### 2.1 文字输入 (P0)
+- **R2.1** 用户可输入任意文字内容保存为记忆
+- **R2.2** 支持在文字中嵌入 `#标签`
+- **R2.3** 创建后 `processing_status = pending`
+
+### 2.2 链接保存 (P0)
+- **R2.4** 用户可粘贴 URL 保存为链接类型记忆
+- **R2.5** 自动触发链接抓取任务（标题、摘要）
+- **R2.6** 链接类型也需向量化处理
+
+### 2.3 自动标签 (P1)
+- **R2.7** LLM 自动生成 3-5 个中文标签
+- **R2.8** LLM 失败时降级为本地关键词提取
+- **R2.9** 用户可手动编辑标签
+
+## 3. 记忆管理
+
+### 3.1 时间轴浏览 (P0)
+- **R3.1** 首页展示记忆列表，按时间倒序
+- **R3.2** 分页加载（page + limit 参数）
+- **R3.3** 支持按标签筛选
+- **R3.4** 卡片高度 80-120px，3行内容预览
+
+### 3.2 记忆详情 (P0)
+- **R3.5** 点击卡片进入详情页
+- **R3.6** 展示完整内容、标签、备注、元数据
+- **R3.7** 支持编辑标签和备注
+- **R3.8** 支持删除记忆
+
+## 4. 搜索能力
+
+### 4.1 语义搜索 (P0)
+- **R4.1** 支持自然语言查询
+- **R4.2** 查询文本通过 BGE-M3 生成 768 维向量
+- **R4.3** 使用 pgvector 余弦相似度检索
+- **R4.4** 阈值 0.75，低于阈值的结果过滤
+- **R4.5** 返回结果含 similarity 分数
+
+### 4.2 相似推荐 (P0)
+- **R4.6** 记忆详情页展示"你可能还感兴趣"
+- **R4.7** 基于已有向量查询最相似 N 条
+
+## 5. AI 能力
+
+### 5.1 LLM 抽象层 (P1)
+- **R5.1** 统一接口 `GenerateTags(content string) ([]string, error)`
+- **R5.2** 支持 OpenAI / Anthropic 切换（`LLM_PROVIDER` 环境变量）
+- **R5.3** 工厂模式创建 Provider 实例
+
+### 5.2 异步处理 (P0)
+- **R5.4** 记忆创建后自动发布 3 个 Redis Stream 任务
+- **R5.5** 任务类型：`link:fetch`、`text:vectorize`、`tag:generate`
+- **R5.6** 状态流转：`pending → processing → completed/failed`
+- **R5.7** 失败任务最多重试 3 次
+
+## 6. 前端体验
+
+### 6.1 设计 (P0)
+- **R6.1** Notion-like 极简美学
+- **R6.2** 暗黑模式完整支持（非简单反色）
+- **R6.3** 所有交互有过渡动画（200-300ms ease-out）
+- **R6.4** 响应式适配（桌面 + 平板）
+
+### 6.2 动效 (P1)
+- **R6.5** 页面切换动画（Framer Motion）
+- **R6.6** 卡片入场动画
+- **R6.7** 加载状态 / 骨架屏
+
+## 7. 可观测性 (Sprint 5)
+
+### 7.1 Metrics (P1)
+- **R7.1** `/metrics` 端点暴露 Prometheus 指标
+- **R7.2** HTTP 请求总量、延迟分桶
+
+### 7.2 Tracing (P1)
+- **R7.3** Gateway 生成 trace_id 透传全链路
+- **R7.4** OpenTelemetry 跨服务调用 Span
+
+### 7.3 Logging (P1)
+- **R7.5** Zap 结构化日志（JSON 格式）
+- **R7.6** 日志含 trace_id / span_id
+
+## 8. 部署
+
+- **R8.1** Docker Compose 本地开发
+- **R8.2** Kubernetes 生产部署（预留）
+- **R8.3** Windows 兼容（WSL2 / Docker Desktop）
+
+---
+
+*Requirements derived from PRD.md v7.1. Created: 2026-04-19*
