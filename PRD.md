@@ -581,7 +581,7 @@ kubectl apply -f k8s/
 
 ### Sprint 1：认证体系（Week 2）
 
-**状态**：进行中（核心认证链路已完成，GitHub OAuth/Zod验证/状态管理待完善）
+**状态**：已完成
 
 **目标**：用户可注册、登录，JWT 认证链路贯穿 Gateway → User Service。
 
