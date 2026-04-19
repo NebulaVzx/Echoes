@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS memories (
     ocr_text TEXT,
     transcript_text TEXT,
 
-    -- Vector embedding for semantic search (BGE-M3 produces 768-dim vectors)
-    vector VECTOR(768),
+    -- Vector embedding for semantic search (BGE-M3 produces 1024-dim vectors)
+    vector VECTOR(1024),
 
     -- Metadata
     tags VARCHAR(50)[] DEFAULT '{}',
@@ -84,5 +84,5 @@ CREATE TRIGGER update_memories_updated_at
 -- Comment on tables for documentation
 COMMENT ON TABLE users IS 'Registered users (email/password or OAuth)';
 COMMENT ON TABLE memories IS 'User saved content (text snippets, links, future media)';
-COMMENT ON COLUMN memories.vector IS 'BGE-M3 embedding (768 dimensions) for semantic search';
+COMMENT ON COLUMN memories.vector IS 'BGE-M3 embedding (1024 dimensions) for semantic search';
 COMMENT ON COLUMN memories.processing_status IS 'pending -> processing -> completed/failed';

@@ -21,7 +21,7 @@ type Memory struct {
 	MediaDuration    int       `gorm:"type:int" json:"media_duration,omitempty"`
 	OCRText          string    `gorm:"type:text" json:"ocr_text,omitempty"`
 	TranscriptText   string    `gorm:"type:text" json:"transcript_text,omitempty"`
-	Vector           string    `gorm:"type:vector(768);->:false;<-:false" json:"-"` // exclude from JSON, handled separately
+	Vector           string    `gorm:"type:vector(1024);->:false;<-:false" json:"-"` // exclude from JSON, handled separately
 	Tags             pq.StringArray `gorm:"type:varchar(50)[]" json:"tags"`
 	Note             string    `gorm:"type:text" json:"note,omitempty"`
 	Metadata         string    `gorm:"type:jsonb;->:false;<-:false" json:"metadata,omitempty"`
