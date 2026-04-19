@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS memories (
     tags VARCHAR(50)[] DEFAULT '{}',
     note TEXT,
     metadata JSONB DEFAULT '{}',
-    processing_status VARCHAR(20) DEFAULT 'pending',
-    visibility VARCHAR(20) DEFAULT 'private',
+    processing_status VARCHAR(20) DEFAULT 'pending' CHECK (processing_status IN ('pending', 'processing', 'completed', 'failed')),
+    visibility VARCHAR(20) DEFAULT 'private' CHECK (visibility IN ('private', 'public')),
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

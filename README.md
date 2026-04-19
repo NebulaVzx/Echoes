@@ -13,9 +13,22 @@
 
 **Echoes (拾忆)** 是一个个人语义搜索引擎。用户随手保存的文字、链接，自动向量化存储，支持自然语言语义检索和相似内容推荐。
 
+**Slogan：** "拾起遗落的记忆"
+
+**核心价值：**
 - **捕获 friction 极低**：看到就存，无需整理
 - **找回能力极强**：语义搜索，不用记得关键词
 - **发现意外关联**："原来我之前还存过类似的"
+
+**目标用户：**
+- 信息囤积者：收藏100篇文章，需要时找不到
+- 知识工作者：需要建立个人知识库
+- 终身学习者：囤积课程/论文/教程
+
+**AI 层级：**
+- **Phase 1 (MVP)**：LLM 自动生成标签 + BGE-M3 向量化 + 语义搜索
+- **Phase 2 (Echo Assistant)**：对话式 AI 助手，基于 RAG 回答关于用户记忆的问题
+- **Phase 3 (Agent 平台)**：架构预留扩展性，支持未来第三方 Agent 接入
 
 ## 技术栈
 
@@ -32,6 +45,16 @@
 | 缓存/队列 | Redis 7 | Stream 消息队列 |
 | 对象存储 | MinIO | S3 兼容 |
 | 可观测性 | Prometheus + OTel + Zap | Metrics/Tracing/Logging |
+
+**选型原则：能力 > 工具名称。** 有偏好的说明理由后可用平替。关键能力必须满足：可观测性三件套（Metrics/Tracing/Logging）、向量数据库、LLM 多提供商切换。
+
+| 能力需求 | 首选 | 可平替 | 关键要求 |
+|----------|------|--------|----------|
+| ReAct 推理 | 自研 Go | 任何多步推理+工具调用框架 | Agent 思考-行动-观察循环 |
+| MCP 协议 | 自研 | gRPC / HTTP / OpenAPI | 标准化接口 |
+| LLM 框架 | 轻量抽象层 | LangChain / LlamaIndex | 多模型切换、RAG |
+| 向量数据库 | pgvector | Milvus / Pinecone / Weaviate | 768维、Cosine、可扩展 |
+| 可观测性 | Prometheus + OTel | StatsD + Zipkin / Jaeger | Metrics/Tracing/Logging |
 
 ## 快速开始
 
@@ -146,6 +169,8 @@ make fmt-web
 | 3 | 4 | 处理能力 - Processor、Vectorizer、自动标签 | 未开始 |
 | 4 | 5 | 搜索能力 - 语义搜索、相似推荐、暗黑模式 | 未开始 |
 | 5 | 6 | 可观测性 + 打磨上线 - Prometheus/OTel/Zap | 未开始 |
+| Phase 2 | +1-2周 | Echo Assistant - 对话式 AI 助手，基于 RAG 回答记忆相关问题 | 未开始 |
+| Phase 3 | 预留 | Agent 平台 - 架构预留，支持第三方 Agent 接入 | 预留 |
 
 ## 文档
 
@@ -156,18 +181,79 @@ make fmt-web
 
 ## 设计原则
 
+### 美学原则（Notion-like）
+
 - **极简主义**：界面元素做减法，每个元素必须有明确目的
 - **呼吸感**：充足的留白（Padding 16-24px），不拥挤
-- **色彩低调**：主色调使用灰度，强调色仅用于交互
+- **字体克制**：使用 Inter 或系统默认无衬线字体，最多2种字重
+- **色彩低调**：主色调使用灰度（Gray 50-900），强调色仅用于交互
 - **无框设计**：减少边框使用，用背景色/阴影区分层次
 - **细腻动效**：所有交互有过渡动画（200-300ms，ease-out）
-- **暗黑模式**：必须支持，且暗黑模式不是简单反色
+- **暗黑模式**：必须支持，且暗黑模式不是简单反色，需单独设计
+
+### 交互原则
+
+- **即时反馈**：任何操作1秒内必须有视觉响应
+- **渐进披露**：高级功能隐藏，核心功能一眼可见
+- **手势友好**：移动端（未来）考虑，Web端考虑键盘快捷键
+- **容错设计**：误操作可撤销，危险操作需确认
+
+### 内容密度
+
+介于 Notion 和 Twitter 之间：
+- 时间轴列表：每条记忆卡片高度 80-120px
+- 内容预览：最多3行文字
+- 间距：元素间距16px，区块间距24px
 
 ## 贡献
 
 本项目采用 [Conventional Commits](https://www.conventionalcommits.org/) 提交规范。
 
-分支策略：`main` / `develop` / `feature/*`
+**分支策略：** `main`（稳定）/ `develop`（日常开发）/ `feature/*`（功能分支）
+
+**提交频率：** 每天至少提交一次，有进度就提交
+
+**提交格式：**
+- `feat:` 新功能
+- `fix:` 修复
+- `docs:` 文档更新
+- `refactor:` 重构
+
+**提交前检查：**
+- 代码可编译/运行
+- `git diff` 查看变更，确认无意外修改
+- 无敏感信息泄露（检查 password/key/secret）
+
+**Push 策略：**
+- Sprint 结束 **必须** push 到 GitHub
+- 关键里程碑 **必须** push（数据库模型完成、认证可用、搜索可用等）
+- 每日开发结束 **建议** push
+
+## Windows 开发指南
+
+**推荐方案：WSL2**
+
+所有 `make` 命令、shell 脚本和 Go/Python 工具应在 WSL2 中运行。
+
+```powershell
+# 安装 WSL2（管理员 PowerShell）
+wsl --install
+
+# 重启后进入 Ubuntu，在项目目录执行
+wsl make dev-start
+```
+
+**备选方案：Docker Desktop**
+
+确保 Docker Desktop 启用 WSL2 backend，在项目根目录执行 `docker-compose up -d`。
+
+**常见问题：**
+
+| 问题 | 解决 |
+|------|------|
+| `make` 不存在 | 使用 `mingw32-make` 或 `wsl make` |
+| 换行符 CRLF | 已配置 `.gitattributes` 强制 LF |
+| 路径问题 | 使用 WSL2 统一处理 |
 
 ## 许可
 

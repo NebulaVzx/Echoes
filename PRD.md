@@ -347,8 +347,8 @@ CREATE TABLE memories (
     tags VARCHAR(50)[] DEFAULT '{}',
     note TEXT,
     metadata JSONB DEFAULT '{}',
-    processing_status VARCHAR(20) DEFAULT 'pending',
-    visibility VARCHAR(20) DEFAULT 'private',
+    processing_status VARCHAR(20) DEFAULT 'pending' CHECK (processing_status IN ('pending', 'processing', 'completed', 'failed')),
+    visibility VARCHAR(20) DEFAULT 'private' CHECK (visibility IN ('private', 'public')),
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -498,7 +498,7 @@ Write-Host "Run migrations in WSL2: wsl make migrate" -ForegroundColor Cyan
 Write-Host "Or manually: psql postgres://echoes_user:password@localhost:5432/echoes -f shared/migrations/001_init.sql" -ForegroundColor Cyan
 
 Write-Host "Environment ready!" -ForegroundColor Green
-Write-Host "API: http://localhost:8080" -ForegroundColor Cyan
+Write-Host "API Gateway: http://localhost:8088" -ForegroundColor Cyan
 ```
 
 ---
