@@ -150,39 +150,25 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
           ))}
         </div>
 
-        {/* Content input with smooth height transition via CSS grid */}
+        {/* Content input */}
         <div className="mb-3">
-          {/* Text area — animates via grid trick */}
-          <div
-            className="grid transition-all duration-300 ease-out"
-            style={{ gridTemplateRows: contentType === 'text' ? '1fr' : '0fr' }}
-          >
-            <div className="overflow-hidden rounded-md focus-within:ring-2 focus-within:ring-gray-400 dark:focus-within:ring-gray-500 transition-colors">
-              <textarea
-                value={textContent}
-                onChange={(e) => setTextContent(e.target.value)}
-                placeholder="记下你的想法..."
-                rows={4}
-                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none transition-colors resize-none text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Link input — animates via grid trick */}
-          <div
-            className="grid transition-all duration-300 ease-out"
-            style={{ gridTemplateRows: contentType === 'link' ? '1fr' : '0fr' }}
-          >
-            <div className="overflow-hidden rounded-md focus-within:ring-2 focus-within:ring-gray-400 dark:focus-within:ring-gray-500 transition-colors">
-              <input
-                type="url"
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none transition-colors text-sm"
-              />
-            </div>
-          </div>
+          {contentType === 'text' ? (
+            <textarea
+              value={textContent}
+              onChange={(e) => setTextContent(e.target.value)}
+              placeholder="记下你的想法..."
+              rows={4}
+              className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 transition-colors resize-none text-sm"
+            />
+          ) : (
+            <input
+              type="url"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://..."
+              className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 transition-colors text-sm"
+            />
+          )}
         </div>
 
         {/* Tags — chip input */}
