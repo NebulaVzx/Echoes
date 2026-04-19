@@ -39,13 +39,14 @@ type: state
 
 ## 待办事项（下一步）
 
-### Sprint 3：AI 处理层（讨论完成，待规划）
+### Sprint 3：AI 处理层（规划完成，待执行）
 - [x] Phase 3 上下文讨论完成（见 `03-CONTEXT.md`）
 - [x] 修复 Critical 安全问题 C1-C5 + M7
-- [ ] LLM Provider 抽象层（OpenAI / Anthropic）
-- [ ] Processor Service：Redis Consumer Group + 链接抓取 + 标签生成
-- [ ] Vectorizer Service：BGE-M3 模型 + 向量生成
-- [ ] 状态流转管理 + 子任务级重试
+- [x] Phase 3 技术研究和规划完成（4 个计划，3 个 wave）
+- [ ] LLM Provider 抽象层（OpenAI / Anthropic）— 计划 03-02
+- [ ] Processor Service：Redis Consumer Group + 链接抓取 + 标签生成 — 计划 03-02
+- [ ] Vectorizer Service：BGE-M3 模型 + 向量生成 — 计划 03-03
+- [ ] 状态流转管理 + 子任务级重试 — 计划 03-01
 
 ### 技术债务（已修复）
 - [x] 移除硬编码 JWT Secret（C1）
