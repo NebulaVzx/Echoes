@@ -39,6 +39,7 @@ func Setup() *gin.Engine {
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
 	router.Use(corsMiddleware())
+	router.RedirectTrailingSlash = false
 
 	// Health check
 	router.GET("/health", func(c *gin.Context) {
@@ -60,16 +61,22 @@ func Setup() *gin.Engine {
 	memoryProxy := newReverseProxy("MEMORY_SERVICE_URL", "http://memory-service:8002")
 
 	// Auth routes → User Service
+	v1.Any("/auth", func(c *gin.Context) {
+		userProxy.ServeHTTP(c.Writer, c.Request)
+	})
 	v1.Any("/auth/*path", func(c *gin.Context) {
 		userProxy.ServeHTTP(c.Writer, c.Request)
 	})
 
-	// Memory routes → Memory Service (placeholder for Sprint 2)
+	// Memory routes → Memory Service
+	v1.Any("/memories", func(c *gin.Context) {
+		memoryProxy.ServeHTTP(c.Writer, c.Request)
+	})
 	v1.Any("/memories/*path", func(c *gin.Context) {
 		memoryProxy.ServeHTTP(c.Writer, c.Request)
 	})
 
-	// Search route → Memory Service (placeholder for Sprint 4)
+	// Search route → Memory Service
 	v1.Any("/search", func(c *gin.Context) {
 		memoryProxy.ServeHTTP(c.Writer, c.Request)
 	})

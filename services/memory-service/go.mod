@@ -9,3 +9,5 @@ require (
 	gorm.io/driver/postgres v1.5.7
 	gorm.io/gorm v1.25.7
 )
+
+require github.com/lib/pq v1.12.3 // indirect

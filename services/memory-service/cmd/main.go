@@ -4,6 +4,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/NebulaVzx/Echoes/services/memory-service/internal/config"
+	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
+	"github.com/NebulaVzx/Echoes/services/memory-service/internal/service"
+	"github.com/NebulaVzx/Echoes/services/memory-service/internal/transport"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,6 +19,25 @@ func main() {
 		port = "8002"
 	}
 
+	// Initialize database
+	db, err := config.NewDatabase()
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Initialize repository
+	memoryRepo := repository.NewGormMemoryRepository(db)
+
+	// Initialize Redis task queue
+	taskQueue := service.NewRedisTaskQueue()
+
+	// Initialize service
+	memoryService := service.NewMemoryService(memoryRepo, taskQueue)
+
+	// Initialize handler
+	memoryHandler := transport.NewMemoryHandler(memoryService)
+
+	// Setup router
 	gin.SetMode(gin.DebugMode)
 	router := gin.Default()
 
@@ -23,9 +46,13 @@ func main() {
 		c.JSON(200, gin.H{
 			"status":  "ok",
 			"service": "memory-service",
-			"version": "0.1.0",
+			"version": "0.2.0",
 		})
 	})
+
+	// API routes
+	v1 := router.Group("/api/v1")
+	memoryHandler.RegisterRoutes(v1)
 
 	log.Printf("Memory service starting on port %s", port)
 	if err := router.Run(":" + port); err != nil {

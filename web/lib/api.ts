@@ -33,6 +33,29 @@ export interface AuthResponse {
   token: TokenPair
 }
 
+export interface Memory {
+  id: string
+  user_id: string
+  content_type: 'text' | 'link'
+  text_content?: string
+  link_url?: string
+  link_title?: string
+  link_summary?: string
+  tags: string[]
+  note?: string
+  processing_status: 'pending' | 'processing' | 'completed' | 'failed'
+  visibility: 'private' | 'public'
+  created_at: string
+  updated_at: string
+}
+
+export interface ListMemoriesResponse {
+  memories: Memory[]
+  total: number
+  page: number
+  limit: number
+}
+
 class ApiClient {
   private baseURL: string
   private token: string | null = null
@@ -127,6 +150,38 @@ class ApiClient {
 
   async getMe(): Promise<ApiResponse<User>> {
     return this.request<User>('GET', '/api/v1/auth/me')
+  }
+
+  // Memory endpoints
+  async createMemory(data: {
+    content_type: 'text' | 'link'
+    text_content?: string
+    link_url?: string
+    tags?: string[]
+    note?: string
+  }): Promise<ApiResponse<Memory>> {
+    return this.request<Memory>('POST', '/api/v1/memories', data)
+  }
+
+  async listMemories(params?: { page?: number; limit?: number; tag?: string }): Promise<ApiResponse<ListMemoriesResponse>> {
+    const searchParams = new URLSearchParams()
+    if (params?.page) searchParams.set('page', String(params.page))
+    if (params?.limit) searchParams.set('limit', String(params.limit))
+    if (params?.tag) searchParams.set('tag', params.tag)
+    const query = searchParams.toString()
+    return this.request<ListMemoriesResponse>('GET', `/api/v1/memories${query ? '?' + query : ''}`)
+  }
+
+  async getMemory(id: string): Promise<ApiResponse<Memory>> {
+    return this.request<Memory>('GET', `/api/v1/memories/${id}`)
+  }
+
+  async updateMemory(id: string, data: { tags?: string[]; note?: string }): Promise<ApiResponse<Memory>> {
+    return this.request<Memory>('PUT', `/api/v1/memories/${id}`, data)
+  }
+
+  async deleteMemory(id: string): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('DELETE', `/api/v1/memories/${id}`)
   }
 }
 

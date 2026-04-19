@@ -4,7 +4,7 @@
 -- Description: Initial schema for users, memories, and supporting structures
 
 -- Enable pgvector extension for vector similarity search
-CREATE EXTENSION IF NOT EXISTS pgvector;
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (

@@ -7,7 +7,7 @@ version: "3.8"
 services:
   # PostgreSQL 15 with pgvector extension
   postgres:
-    image: ankane/pgvector:v0.5.1
+    image: pgvector/pgvector:pg15
     container_name: echoes-postgres
     restart: unless-stopped
     environment:
