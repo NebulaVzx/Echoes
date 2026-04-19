@@ -2,6 +2,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -194,6 +195,119 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 		}
 	}
 	return &resp, nil
+}
+
+// TestLLMConnection attempts to connect to the specified LLM provider with the given config.
+func (s *AuthService) TestLLMConnection(ctx context.Context, llm domain.LLMSettings) error {
+	provider := strings.ToLower(llm.Provider)
+	if provider == "" {
+		provider = "openai"
+	}
+
+	apiKey := llm.APIKey
+	if strings.Contains(apiKey, "***") {
+		// Masked key means "keep existing" — fetch user's actual key for test
+		// This should be handled by the caller (handler) providing the decrypted key
+		apiKey = ""
+	}
+
+	switch provider {
+	case "openai":
+		return testOpenAI(ctx, llm.Model, apiKey)
+	case "anthropic":
+		return testAnthropic(ctx, llm.Model, apiKey)
+	default:
+		return fmt.Errorf("unsupported provider: %s", provider)
+	}
+}
+
+func testOpenAI(ctx context.Context, model, apiKey string) error {
+	if apiKey == "" {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+	if apiKey == "" {
+		return errors.New("OpenAI API Key 未配置")
+	}
+	if model == "" {
+		model = "gpt-4o-mini"
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"model":       model,
+		"messages":    []map[string]string{{"role": "user", "content": "hi"}},
+		"max_tokens":  1,
+	})
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("连接 OpenAI 失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		if errResp.Error.Message != "" {
+			return fmt.Errorf("OpenAI 错误: %s", errResp.Error.Message)
+		}
+		return fmt.Errorf("OpenAI 返回 HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func testAnthropic(ctx context.Context, model, apiKey string) error {
+	if apiKey == "" {
+		apiKey = os.Getenv("ANTHROPIC_API_KEY")
+	}
+	if apiKey == "" {
+		return errors.New("Anthropic API Key 未配置")
+	}
+	if model == "" {
+		model = "claude-sonnet-4-20250514"
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"model":      model,
+		"max_tokens": 1,
+		"messages":   []map[string]string{{"role": "user", "content": "hi"}},
+	})
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("连接 Anthropic 失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		if errResp.Error.Message != "" {
+			return fmt.Errorf("Anthropic 错误: %s", errResp.Error.Message)
+		}
+		return fmt.Errorf("Anthropic 返回 HTTP %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // RefreshToken generates a new access token from a valid refresh token.

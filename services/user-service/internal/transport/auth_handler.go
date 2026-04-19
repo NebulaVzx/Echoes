@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,6 +72,7 @@ func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup) {
 	auth.GET("/me", h.GetMe)
 	auth.GET("/me/settings", h.GetSettings)
 	auth.PUT("/me/settings", h.UpdateSettings)
+	auth.POST("/me/settings/test", h.TestSettings)
 }
 
 // GetAuthProviders returns available authentication providers and their configuration status.
@@ -307,6 +309,44 @@ func (h *AuthHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": settings})
+}
+
+// TestSettings tests LLM connectivity with the provided configuration.
+func (h *AuthHandler) TestSettings(c *gin.Context) {
+	userIDStr, ok := getUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		return
+	}
+
+	userIDUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid user ID format"}})
+		return
+	}
+
+	var req domain.TestLLMRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		return
+	}
+
+	// If API key is masked, use the user's stored key for testing
+	if strings.Contains(req.LLM.APIKey, "***") {
+		stored, err := h.authService.GetUserSettings(c.Request.Context(), userIDUUID)
+		if err == nil && stored != nil && stored.APIKey != "" {
+			req.LLM.APIKey = stored.APIKey
+		} else {
+			req.LLM.APIKey = ""
+		}
+	}
+
+	if err := h.authService.TestLLMConnection(c.Request.Context(), req.LLM); err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "error": gin.H{"code": "LLM_CONNECTION_FAILED", "message": err.Error()}})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "连接成功"})
 }
 
 // AuthMiddleware validates JWT access tokens and injects userID into context.

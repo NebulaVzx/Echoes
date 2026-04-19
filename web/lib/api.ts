@@ -172,6 +172,10 @@ class ApiClient {
     return this.request<LLMSettings>('PUT', '/api/v1/auth/me/settings', settings)
   }
 
+  async testLLMConnection(settings: UpdateSettingsRequest): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('POST', '/api/v1/auth/me/settings/test', settings)
+  }
+
   // Memory endpoints
   async createMemory(data: {
     content_type: 'text' | 'link'

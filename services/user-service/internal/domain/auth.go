@@ -45,6 +45,11 @@ type UpdateSettingsRequest struct {
 	LLM LLMSettings `json:"llm" binding:"required"`
 }
 
+// TestLLMRequest represents a request to test LLM connectivity.
+type TestLLMRequest struct {
+	LLM LLMSettings `json:"llm" binding:"required"`
+}
+
 // GitHubOAuthState stores state for OAuth CSRF protection.
 type GitHubOAuthState struct {
 	State     string `json:"state"`

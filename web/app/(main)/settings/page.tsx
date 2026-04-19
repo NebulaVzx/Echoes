@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -31,12 +31,17 @@ export default function SettingsPage() {
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
 
+  // Test connection state
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
+  const [testError, setTestError] = useState('')
+
   const {
     register,
     handleSubmit,
     watch,
     setValue,
     reset,
+    getValues,
     formState: { errors },
   } = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
@@ -51,6 +56,9 @@ export default function SettingsPage() {
   })
 
   const selectedProvider = watch('llm.llm_provider')
+
+  // Track last tested values to detect changes
+  const lastTestedRef = useRef<SettingsFormData | null>(null)
 
   // Load existing settings
   useEffect(() => {
@@ -78,7 +86,54 @@ export default function SettingsPage() {
     }
   }, [selectedProvider, setValue, watch])
 
+  // Reset test status when form values change
+  useEffect(() => {
+    const subscription = watch((value) => {
+      if (lastTestedRef.current) {
+        const current = value.llm
+        const last = lastTestedRef.current.llm
+        if (
+          current?.llm_provider !== last.llm_provider ||
+          current?.llm_model !== last.llm_model ||
+          current?.llm_temperature !== last.llm_temperature ||
+          current?.api_key !== last.api_key
+        ) {
+          setTestStatus('idle')
+          setTestError('')
+        }
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [watch])
+
+  const handleTest = async () => {
+    const data = getValues()
+    setTestStatus('testing')
+    setTestError('')
+    setSaveSuccess(false)
+    setSaveError('')
+
+    try {
+      const response = await api.testLLMConnection(data)
+      if (response.success) {
+        setTestStatus('success')
+        lastTestedRef.current = data
+      } else {
+        setTestStatus('error')
+        setTestError(response.error?.message || '连接失败')
+      }
+    } catch (err) {
+      setTestStatus('error')
+      setTestError(err instanceof Error ? err.message : '连接失败')
+    }
+  }
+
   const onSubmit = async (data: SettingsFormData) => {
+    if (testStatus !== 'success') {
+      setSaveError('请先测试连接')
+      return
+    }
+
     setIsSaving(true)
     setSaveError('')
     setSaveSuccess(false)
@@ -88,6 +143,8 @@ export default function SettingsPage() {
         setSaveSuccess(true)
         if (response.data) {
           reset({ llm: response.data })
+          lastTestedRef.current = null
+          setTestStatus('idle')
         }
       } else {
         setSaveError(response.error?.message || '保存失败')
@@ -124,6 +181,18 @@ export default function SettingsPage() {
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-50 mb-6">
           LLM 设置
         </h1>
+
+        {/* Test connection status */}
+        {testStatus === 'success' && (
+          <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md text-green-600 dark:text-green-400 text-sm">
+            连接成功，可以保存设置
+          </div>
+        )}
+        {testStatus === 'error' && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-600 dark:text-red-400 text-sm">
+            {testError}
+          </div>
+        )}
 
         {saveSuccess && (
           <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md text-green-600 dark:text-green-400 text-sm">
@@ -219,8 +288,16 @@ export default function SettingsPage() {
 
           <div className="pt-4 flex items-center gap-4">
             <button
+              type="button"
+              onClick={handleTest}
+              disabled={testStatus === 'testing'}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {testStatus === 'testing' ? '测试中...' : '测试连接'}
+            </button>
+            <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || testStatus !== 'success'}
               className="px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-md text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? '保存中...' : '保存设置'}
