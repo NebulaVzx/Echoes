@@ -39,11 +39,13 @@ type: state
 
 ## 待办事项（下一步）
 
-### Sprint 3：AI 处理层（即将开始）
+### Sprint 3：AI 处理层（讨论完成，待规划）
+- [x] Phase 3 上下文讨论完成（见 `03-CONTEXT.md`）
 - [ ] LLM Provider 抽象层（OpenAI / Anthropic）
-- [ ] Processor Service：Redis 消费者 + 链接抓取 + 标签生成
+- [ ] Processor Service：Redis Consumer Group + 链接抓取 + 标签生成
 - [ ] Vectorizer Service：BGE-M3 模型 + 向量生成
-- [ ] 状态流转管理 + 重试机制
+- [ ] 状态流转管理 + 子任务级重试
+- [ ] 修复 Critical 安全问题（C1-C5）
 
 ### 技术债务（Sprint 3 前需处理）
 - [ ] 移除硬编码 JWT Secret（安全）
