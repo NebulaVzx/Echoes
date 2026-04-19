@@ -1,16 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none"
-  stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  stroke="#374151" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <style>
+    @media (prefers-color-scheme: dark) {
+      :root { stroke: #d1d5db; }
+      path, circle, polygon { stroke: #d1d5db; }
+      circle, polygon { fill: #d1d5db; }
+    }
+    @media (prefers-color-scheme: light) {
+      :root { stroke: #374151; }
+      path, circle, polygon { stroke: #374151; }
+      circle, polygon { fill: #374151; }
+    }
+  </style>
 
-  <!-- 外层弧线 -->
+  <!-- Outer echo ripple -->
   <path d="M 5 16 A 11 11 0 1 1 23 23" opacity="0.4" />
 
-  <!-- 内层弧线 -->
+  <!-- Inner echo ripple -->
   <path d="M 10 16 A 6 6 0 1 1 19 19" opacity="0.8" />
 
-  <!-- 中心圆点 -->
-  <circle cx="16" cy="16" r="2.5" fill="currentColor" stroke="none" />
+  <!-- Center dot: memory core -->
+  <circle cx="16" cy="16" r="2.5" fill="#374151" stroke="none" />
 
-  <!-- 记忆碎片 -->
-  <polygon points="25,5 28,8 26,11 23,8" fill="currentColor" stroke="none" opacity="0.85" />
+  <!-- Picked-up memory fragment -->
+  <polygon points="25,5 28,8 26,11 23,8" fill="#374151" stroke="none" opacity="0.85" />
 
 </svg>

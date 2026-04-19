@@ -86,6 +86,7 @@ func isPublicRoute(path string) bool {
 	publicPaths := []string{
 		"/api/v1/auth/register",
 		"/api/v1/auth/login",
+		"/api/v1/auth/providers",
 		"/api/v1/auth/github",
 		"/api/v1/auth/github/callback",
 		"/api/v1/auth/refresh",

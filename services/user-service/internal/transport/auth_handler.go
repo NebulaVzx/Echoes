@@ -61,6 +61,7 @@ func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/login", h.Login)
 	router.POST("/refresh", h.RefreshToken)
 	router.POST("/logout", h.Logout)
+	router.GET("/providers", h.GetAuthProviders)
 	router.GET("/github", h.GitHubOAuth)
 	router.GET("/github/callback", h.GitHubCallback)
 
@@ -68,6 +69,21 @@ func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup) {
 	auth := router.Group("")
 	auth.Use(h.AuthMiddleware())
 	auth.GET("/me", h.GetMe)
+}
+
+// GetAuthProviders returns available authentication providers and their configuration status.
+func (h *AuthHandler) GetAuthProviders(c *gin.Context) {
+	_, err := h.authService.GetGitHubAuthURL("test")
+	githubAvailable := err == nil
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"providers": gin.H{
+				"email":    true,
+				"github":   githubAvailable,
+			},
+		},
+	})
 }
 
 // Register handles user registration.
@@ -146,14 +162,12 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 // GitHubOAuth initiates GitHub OAuth flow.
 func (h *AuthHandler) GitHubOAuth(c *gin.Context) {
-	clientID := c.GetHeader("X-GitHub-Client-ID")
-	if clientID == "" {
-		clientID = ""
-	}
-	_ = clientID // reserved for frontend override
-
 	state := generateState()
-	authURL := h.authService.GetGitHubAuthURL(state)
+	authURL, err := h.authService.GetGitHubAuthURL(state)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": gin.H{"code": "OAUTH_NOT_CONFIGURED", "message": "GitHub OAuth 未配置，请在环境变量中设置 GITHUB_CLIENT_ID 和 GITHUB_CLIENT_SECRET"}})
+		return
+	}
 	c.Redirect(http.StatusFound, authURL)
 }
 

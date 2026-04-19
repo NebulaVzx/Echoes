@@ -94,11 +94,41 @@
 
 **响应：** 同注册响应
 
+### GET /auth/providers
+获取可用认证方式
+
+**响应：**
+```json
+{
+  "success": true,
+  "data": {
+    "providers": {
+      "email": true,
+      "github": true
+    }
+  }
+}
+```
+
+- `github`: 当 `GITHUB_CLIENT_ID` 环境变量已配置时为 `true`，否则为 `false`
+- 前端据此决定是否显示/禁用 GitHub 登录按钮
+
 ### GET /auth/github
 GitHub OAuth 入口
 
 - 重定向到 GitHub 授权页面
 - 参数：`client_id`, `redirect_uri`, `scope`, `state`
+
+**未配置时的响应（503）：**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "OAUTH_NOT_CONFIGURED",
+    "message": "GitHub OAuth 未配置，请在环境变量中设置 GITHUB_CLIENT_ID 和 GITHUB_CLIENT_SECRET"
+  }
+}
+```
 
 ### GET /auth/github/callback
 GitHub OAuth 回调
@@ -411,6 +441,7 @@ GitHub OAuth 回调
 | `INVALID_CREDENTIALS` | 用户名或密码错误 | 401 |
 | `RATE_LIMITED` | 请求过于频繁 | 429 |
 | `OAUTH_ERROR` | OAuth 授权失败（GitHub 返回错误） | 500 |
+| `OAUTH_NOT_CONFIGURED` | GitHub OAuth 未配置（缺少环境变量） | 503 |
 | `INVALID_STATE` | OAuth state 参数无效或过期 | 400 |
 | `INTERNAL_ERROR` | 服务器内部错误 | 500 |
 | `SERVICE_UNAVAILABLE` | 服务暂时不可用 | 503 |

@@ -214,9 +214,15 @@ func (s *AuthService) parseToken(tokenString string) (*tokenClaims, error) {
 
 // GitHub OAuth helpers
 
+// ErrOAuthNotConfigured is returned when GitHub OAuth environment variables are not set.
+var ErrOAuthNotConfigured = fmt.Errorf("GitHub OAuth not configured: GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be set")
+
 // GetGitHubAuthURL generates the GitHub OAuth authorization URL.
-func (s *AuthService) GetGitHubAuthURL(state string) string {
+func (s *AuthService) GetGitHubAuthURL(state string) (string, error) {
 	clientID := os.Getenv("GITHUB_CLIENT_ID")
+	if clientID == "" {
+		return "", ErrOAuthNotConfigured
+	}
 	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
 	if redirectURI == "" {
 		redirectURI = "http://localhost:8088/api/v1/auth/github/callback"
@@ -224,7 +230,7 @@ func (s *AuthService) GetGitHubAuthURL(state string) string {
 	return fmt.Sprintf(
 		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=user:email&state=%s",
 		clientID, redirectURI, state,
-	)
+	), nil
 }
 
 // GitHubUserInfo holds the user data from GitHub API.
