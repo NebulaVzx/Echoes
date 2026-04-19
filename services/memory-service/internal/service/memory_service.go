@@ -5,6 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
+	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
@@ -16,7 +19,52 @@ import (
 var (
 	ErrMemoryNotFound = errors.New("memory not found")
 	ErrUnauthorized   = errors.New("unauthorized access to memory")
+	ErrInvalidURL     = errors.New("invalid URL: must be http or https")
 )
+
+// dangerousHTMLTags matches potentially harmful HTML tags.
+var dangerousHTMLTags = regexp.MustCompile(`(?i)<(script|iframe|object|embed|form|input|style)[\s\S]*?>|</(script|iframe|object|embed|form|input|style)>`)
+
+// sanitizeText removes dangerous HTML tags and escapes remaining HTML.
+func sanitizeText(input string) string {
+	// Remove dangerous tags
+	cleaned := dangerousHTMLTags.ReplaceAllString(input, "")
+	// Escape any remaining HTML to prevent rendering
+	return html.EscapeString(cleaned)
+}
+
+// sanitizeTags cleans each tag string.
+func sanitizeTags(tags []string) []string {
+	cleaned := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		t := strings.TrimSpace(tag)
+		if t == "" {
+			continue
+		}
+		// Remove HTML from tags
+		t = dangerousHTMLTags.ReplaceAllString(t, "")
+		t = html.EscapeString(t)
+		if t != "" {
+			cleaned = append(cleaned, t)
+		}
+	}
+	return cleaned
+}
+
+// validateLinkURL ensures the URL is valid and uses http/https scheme.
+func validateLinkURL(rawURL string) error {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidURL, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("%w: scheme must be http or https, got %s", ErrInvalidURL, u.Scheme)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("%w: missing host", ErrInvalidURL)
+	}
+	return nil
+}
 
 // MemoryService handles memory CRUD business logic.
 type MemoryService struct {
@@ -48,15 +96,26 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 	if req.ContentType == "link" && strings.TrimSpace(req.LinkURL) == "" {
 		return nil, errors.New("link URL is required for link memories")
 	}
+	// Validate and sanitize link URL
+	if req.ContentType == "link" {
+		if err := validateLinkURL(req.LinkURL); err != nil {
+			return nil, err
+		}
+	}
+
+	// Sanitize user inputs
+	textContent := sanitizeText(req.TextContent)
+	note := sanitizeText(req.Note)
+	tags := sanitizeTags(req.Tags)
 
 	memory := &domain.Memory{
-		ID:          uuid.New(),
-		UserID:      userID,
-		ContentType: req.ContentType,
-		TextContent: req.TextContent,
-		LinkURL:     req.LinkURL,
-		Tags:        pq.StringArray(req.Tags),
-		Note:        req.Note,
+		ID:               uuid.New(),
+		UserID:           userID,
+		ContentType:      req.ContentType,
+		TextContent:      textContent,
+		LinkURL:          req.LinkURL,
+		Tags:             pq.StringArray(tags),
+		Note:             note,
 		ProcessingStatus: "pending",
 		Visibility:       "private",
 	}
@@ -148,8 +207,9 @@ func (s *MemoryService) Update(ctx context.Context, memoryID, userID uuid.UUID, 
 		return nil, err
 	}
 
-	memory.Tags = pq.StringArray(req.Tags)
-	memory.Note = req.Note
+	// Sanitize user inputs
+	memory.Tags = pq.StringArray(sanitizeTags(req.Tags))
+	memory.Note = sanitizeText(req.Note)
 
 	if err := s.repo.Update(ctx, memory); err != nil {
 		return nil, fmt.Errorf("failed to update memory: %w", err)

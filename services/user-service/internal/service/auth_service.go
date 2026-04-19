@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -35,7 +36,7 @@ type AuthService struct {
 func NewAuthService(repo repository.UserRepository) *AuthService {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		secret = "echoes_dev_secret_key_change_in_production"
+		log.Fatal("JWT_SECRET environment variable is required but not set")
 	}
 	return &AuthService{
 		repo:      repo,

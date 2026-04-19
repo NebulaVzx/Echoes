@@ -3,6 +3,7 @@ package middleware
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -16,7 +17,7 @@ var jwtSecret []byte
 func init() {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		secret = "echoes_dev_secret_key_change_in_production"
+		log.Fatal("JWT_SECRET environment variable is required but not set")
 	}
 	jwtSecret = []byte(secret)
 }
@@ -93,7 +94,8 @@ func isPublicRoute(path string) bool {
 		"/health",
 	}
 	for _, p := range publicPaths {
-		if strings.HasPrefix(path, p) {
+		// Exact match or exact prefix with trailing slash to prevent bypass
+		if path == p || strings.HasPrefix(path, p+"/") {
 			return true
 		}
 	}
