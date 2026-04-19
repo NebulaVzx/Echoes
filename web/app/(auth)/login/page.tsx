@@ -17,9 +17,16 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, isAuthenticated } = useAuth()
   const [serverError, setServerError] = useState('')
   const [githubAvailable, setGithubAvailable] = useState(true)
+
+  // Redirect to home if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      window.location.href = '/'
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
     fetch(`${API_BASE}/api/v1/auth/providers`)

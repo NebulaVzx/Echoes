@@ -223,17 +223,26 @@ func (h *AuthHandler) GitHubCallback(c *gin.Context) {
 </html>`)
 }
 
+// getUserID extracts user ID from Gin context (direct calls) or X-User-ID header (Gateway proxy).
+func getUserID(c *gin.Context) (string, bool) {
+	// 1. Try Gin context (direct calls with AuthMiddleware)
+	if userID, exists := c.Get("userID"); exists {
+		if str, ok := userID.(string); ok && str != "" {
+			return str, true
+		}
+	}
+	// 2. Fallback to X-User-ID header (calls routed through Gateway)
+	if userID := c.GetHeader("X-User-ID"); userID != "" {
+		return userID, true
+	}
+	return "", false
+}
+
 // GetMe returns the current authenticated user.
 func (h *AuthHandler) GetMe(c *gin.Context) {
-	userID, exists := c.Get("userID")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
-		return
-	}
-
-	userIDStr, ok := userID.(string)
+	userIDStr, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid user ID"}})
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
 		return
 	}
 

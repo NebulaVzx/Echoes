@@ -34,3 +34,6 @@ services/*/.env
 ### OS
 .DS_Storeservices/user-service/user-service-test
 web/package-lock.json
+
+### env
+.env
