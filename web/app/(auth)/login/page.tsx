@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { api } from '@/lib/api'
+import { api, API_BASE } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
 
 const loginSchema = z.object({
@@ -120,7 +120,7 @@ export default function LoginPage() {
             </div>
 
             <a
-              href="http://localhost:8088/api/v1/auth/github"
+              href={`${API_BASE}/api/v1/auth/github`}
               className="flex w-full items-center justify-center gap-2 py-2.5 bg-gray-800 dark:bg-gray-700 text-white rounded-md font-medium hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">

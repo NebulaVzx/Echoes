@@ -611,15 +611,15 @@ kubectl apply -f k8s/
 **前端（Next.js）：**
 - [x] 登录页面（`app/(auth)/login/page.tsx`）
 - [x] 注册页面（`app/(auth)/register/page.tsx`）
-- [ ] 表单验证（Zod / React Hook Form）
+- [x] 表单验证（Zod / React Hook Form）
 - [x] API 客户端封装（fetch wrapper + token 自动注入）
-- [ ] 登录状态管理（React Context / Zustand）
+- [x] 登录状态管理（React Context / Zustand）
 - [x] 路由保护（middleware.ts 未认证重定向至登录页）
 
 **文档：**
-- [ ] 更新 docs/API.md（认证接口详细定义）
-- [ ] 更新 docs/PROGRESS.md（Sprint 1 完成标记）
-- [ ] 更新 CHANGELOG.md（v0.2.0）
+- [x] 更新 docs/API.md（认证接口详细定义：错误码表补充 OAUTH_ERROR/INVALID_STATE、GitHub OAuth 回调响应、健康检查版本 0.2.0）
+- [x] 更新 docs/PROGRESS.md（Sprint 1 完成标记）
+- [x] 更新 CHANGELOG.md（v0.2.0）
 
 **里程碑验证：**
 - [x] 用户可通过邮箱注册、登录

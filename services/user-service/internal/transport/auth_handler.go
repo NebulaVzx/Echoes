@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -167,10 +168,13 @@ func (h *AuthHandler) GitHubCallback(c *gin.Context) {
 	}
 
 	if !validateState(state) {
-		// In development, some clients may bypass state validation; log but continue
-		// For production, uncomment the following:
-		// c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "INVALID_STATE", "message": "Invalid or expired state"}})
-		// return
+		// Strict state validation in production; relaxed in development for testing
+		if os.Getenv("ENV") == "production" {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "INVALID_STATE", "message": "Invalid or expired state"}})
+			return
+		}
+		// In development, log but continue
+		fmt.Printf("[WARN] Invalid or expired OAuth state in development: %s\n", state)
 	}
 
 	resp, err := h.authService.HandleGitHubCallback(c.Request.Context(), code)

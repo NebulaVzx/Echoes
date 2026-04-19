@@ -1,6 +1,6 @@
 // Echoes API client - centralized HTTP client for backend communication
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8088'
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8088'
 
 export interface ApiResponse<T> {
   success: boolean

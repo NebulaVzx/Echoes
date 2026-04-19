@@ -308,7 +308,7 @@ func (s *AuthService) HandleGitHubCallback(ctx context.Context, code string) (*d
 		return nil, err
 	}
 
-	// 4. Create user if not exists
+	// 4. Create user if not exists (or link to existing user with same email)
 	if user == nil {
 		email := githubUser.Email
 		if email == "" {
@@ -329,7 +329,25 @@ func (s *AuthService) HandleGitHubCallback(ctx context.Context, code string) (*d
 			IsActive:      true,
 		}
 		if err := s.repo.Create(ctx, user); err != nil {
-			return nil, fmt.Errorf("failed to create oauth user: %w", err)
+			if errors.Is(err, repository.ErrEmailExists) {
+				// Try to find and link existing user with the same email
+				existingUser, getErr := s.repo.GetByEmail(ctx, email)
+				if getErr == nil && existingUser != nil {
+					existingUser.OAuthProvider = "github"
+					existingUser.OAuthID = oauthID
+					if existingUser.AvatarURL == "" {
+						existingUser.AvatarURL = githubUser.AvatarURL
+					}
+					if err := s.repo.Update(ctx, existingUser); err != nil {
+						return nil, fmt.Errorf("failed to link oauth to existing user: %w", err)
+					}
+					user = existingUser
+				} else {
+					return nil, fmt.Errorf("failed to create oauth user: %w", err)
+				}
+			} else {
+				return nil, fmt.Errorf("failed to create oauth user: %w", err)
+			}
 		}
 	}
 

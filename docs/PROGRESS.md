@@ -93,8 +93,8 @@
 - [x] 前端 - 登录页面
 - [x] 前端 - 注册页面
 - [x] 前端 - 路由保护（middleware.ts 未认证重定向至 /login）
-- [ ] 前端 - 表单验证（Zod，目前仅 HTML5 验证）
-- [ ] 前端 - 登录状态管理（React Context / Zustand）
+- [x] 前端 - 表单验证（Zod + React Hook Form）
+- [x] 前端 - 登录状态管理（React Context）
 
 ### Day 1 (2026-04-19)
 
@@ -132,7 +132,7 @@
 - [x] Zod 表单验证（替代 HTML5 验证）
 - [x] React Context 登录状态管理（全局 auth state）
 - [x] Logout 按钮（首页显示当前用户 + 登出功能）
-- [ ] 文档同步：PRD.md / PROGRESS.md / CHANGELOG.md / API.md
+- [x] 文档同步：PRD.md / PROGRESS.md / CHANGELOG.md / API.md
 
 ## Sprint 2：记忆捕获 (Week 3: 2026-05-03 ~ 2026-05-09)
 

@@ -107,7 +107,31 @@ GitHub OAuth 回调
 - `code`: GitHub 授权码
 - `state`: CSRF 防护状态码
 
-**响应：** 同注册响应
+**响应：**
+- **浏览器端**：返回 HTML 页面，自动设置 `localStorage` token 并跳转至前端首页
+- **API 调用**：同注册响应（JSON 格式，含 `user` + `token`）
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "uuid",
+      "email": "user@example.com",
+      "username": "username",
+      "avatar_url": "https://...",
+      "oauth_provider": "github",
+      "is_active": true,
+      "created_at": "2026-04-18T12:00:00Z"
+    },
+    "token": {
+      "access_token": "jwt_token",
+      "refresh_token": "refresh_token",
+      "expires_in": 900
+    }
+  }
+}
+```
 
 ### POST /auth/refresh
 刷新 Token
@@ -370,7 +394,7 @@ GitHub OAuth 回调
 {
   "status": "ok",
   "service": "gateway",
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
 ```
 
@@ -386,5 +410,7 @@ GitHub OAuth 回调
 | `USER_EXISTS` | 用户已存在 | 409 |
 | `INVALID_CREDENTIALS` | 用户名或密码错误 | 401 |
 | `RATE_LIMITED` | 请求过于频繁 | 429 |
+| `OAUTH_ERROR` | OAuth 授权失败（GitHub 返回错误） | 500 |
+| `INVALID_STATE` | OAuth state 参数无效或过期 | 400 |
 | `INTERNAL_ERROR` | 服务器内部错误 | 500 |
 | `SERVICE_UNAVAILABLE` | 服务暂时不可用 | 503 |
