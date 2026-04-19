@@ -12,11 +12,33 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// corsMiddleware handles CORS for cross-origin requests from the frontend.
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		origin := c.Request.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	}
+}
+
 // Setup configures all routes and returns the Gin engine.
 func Setup() *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
+	router.Use(corsMiddleware())
 
 	// Health check
 	router.GET("/health", func(c *gin.Context) {
