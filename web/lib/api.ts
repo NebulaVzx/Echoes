@@ -45,8 +45,14 @@ class ApiClient {
     this.token = token
     if (token) {
       localStorage.setItem('echoes_token', token)
+      // Also set cookie for Next.js middleware (15 min expiry)
+      document.cookie = `echoes_token=${encodeURIComponent(token)}; path=/; max-age=900; SameSite=Lax`
     } else {
       localStorage.removeItem('echoes_token')
+      localStorage.removeItem('echoes_refresh_token')
+      // Clear cookies
+      document.cookie = 'echoes_token=; path=/; max-age=0'
+      document.cookie = 'echoes_refresh_token=; path=/; max-age=0'
     }
   }
 

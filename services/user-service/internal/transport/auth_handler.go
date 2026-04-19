@@ -197,7 +197,7 @@ func (h *AuthHandler) GitHubCallback(c *gin.Context) {
 		return
 	}
 
-	// Return an HTML page that sets the token in localStorage and redirects to frontend
+	// Return an HTML page that sets the token in localStorage + cookie, then redirects to frontend
 	frontendURL := "http://localhost:3000"
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	c.String(http.StatusOK, `<!DOCTYPE html>
@@ -205,9 +205,18 @@ func (h *AuthHandler) GitHubCallback(c *gin.Context) {
 <head><title>Login Success</title></head>
 <body>
 <script>
-localStorage.setItem('echoes_token', '`+resp.Token.AccessToken+`');
-localStorage.setItem('echoes_refresh_token', '`+resp.Token.RefreshToken+`');
-window.location.href = '`+frontendURL+`';
+(function() {
+  var token = '`+resp.Token.AccessToken+`';
+  var refreshToken = '`+resp.Token.RefreshToken+`';
+  // Client-side storage for API client
+  localStorage.setItem('echoes_token', token);
+  localStorage.setItem('echoes_refresh_token', refreshToken);
+  // Cookie for Next.js middleware (15 min expiry matching access token)
+  var maxAge = 900;
+  document.cookie = 'echoes_token=' + encodeURIComponent(token) + '; path=/; max-age=' + maxAge + '; SameSite=Lax';
+  document.cookie = 'echoes_refresh_token=' + encodeURIComponent(refreshToken) + '; path=/; max-age=604800; SameSite=Lax';
+  window.location.href = '`+frontendURL+`';
+})();
 </script>
 <p>登录成功，正在跳转...</p>
 </body>
