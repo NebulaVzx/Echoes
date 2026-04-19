@@ -70,23 +70,25 @@ func validateLinkURL(rawURL string) error {
 
 // MemoryService handles memory CRUD business logic.
 type MemoryService struct {
-	repo  repository.MemoryRepository
-	queue TaskQueue
+	repo     repository.MemoryRepository
+	userRepo repository.UserRepository
+	queue    TaskQueue
 }
 
 // TaskQueue defines the interface for publishing async tasks.
 type TaskQueue interface {
-	PublishLinkFetch(memoryID uuid.UUID, linkURL string) error
-	PublishTextVectorize(memoryID uuid.UUID, content string) error
-	PublishTagGenerate(memoryID uuid.UUID, content string) error
+	PublishLinkFetch(memoryID uuid.UUID, linkURL string, llmConfig map[string]interface{}) error
+	PublishTextVectorize(memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
+	PublishTagGenerate(memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
 // NewMemoryService creates a new memory service.
-func NewMemoryService(repo repository.MemoryRepository, queue TaskQueue) *MemoryService {
+func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue) *MemoryService {
 	return &MemoryService{
-		repo:  repo,
-		queue: queue,
+		repo:     repo,
+		userRepo: userRepo,
+		queue:    queue,
 	}
 }
 
@@ -127,24 +129,61 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 		return nil, fmt.Errorf("failed to create memory: %w", err)
 	}
 
-	// Publish async tasks
-	s.publishTasks(memory)
+	// Fetch user LLM settings and publish async tasks
+	llmConfig, _ := s.getUserLLMConfig(ctx, userID)
+	s.publishTasks(memory, llmConfig)
 
 	return memory, nil
 }
 
+// getUserLLMConfig fetches user settings and extracts LLM config as a flat map.
+func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if len(user.Settings) == 0 || string(user.Settings) == "{}" || string(user.Settings) == "null" {
+		return nil, nil
+	}
+
+	var settings struct {
+		LLMProvider    string  `json:"llm_provider"`
+		LLMModel       string  `json:"llm_model"`
+		LLMTemperature float64 `json:"llm_temperature"`
+		APIKey         string  `json:"api_key"`
+	}
+	if err := json.Unmarshal(user.Settings, &settings); err != nil {
+		return nil, err
+	}
+
+	config := make(map[string]interface{})
+	if settings.LLMProvider != "" {
+		config["llm_provider"] = settings.LLMProvider
+	}
+	if settings.LLMModel != "" {
+		config["llm_model"] = settings.LLMModel
+	}
+	if settings.LLMTemperature != 0 {
+		config["llm_temperature"] = settings.LLMTemperature
+	}
+	if settings.APIKey != "" {
+		config["api_key"] = settings.APIKey
+	}
+	return config, nil
+}
+
 // publishTasks publishes async processing tasks based on memory type.
-func (s *MemoryService) publishTasks(memory *domain.Memory) {
+func (s *MemoryService) publishTasks(memory *domain.Memory, llmConfig map[string]interface{}) {
 	// For link memories, publish link fetch task
 	if memory.ContentType == "link" && memory.LinkURL != "" {
-		_ = s.queue.PublishLinkFetch(memory.ID, memory.LinkURL)
+		_ = s.queue.PublishLinkFetch(memory.ID, memory.LinkURL, llmConfig)
 	}
 
 	// For all memories, publish text vectorization
 	content := s.extractContent(memory)
 	if content != "" {
-		_ = s.queue.PublishTextVectorize(memory.ID, content)
-		_ = s.queue.PublishTagGenerate(memory.ID, content)
+		_ = s.queue.PublishTextVectorize(memory.ID, content, llmConfig)
+		_ = s.queue.PublishTagGenerate(memory.ID, content, llmConfig)
 	}
 }
 
@@ -359,9 +398,16 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 		return fmt.Errorf("invalid task_type: %s", taskType)
 	}
 
+	// Fetch user LLM settings for retry
+	llmConfig, _ := s.getUserLLMConfig(ctx, memory.UserID)
+
 	// Build publish data based on task type and memory content
 	data := map[string]interface{}{
 		"memory_id": memory.ID.String(),
+	}
+	// Merge LLM config into publish data
+	for k, v := range llmConfig {
+		data[k] = v
 	}
 	switch taskType {
 	case "link:fetch":

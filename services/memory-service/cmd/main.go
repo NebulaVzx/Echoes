@@ -25,14 +25,15 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	// Initialize repository
+	// Initialize repositories
 	memoryRepo := repository.NewGormMemoryRepository(db)
+	userRepo := repository.NewGormUserRepository(db)
 
 	// Initialize Redis task queue
 	taskQueue := service.NewRedisTaskQueue()
 
 	// Initialize service
-	memoryService := service.NewMemoryService(memoryRepo, taskQueue)
+	memoryService := service.NewMemoryService(memoryRepo, userRepo, taskQueue)
 
 	// Initialize handler
 	memoryHandler := transport.NewMemoryHandler(memoryService)

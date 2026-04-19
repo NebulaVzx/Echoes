@@ -30,8 +30,8 @@ func NewDatabase() (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to create vector extension: %w", err)
 	}
 
-	// Auto-migrate the memories table
-	if err := db.AutoMigrate(&domain.Memory{}); err != nil {
+	// Auto-migrate the memories and users tables
+	if err := db.AutoMigrate(&domain.Memory{}, &domain.User{}); err != nil {
 		return nil, fmt.Errorf("failed to auto-migrate: %w", err)
 	}
 
