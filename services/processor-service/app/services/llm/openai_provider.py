@@ -6,18 +6,19 @@ from .base import LLMProvider
 
 
 class OpenAIProvider(LLMProvider):
-    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None):
+    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None, temperature: float = 0.7):
+        super().__init__(model=model, temperature=temperature)
         self.client = AsyncOpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
-        self.model = model
 
-    async def generate(self, prompt: str, temperature: float = 0.7, max_tokens: int = 500) -> str:
+    async def generate(self, prompt: str, temperature: float = None, max_tokens: int = 500) -> str:
+        temp = temperature if temperature is not None else self.temperature
         for attempt in range(3):
             try:
                 resp = await asyncio.wait_for(
                     self.client.chat.completions.create(
                         model=self.model,
                         messages=[{"role": "user", "content": prompt}],
-                        temperature=temperature,
+                        temperature=temp,
                         max_tokens=max_tokens,
                     ),
                     timeout=30.0,

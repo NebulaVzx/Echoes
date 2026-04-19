@@ -3,6 +3,20 @@ from app.consumers.base import RedisStreamConsumer
 from app.clients.memory_client import MemoryServiceClient
 from app.services.llm.factory import LLMFactory
 from app.config import settings
+from app.crypto import decrypt
+
+
+def _create_llm(fields: dict):
+    """Create LLM provider with per-message overrides, decrypting API key if present."""
+    provider = fields.get("llm_provider") or settings.llm_provider
+    model = fields.get("llm_model") or settings.llm_model
+    temp_raw = fields.get("llm_temperature")
+    temperature = float(temp_raw) if temp_raw is not None else settings.llm_temperature
+    api_key = None
+    encrypted_key = fields.get("api_key")
+    if encrypted_key:
+        api_key = decrypt(encrypted_key)
+    return LLMFactory.create(provider=provider, model=model, temperature=temperature, api_key=api_key)
 
 
 class TagConsumer(RedisStreamConsumer):
@@ -15,7 +29,6 @@ class TagConsumer(RedisStreamConsumer):
             memory_client=memory_client,
             max_retries=3,
         )
-        self.llm = LLMFactory.create(settings.llm_provider, settings.llm_model)
 
     async def process_message(self, msg_id: str, fields: dict):
         memory_id = fields.get("memory_id", "")
@@ -23,7 +36,8 @@ class TagConsumer(RedisStreamConsumer):
         if not content:
             raise ValueError("content is required")
 
-        tags = await self.llm.generate_tags(content)
+        llm = _create_llm(fields)
+        tags = await llm.generate_tags(content)
         if not tags:
             raise ValueError("LLM returned no tags")
 

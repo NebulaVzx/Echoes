@@ -7,18 +7,19 @@ from .base import LLMProvider
 
 
 class AnthropicProvider(LLMProvider):
-    def __init__(self, model: str = "claude-sonnet-4-20250514", api_key: str = None):
+    def __init__(self, model: str = "claude-sonnet-4-20250514", api_key: str = None, temperature: float = 0.7):
+        super().__init__(model=model, temperature=temperature)
         self.client = AsyncAnthropic(api_key=api_key or os.getenv("ANTHROPIC_API_KEY"))
-        self.model = model
 
-    async def generate(self, prompt: str, temperature: float = 0.7, max_tokens: int = 500) -> str:
+    async def generate(self, prompt: str, temperature: float = None, max_tokens: int = 500) -> str:
+        temp = temperature if temperature is not None else self.temperature
         for attempt in range(3):
             try:
                 resp = await asyncio.wait_for(
                     self.client.messages.create(
                         model=self.model,
                         max_tokens=max_tokens,
-                        temperature=temperature,
+                        temperature=temp,
                         messages=[{"role": "user", "content": prompt}],
                     ),
                     timeout=30.0,

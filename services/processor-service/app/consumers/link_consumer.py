@@ -4,6 +4,29 @@ from app.clients.memory_client import MemoryServiceClient
 from app.services.scraper import LinkScraper
 from app.services.llm.factory import LLMFactory
 from app.config import settings
+from app.crypto import decrypt
+
+
+def _create_llm(fields: dict):
+    """Create LLM provider with per-message overrides, decrypting API key if present."""
+    provider = fields.get("llm_provider") or settings.llm_provider
+    model = fields.get("llm_model") or settings.llm_model
+    temp_raw = fields.get("llm_temperature")
+    temperature = float(temp_raw) if temp_raw is not None else settings.llm_temperature
+    api_key = None
+    encrypted_key = fields.get("api_key")
+    if encrypted_key:
+        api_key = decrypt(encrypted_key)
+    return LLMFactory.create(provider=provider, model=model, temperature=temperature, api_key=api_key)
+
+
+def _extract_llm_fields(fields: dict) -> dict:
+    """Extract LLM config fields from message for propagation to derived tasks."""
+    result = {}
+    for key in ["llm_provider", "llm_model", "llm_temperature", "api_key"]:
+        if key in fields:
+            result[key] = fields[key]
+    return result
 
 
 class LinkConsumer(RedisStreamConsumer):
@@ -17,8 +40,7 @@ class LinkConsumer(RedisStreamConsumer):
             max_retries=3,
         )
         self.scraper = LinkScraper()
-        self.llm = LLMFactory.create(settings.llm_provider, settings.llm_model)
-        self._redis = redis_client  # Keep reference for publishing derived tasks
+        self._redis = redis_client
 
     async def process_message(self, msg_id: str, fields: dict):
         memory_id = fields.get("memory_id", "")
@@ -31,7 +53,8 @@ class LinkConsumer(RedisStreamConsumer):
         title = scraped.get("title", "")
         content = scraped.get("content", "")
 
-        # Generate summary via LLM
+        # Generate summary via LLM with per-user config
+        llm = _create_llm(fields)
         summary = ""
         if content:
             prompt = f"""Summarize the following web page content in 2-3 concise Chinese sentences.
@@ -39,7 +62,7 @@ Focus on the main points. Keep it under 200 characters.
 
 Title: {title}
 Content: {content[:4000]}"""
-            summary = await self.llm.generate(prompt, temperature=0.5, max_tokens=200)
+            summary = await llm.generate(prompt, temperature=0.5, max_tokens=200)
 
         # Report link:fetch completion
         result = {
@@ -51,16 +74,15 @@ Content: {content[:4000]}"""
         )
 
         # Publish derived text:vectorize task with scraped content
-        # Per RESEARCH.md Q3: link memories need vectorization with meaningful content
         vectorize_content = f"{title}\n{summary}".strip()
         if vectorize_content:
-            await self._redis.xadd(
-                "text:vectorize",
-                {
-                    "memory_id": memory_id,
-                    "content": vectorize_content,
-                }
-            )
+            vectorize_fields = {
+                "memory_id": memory_id,
+                "content": vectorize_content,
+            }
+            # Propagate LLM config to derived task
+            vectorize_fields.update(_extract_llm_fields(fields))
+            await self._redis.xadd("text:vectorize", vectorize_fields)
 
     async def stop(self):
         await self.scraper.close()
