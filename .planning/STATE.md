@@ -8,7 +8,7 @@ type: state
 
 **最后更新：** 2026-04-19
 **当前分支：** develop
-**当前阶段：** Sprint 3 进行中，计划 03-02 已完成
+**当前阶段：** Sprint 3 已完成，计划 03-03 已完成
 
 ---
 
@@ -46,7 +46,7 @@ type: state
 - [x] 计划 03-01：BGE-M3 向量维度迁移 + 子任务状态追踪 + 内部 API（已完成 2026-04-19）
 - [x] LLM Provider 抽象层（OpenAI / Anthropic）— 计划 03-02（已完成 2026-04-19）
 - [x] Processor Service：Redis Consumer Group + 链接抓取 + 标签生成 — 计划 03-02（已完成 2026-04-19）
-- [ ] Vectorizer Service：BGE-M3 模型 + 向量生成 — 计划 03-03
+- [x] Vectorizer Service：BGE-M3 模型 + 向量生成 — 计划 03-03（已完成 2026-04-19）
 
 ### 技术债务（已修复）
 - [x] 移除硬编码 JWT Secret（C1）
@@ -60,7 +60,7 @@ type: state
 
 ## 已知问题
 
-1. **Vectorizer 是空壳**：只有 health check，不消费 Redis Stream（Processor 已完成）
+1. ~~Vectorizer 是空壳~~：已修复（03-03 完成）
 2. **无测试文件**：整个代码库零测试
 3. **OAuth state 内存泄漏**：未清理过期 state 条目
 4. **Gateway 无后端健康检查**：服务宕机时返回 502/503
