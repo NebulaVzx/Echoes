@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/app/providers/auth-provider'
+import Logo from '@/components/logo'
 
 export default function Home() {
   const { user, isLoading, logout } = useAuth()
@@ -19,7 +20,7 @@ export default function Home() {
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/logo.svg" alt="Echoes" className="w-8 h-8 dark:invert-[0.85]" />
+            <Logo size={32} className="text-gray-900 dark:text-gray-100" />
             <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-50">Echoes</h1>
             <span className="text-sm text-gray-400 dark:text-gray-500">拾忆</span>
           </div>

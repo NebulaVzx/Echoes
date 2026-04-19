@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { api, API_BASE } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
+import Logo from '@/components/logo'
 
 const loginSchema = z.object({
   email: z.string().email('请输入有效的邮箱地址'),
@@ -46,7 +47,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
-          <img src="/logo.svg" alt="Echoes" className="w-16 h-16 mx-auto mb-3 dark:invert-[0.85]" />
+          <Logo size={64} className="mx-auto mb-3 text-gray-900 dark:text-gray-100" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50 mb-1">
             Echoes
           </h1>

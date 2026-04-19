@@ -1,77 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
-  <defs>
-    <!-- 水彩渐变：主波纹 -->
-    <radialGradient id="ripple1" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#6B7280" stop-opacity="0.9"/>
-      <stop offset="40%" stop-color="#9CA3AF" stop-opacity="0.6"/>
-      <stop offset="70%" stop-color="#D1D5DB" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#F3F4F6" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="ripple1Dark" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#D1D5DB" stop-opacity="0.9"/>
-      <stop offset="40%" stop-color="#9CA3AF" stop-opacity="0.6"/>
-      <stop offset="70%" stop-color="#4B5563" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#1F2937" stop-opacity="0"/>
-    </radialGradient>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none"
+  stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
 
-    <!-- 水彩渐变：记忆碎片 -->
-    <linearGradient id="fragment1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#A78BFA" stop-opacity="0.7"/>
-      <stop offset="50%" stop-color="#818CF8" stop-opacity="0.5"/>
-      <stop offset="100%" stop-color="#60A5FA" stop-opacity="0.3"/>
-    </linearGradient>
-    <linearGradient id="fragment2" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#34D399" stop-opacity="0.6"/>
-      <stop offset="50%" stop-color="#2DD4BF" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.2"/>
-    </linearGradient>
-    <linearGradient id="fragment3" x1="50%" y1="0%" x2="50%" y2="100%">
-      <stop offset="0%" stop-color="#F472B6" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#A78BFA" stop-opacity="0.2"/>
-    </linearGradient>
+  <!-- 外层回声波纹 -->
+  <path d="M 35 100 A 65 65 0 1 1 145 145" opacity="0.35" />
 
-    <!-- 水彩边缘模糊滤镜 -->
-    <filter id="watercolor" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur"/>
-      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" result="noise"/>
-      <feDisplacementMap in="blur" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
+  <!-- 中层回声波纹 -->
+  <path d="M 55 100 A 45 45 0 1 1 130 130" opacity="0.6" />
 
-    <!-- 柔和发光 -->
-    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="2" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
+  <!-- 内层回声波纹 -->
+  <path d="M 75 100 A 25 25 0 1 1 115 115" opacity="0.9" />
 
-  <!-- 回声波纹 - 三层同心圆，Saul Bass负空间风格 -->
-  <circle cx="100" cy="100" r="70" fill="none" stroke="url(#ripple1)" stroke-width="8" opacity="0.8" filter="url(#watercolor)"/>
-  <circle cx="100" cy="100" r="50" fill="none" stroke="url(#ripple1)" stroke-width="6" opacity="0.6" filter="url(#watercolor)"/>
-  <circle cx="100" cy="100" r="30" fill="none" stroke="url(#ripple1)" stroke-width="4" opacity="0.5" filter="url(#watercolor)"/>
+  <!-- 中心圆点：记忆核心 -->
+  <circle cx="100" cy="100" r="10" fill="currentColor" stroke="none" />
 
-  <!-- 中心圆点 - 声音的起点 -->
-  <circle cx="100" cy="100" r="10" fill="#6B7280" opacity="0.8" filter="url(#watercolor)"/>
+  <!-- 拾起的记忆碎片：右上方菱形 -->
+  <polygon points="152,42 166,56 156,70 142,56" fill="currentColor" stroke="none" opacity="0.85" />
 
-  <!-- 记忆碎片 - 散布的几何形状，Gris水彩质感 -->
-  <!-- 碎片1：右上，不规则多边形 -->
-  <polygon points="155,45 165,55 158,68 148,60" fill="url(#fragment1)" filter="url(#watercolor)" opacity="0.8"/>
-
-  <!-- 碎片2：左下，小菱形 -->
-  <polygon points="45,145 52,152 45,159 38,152" fill="url(#fragment2)" filter="url(#watercolor)" opacity="0.7"/>
-
-  <!-- 碎片3：右侧，椭圆 -->
-  <ellipse cx="170" cy="110" rx="8" ry="12" transform="rotate(30 170 110)" fill="url(#fragment3)" filter="url(#watercolor)" opacity="0.6"/>
-
-  <!-- 碎片4：左上，小三角形 -->
-  <polygon points="50,55 60,50 58,62" fill="url(#fragment1)" filter="url(#watercolor)" opacity="0.5"/>
-
-  <!-- 碎片5：下方，细长条 -->
-  <ellipse cx="100" cy="175" rx="15" ry="4" transform="rotate(-15 100 175)" fill="url(#fragment2)" filter="url(#watercolor)" opacity="0.4"/>
-
-  <!-- 负空间设计：碎片与波纹的交叠处形成"E"的暗示 -->
-  <!-- 左侧缺口暗示字母E -->
-  <path d="M 30 100 Q 45 95 55 100 Q 45 105 30 100" fill="#F9FAFB" opacity="0.3" filter="url(#watercolor)"/>
 </svg>
