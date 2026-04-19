@@ -13,7 +13,7 @@ type: roadmap
 | 阶段 0 | Sprint 0 | 基础设施 | Week 1 | 已完成 |
 | 阶段 1 | Sprint 1 | 认证体系 | Week 2 | 已完成 |
 | 阶段 2 | Sprint 2 | 记忆捕获 | Week 3 | 已完成 |
-| 阶段 3 | Sprint 3 | AI 处理层 | Week 4 | 待开发 |
+| 阶段 3 | Sprint 3 | AI 处理层 | Week 4 | 进行中（03-01 完成） |
 | 阶段 4 | Sprint 4 | 搜索能力 | Week 5 | 待开发 |
 | 阶段 5 | Sprint 5 | 可观测性 + 打磨 | Week 6 | 待开发 |
 | 阶段 6 | Phase 2 | Echo Assistant | +1-2 周 | 规划中 |
