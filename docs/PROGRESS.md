@@ -87,7 +87,7 @@
 ### 目标
 - [x] User Service - 用户注册/登录 API
 - [x] User Service - JWT Token 体系（Access Token 15min + Refresh Token 7days）
-- [ ] User Service - GitHub OAuth 集成（Placeholder，待实现）
+- [x] User Service - GitHub OAuth 集成（授权入口 + Callback + 用户绑定/创建）
 - [x] Gateway - 认证中间件（JWT验证 + 公开路由白名单）
 - [x] Gateway - 路由转发（/api/v1/auth/* → User Service）
 - [x] 前端 - 登录页面
@@ -128,10 +128,10 @@
 - Go 版本升级：1.22 → 1.23（解决依赖兼容问题）
 
 ### 待完成（Sprint 1 收尾）
-- [ ] GitHub OAuth 完整实现（授权入口 + Callback + 用户绑定）
-- [ ] Zod 表单验证（替代 HTML5 验证）
-- [ ] React Context 登录状态管理（全局 auth state）
-- [ ] Logout 按钮（首页显示当前用户 + 登出功能）
+- [x] GitHub OAuth 完整实现（授权入口 + Callback + 用户绑定）
+- [x] Zod 表单验证（替代 HTML5 验证）
+- [x] React Context 登录状态管理（全局 auth state）
+- [x] Logout 按钮（首页显示当前用户 + 登出功能）
 - [ ] 文档同步：PRD.md / PROGRESS.md / CHANGELOG.md / API.md
 
 ## Sprint 2：记忆捕获 (Week 3: 2026-05-03 ~ 2026-05-09)

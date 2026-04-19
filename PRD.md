@@ -592,13 +592,13 @@ kubectl apply -f k8s/
 - [x] Service 层：
   - [x] 注册（bcrypt 密码哈希，cost=12）
   - [x] 登录（密码校验 + JWT 签发）
-  - [ ] GitHub OAuth（授权入口 + Callback + 用户绑定）
+  - [x] GitHub OAuth（授权入口 + Callback + 用户绑定）
   - [x] Token 刷新（Refresh Token 机制）
 - [x] Transport 层（Gin HTTP Handler）：
   - [x] `POST /api/v1/auth/register`
   - [x] `POST /api/v1/auth/login`
-  - [ ] `GET /api/v1/auth/github`
-  - [ ] `GET /api/v1/auth/github/callback`
+  - [x] `GET /api/v1/auth/github`
+  - [x] `GET /api/v1/auth/github/callback`
   - [x] `POST /api/v1/auth/refresh`
   - [x] `POST /api/v1/auth/logout`
   - [x] `GET /api/v1/auth/me`
@@ -625,7 +625,7 @@ kubectl apply -f k8s/
 - [x] 用户可通过邮箱注册、登录
 - [x] 登录后获取 JWT Token
 - [x] Gateway 中间件拒绝无 Token 请求
-- [ ] GitHub OAuth 可完成授权并创建/绑定用户
+- [x] GitHub OAuth 可完成授权并创建/绑定用户
 
 ---
 

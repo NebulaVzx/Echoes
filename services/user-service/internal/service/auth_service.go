@@ -3,9 +3,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/NebulaVzx/Echoes/services/user-service/internal/domain"
@@ -207,4 +210,137 @@ func (s *AuthService) parseToken(tokenString string) (*tokenClaims, error) {
 	}
 
 	return claims, nil
+}
+
+// GitHub OAuth helpers
+
+// GetGitHubAuthURL generates the GitHub OAuth authorization URL.
+func (s *AuthService) GetGitHubAuthURL(state string) string {
+	clientID := os.Getenv("GITHUB_CLIENT_ID")
+	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
+	if redirectURI == "" {
+		redirectURI = "http://localhost:8088/api/v1/auth/github/callback"
+	}
+	return fmt.Sprintf(
+		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=user:email&state=%s",
+		clientID, redirectURI, state,
+	)
+}
+
+// GitHubUserInfo holds the user data from GitHub API.
+type GitHubUserInfo struct {
+	ID        int64  `json:"id"`
+	Login     string `json:"login"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+	Name      string `json:"name"`
+}
+
+// HandleGitHubCallback exchanges the code for an access token, fetches user info,
+// and creates or logs in the user.
+func (s *AuthService) HandleGitHubCallback(ctx context.Context, code string) (*domain.AuthResponse, error) {
+	clientID := os.Getenv("GITHUB_CLIENT_ID")
+	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
+	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
+	if redirectURI == "" {
+		redirectURI = "http://localhost:8088/api/v1/auth/github/callback"
+	}
+
+	// 1. Exchange code for access token
+	tokenReqBody := fmt.Sprintf(
+		"client_id=%s&client_secret=%s&code=%s&redirect_uri=%s",
+		clientID, clientSecret, code, redirectURI,
+	)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://github.com/login/oauth/access_token", strings.NewReader(tokenReqBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to exchange code: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+		Scope       string `json:"scope"`
+		Error       string `json:"error"`
+		ErrorDesc   string `json:"error_description"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return nil, fmt.Errorf("failed to decode token response: %w", err)
+	}
+	if tokenResp.Error != "" {
+		return nil, fmt.Errorf("github error: %s - %s", tokenResp.Error, tokenResp.ErrorDesc)
+	}
+
+	// 2. Fetch user info from GitHub
+	userReq, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user", nil)
+	if err != nil {
+		return nil, err
+	}
+	userReq.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
+	userReq.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	userResp, err := http.DefaultClient.Do(userReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch user info: %w", err)
+	}
+	defer userResp.Body.Close()
+
+	var githubUser GitHubUserInfo
+	if err := json.NewDecoder(userResp.Body).Decode(&githubUser); err != nil {
+		return nil, fmt.Errorf("failed to decode user info: %w", err)
+	}
+
+	if githubUser.ID == 0 {
+		return nil, errors.New("failed to get github user info")
+	}
+
+	// 3. Try to find existing user by OAuth
+	oauthID := fmt.Sprintf("%d", githubUser.ID)
+	user, err := s.repo.GetByOAuth(ctx, "github", oauthID)
+	if err != nil && !errors.Is(err, repository.ErrUserNotFound) {
+		return nil, err
+	}
+
+	// 4. Create user if not exists
+	if user == nil {
+		email := githubUser.Email
+		if email == "" {
+			email = fmt.Sprintf("%s@github.local", githubUser.Login)
+		}
+		username := githubUser.Name
+		if username == "" {
+			username = githubUser.Login
+		}
+
+		user = &domain.User{
+			ID:            uuid.New(),
+			Email:         email,
+			Username:      username,
+			AvatarURL:     githubUser.AvatarURL,
+			OAuthProvider: "github",
+			OAuthID:       oauthID,
+			IsActive:      true,
+		}
+		if err := s.repo.Create(ctx, user); err != nil {
+			return nil, fmt.Errorf("failed to create oauth user: %w", err)
+		}
+	}
+
+	// 5. Generate tokens
+	tokens, err := s.generateTokens(user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.AuthResponse{
+		User:  *user,
+		Token: *tokens,
+	}, nil
 }

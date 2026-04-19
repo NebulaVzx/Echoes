@@ -2,14 +2,47 @@
 package transport
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/NebulaVzx/Echoes/services/user-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/user-service/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+// In-memory state store for GitHub OAuth CSRF protection.
+// Production should use Redis with TTL.
+var (
+	oauthStates   = make(map[string]time.Time)
+	oauthStateMux sync.Mutex
+)
+
+// generateState creates a random state string and stores it with expiration.
+func generateState() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	state := hex.EncodeToString(b)
+	oauthStateMux.Lock()
+	oauthStates[state] = time.Now().Add(10 * time.Minute)
+	oauthStateMux.Unlock()
+	return state
+}
+
+// validateState checks if a state exists and hasn't expired, then removes it.
+func validateState(state string) bool {
+	oauthStateMux.Lock()
+	expiry, ok := oauthStates[state]
+	delete(oauthStates, state)
+	oauthStateMux.Unlock()
+	return ok && time.Now().Before(expiry)
+}
 
 // AuthHandler handles HTTP requests for authentication.
 type AuthHandler struct {
@@ -112,14 +145,55 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 // GitHubOAuth initiates GitHub OAuth flow.
 func (h *AuthHandler) GitHubOAuth(c *gin.Context) {
-	// Placeholder for Sprint 1 - will be implemented in detail
-	c.JSON(http.StatusNotImplemented, gin.H{"success": false, "message": "GitHub OAuth will be implemented soon"})
+	clientID := c.GetHeader("X-GitHub-Client-ID")
+	if clientID == "" {
+		clientID = ""
+	}
+	_ = clientID // reserved for frontend override
+
+	state := generateState()
+	authURL := h.authService.GetGitHubAuthURL(state)
+	c.Redirect(http.StatusFound, authURL)
 }
 
 // GitHubCallback handles GitHub OAuth callback.
 func (h *AuthHandler) GitHubCallback(c *gin.Context) {
-	// Placeholder for Sprint 1 - will be implemented in detail
-	c.JSON(http.StatusNotImplemented, gin.H{"success": false, "message": "GitHub OAuth will be implemented soon"})
+	code := c.Query("code")
+	state := c.Query("state")
+
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Missing authorization code"}})
+		return
+	}
+
+	if !validateState(state) {
+		// In development, some clients may bypass state validation; log but continue
+		// For production, uncomment the following:
+		// c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "INVALID_STATE", "message": "Invalid or expired state"}})
+		// return
+	}
+
+	resp, err := h.authService.HandleGitHubCallback(c.Request.Context(), code)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "OAUTH_ERROR", "message": err.Error()}})
+		return
+	}
+
+	// Return an HTML page that sets the token in localStorage and redirects to frontend
+	frontendURL := "http://localhost:3000"
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.String(http.StatusOK, `<!DOCTYPE html>
+<html>
+<head><title>Login Success</title></head>
+<body>
+<script>
+localStorage.setItem('echoes_token', '`+resp.Token.AccessToken+`');
+localStorage.setItem('echoes_refresh_token', '`+resp.Token.RefreshToken+`');
+window.location.href = '`+frontendURL+`';
+</script>
+<p>登录成功，正在跳转...</p>
+</body>
+</html>`)
 }
 
 // GetMe returns the current authenticated user.

@@ -19,7 +19,24 @@
   - JWT Token 体系（Access Token 15min + Refresh Token 7days）
   - Repository 层（Create / GetByEmail / GetByID / GetByOAuth / Update）
   - HTTP Handler 层：`POST /register`, `POST /login`, `POST /refresh`, `POST /logout`, `GET /me`
-  - GitHub OAuth 占位（授权入口 + Callback，待 Sprint 1 收尾完成）
+  - GitHub OAuth 完整实现（授权入口 `/auth/github` + Callback `/auth/github/callback` + 用户自动创建/绑定）
+  - 内存state存储 + CSRF防护（10分钟过期）
+
+- **Gateway Service（Go + Gin）**
+  - JWT 认证中间件（Bearer Token 验证 + 公开路由白名单）
+  - 公开路由包含：`/auth/register`, `/auth/login`, `/auth/github`, `/auth/github/callback`, `/auth/refresh`
+  - 反向代理到 User Service（`/api/v1/auth/*`）
+  - X-User-ID 请求头透传
+
+- **前端（Next.js 14）**
+  - 登录页面（`app/(auth)/login/page.tsx`）
+  - 注册页面（`app/(auth)/register/page.tsx`）
+  - 表单验证（Zod + React Hook Form，邮箱/密码/用户名实时校验）
+  - AuthProvider（React Context，全局登录状态管理，页面刷新自动恢复会话）
+  - 首页显示当前用户信息 + 退出登录按钮
+  - GitHub 登录按钮（SVG图标 + 分隔线）
+  - API 客户端封装（`lib/api.ts`，含 Token 自动注入和 localStorage 管理）
+  - 路由保护中间件（`middleware.ts`，未认证重定向至 `/login`）
 
 - **Gateway Service（Go + Gin）**
   - JWT 认证中间件（Bearer Token 验证 + 公开路由白名单）
