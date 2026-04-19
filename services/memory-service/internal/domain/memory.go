@@ -77,3 +77,55 @@ type ListMemoriesResponse struct {
 	Page     int                      `json:"page"`
 	Limit    int                      `json:"limit"`
 }
+
+// SubTaskState represents a single sub-task's status in metadata JSONB.
+type SubTaskState struct {
+	Status     string `json:"status"`
+	Error      string `json:"error,omitempty"`
+	UpdatedAt  string `json:"updated_at"`
+	RetryCount int    `json:"retry_count,omitempty"`
+}
+
+// TaskStatusUpdate is the request body for the internal task status API.
+type TaskStatusUpdate struct {
+	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate"`
+	Status   string                 `json:"status" binding:"required,oneof=pending processing completed failed"`
+	Error    string                 `json:"error,omitempty"`
+	Result   map[string]interface{} `json:"result,omitempty"` // e.g., {"tags": [...]}, {"vector": [...]}, {"title": "...", "summary": "..."}
+}
+
+// AggregateStatus computes overall processing_status from sub-task states.
+// Rules per D-14:
+//   - Any processing -> "processing"
+//   - Mixed failed+completed -> "partial_failed"
+//   - All failed -> "failed"
+//   - All completed -> "completed"
+//   - Default (no tasks) -> "pending"
+func AggregateStatus(tasks map[string]SubTaskState) string {
+	if len(tasks) == 0 {
+		return "pending"
+	}
+	hasProcessing := false
+	hasFailed := false
+	hasCompleted := false
+	for _, task := range tasks {
+		switch task.Status {
+		case "processing":
+			hasProcessing = true
+		case "failed":
+			hasFailed = true
+		case "completed":
+			hasCompleted = true
+		}
+	}
+	if hasProcessing {
+		return "processing"
+	}
+	if hasFailed && hasCompleted {
+		return "partial_failed"
+	}
+	if hasFailed && !hasCompleted {
+		return "failed"
+	}
+	return "completed"
+}
