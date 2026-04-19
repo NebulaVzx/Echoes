@@ -37,17 +37,7 @@
   - GitHub 登录按钮（SVG图标 + 分隔线）
   - API 客户端封装（`lib/api.ts`，含 Token 自动注入和 localStorage 管理）
   - 路由保护中间件（`middleware.ts`，未认证重定向至 `/login`）
-
-- **Gateway Service（Go + Gin）**
-  - JWT 认证中间件（Bearer Token 验证 + 公开路由白名单）
-  - 反向代理到 User Service（`/api/v1/auth/*`）
-  - X-User-ID 请求头透传
-
-- **前端（Next.js 14）**
-  - 登录页面（`app/(auth)/login/page.tsx`）
-  - 注册页面（`app/(auth)/register/page.tsx`）
-  - API 客户端封装（`lib/api.ts`，含 Token 自动注入和 localStorage 管理）
-  - 路由保护中间件（`middleware.ts`，未认证重定向至 `/login`）
+  - 图标设计迭代：stroke-based SVG + currentColor 暗黑/明亮模式自适应
 
 #### 技术栈更新
 

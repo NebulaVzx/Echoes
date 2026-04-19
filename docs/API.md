@@ -1,7 +1,7 @@
 # API 接口文档 (API)
 
 > Echoes (拾忆) RESTful API 接口定义
-> 版本：v1.0.0
+> 版本：v0.2.0（对应 Sprint 1：认证体系）
 > Base URL：`/api/v1`
 
 ## 通用规范
