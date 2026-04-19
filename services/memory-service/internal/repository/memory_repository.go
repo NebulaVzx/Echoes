@@ -20,6 +20,7 @@ type MemoryRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Memory, error)
 	ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tag string) ([]domain.Memory, int64, error)
 	Update(ctx context.Context, memory *domain.Memory) error
+	UpdateVector(ctx context.Context, id uuid.UUID, vector string) error
 	Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
 }
 
@@ -77,6 +78,18 @@ func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID,
 // Update modifies an existing memory's tags and note.
 func (r *GormMemoryRepository) Update(ctx context.Context, memory *domain.Memory) error {
 	return r.db.WithContext(ctx).Save(memory).Error
+}
+
+// UpdateVector updates the vector field for a memory using pgvector syntax.
+func (r *GormMemoryRepository) UpdateVector(ctx context.Context, id uuid.UUID, vector string) error {
+	result := r.db.WithContext(ctx).Model(&domain.Memory{}).Where("id = ?", id).Update("vector", gorm.Expr("?::vector", vector))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrMemoryNotFound
+	}
+	return nil
 }
 
 // Delete removes a memory by ID, ensuring it belongs to the user.

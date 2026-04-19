@@ -3,12 +3,14 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
@@ -77,6 +79,7 @@ type TaskQueue interface {
 	PublishLinkFetch(memoryID uuid.UUID, linkURL string) error
 	PublishTextVectorize(memoryID uuid.UUID, content string) error
 	PublishTagGenerate(memoryID uuid.UUID, content string) error
+	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
 // NewMemoryService creates a new memory service.
@@ -227,4 +230,220 @@ func (s *MemoryService) Delete(ctx context.Context, memoryID, userID uuid.UUID) 
 		return err
 	}
 	return nil
+}
+
+// UpdateTaskStatus updates a sub-task status and recomputes aggregated status.
+func (s *MemoryService) UpdateTaskStatus(ctx context.Context, memoryID uuid.UUID, update domain.TaskStatusUpdate) error {
+	memory, err := s.repo.GetByID(ctx, memoryID)
+	if err != nil {
+		if errors.Is(err, repository.ErrMemoryNotFound) {
+			return ErrMemoryNotFound
+		}
+		return err
+	}
+
+	// Parse existing metadata
+	var metadata map[string]interface{}
+	if memory.Metadata != "" {
+		if err := json.Unmarshal([]byte(memory.Metadata), &metadata); err != nil {
+			metadata = make(map[string]interface{})
+		}
+	} else {
+		metadata = make(map[string]interface{})
+	}
+
+	tasksRaw, _ := metadata["tasks"].(map[string]interface{})
+	if tasksRaw == nil {
+		tasksRaw = make(map[string]interface{})
+	}
+
+	// Build new sub-task state
+	taskState := map[string]interface{}{
+		"status":     update.Status,
+		"updated_at": time.Now().UTC().Format(time.RFC3339),
+	}
+	if update.Error != "" {
+		taskState["error"] = update.Error
+	}
+	if update.Result != nil {
+		taskState["result"] = update.Result
+	}
+
+	tasksRaw[update.TaskType] = taskState
+	metadata["tasks"] = tasksRaw
+
+	// Convert to SubTaskState map for aggregation
+	tasks := make(map[string]domain.SubTaskState)
+	for k, v := range tasksRaw {
+		if vm, ok := v.(map[string]interface{}); ok {
+			state := domain.SubTaskState{Status: "pending"}
+			if s, ok := vm["status"].(string); ok {
+				state.Status = s
+			}
+			if e, ok := vm["error"].(string); ok {
+				state.Error = e
+			}
+			tasks[k] = state
+		}
+	}
+
+	aggregated := domain.AggregateStatus(tasks)
+
+	// Update memory fields
+	metaJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+	memory.Metadata = string(metaJSON)
+	memory.ProcessingStatus = aggregated
+
+	// Apply result fields if present
+	if update.Result != nil {
+		if update.TaskType == "link:fetch" {
+			if title, ok := update.Result["title"].(string); ok {
+				memory.LinkTitle = title
+			}
+			if summary, ok := update.Result["summary"].(string); ok {
+				memory.LinkSummary = summary
+			}
+		}
+		if update.TaskType == "tag:generate" {
+			if tagsRaw, ok := update.Result["tags"].([]interface{}); ok {
+				tags := make([]string, 0, len(tagsRaw))
+				for _, t := range tagsRaw {
+					if ts, ok := t.(string); ok && ts != "" {
+						tags = append(tags, ts)
+					}
+				}
+				if len(tags) > 0 {
+					memory.Tags = pq.StringArray(tags)
+				}
+			}
+		}
+		if update.TaskType == "text:vectorize" {
+			if vecRaw, ok := update.Result["vector"].([]interface{}); ok {
+				vecStrs := make([]string, len(vecRaw))
+				for i, v := range vecRaw {
+					vecStrs[i] = fmt.Sprintf("%v", v)
+				}
+				vectorLiteral := "[" + strings.Join(vecStrs, ",") + "]"
+				if err := s.repo.UpdateVector(ctx, memoryID, vectorLiteral); err != nil {
+					return fmt.Errorf("failed to update vector: %w", err)
+				}
+			}
+		}
+	}
+
+	return s.repo.Update(ctx, memory)
+}
+
+// UpdateMemoryVector updates the vector field directly (used by vectorizer).
+func (s *MemoryService) UpdateMemoryVector(ctx context.Context, memoryID uuid.UUID, vector string) error {
+	return s.repo.UpdateVector(ctx, memoryID, vector)
+}
+
+// RetryTask re-publishes a failed sub-task to the appropriate Redis Stream.
+// Per D-15: user can retry individual failed sub-tasks.
+func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskType string) error {
+	memory, err := s.repo.GetByID(ctx, memoryID)
+	if err != nil {
+		if errors.Is(err, repository.ErrMemoryNotFound) {
+			return ErrMemoryNotFound
+		}
+		return err
+	}
+
+	// Validate task type
+	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true}
+	if !validTypes[taskType] {
+		return fmt.Errorf("invalid task_type: %s", taskType)
+	}
+
+	// Build publish data based on task type and memory content
+	data := map[string]interface{}{
+		"memory_id": memory.ID.String(),
+	}
+	switch taskType {
+	case "link:fetch":
+		if memory.LinkURL == "" {
+			return fmt.Errorf("memory has no link_url for link:fetch task")
+		}
+		data["link_url"] = memory.LinkURL
+	case "text:vectorize":
+		content := memory.TextContent
+		if memory.LinkTitle != "" && memory.LinkSummary != "" {
+			content = memory.LinkTitle + "\n" + memory.LinkSummary
+		}
+		if content == "" {
+			return fmt.Errorf("memory has no content for text:vectorize task")
+		}
+		data["content"] = content
+	case "tag:generate":
+		content := memory.TextContent
+		if memory.LinkTitle != "" && memory.LinkSummary != "" {
+			content = memory.LinkTitle + "\n" + memory.LinkSummary
+		}
+		if content == "" {
+			return fmt.Errorf("memory has no content for tag:generate task")
+		}
+		data["content"] = content
+	}
+
+	// Publish to Redis Stream
+	if err := s.queue.PublishTask(ctx, taskType, data); err != nil {
+		return fmt.Errorf("failed to publish retry task: %w", err)
+	}
+
+	// Update sub-task state back to pending
+	var metadata map[string]interface{}
+	if memory.Metadata != "" {
+		if err := json.Unmarshal([]byte(memory.Metadata), &metadata); err != nil {
+			metadata = make(map[string]interface{})
+		}
+	} else {
+		metadata = make(map[string]interface{})
+	}
+
+	tasksRaw, _ := metadata["tasks"].(map[string]interface{})
+	if tasksRaw == nil {
+		tasksRaw = make(map[string]interface{})
+	}
+
+	// Get existing state to preserve retry count
+	existingState := map[string]interface{}{
+		"status":     "pending",
+		"updated_at": time.Now().UTC().Format(time.RFC3339),
+	}
+	if oldState, ok := tasksRaw[taskType].(map[string]interface{}); ok {
+		if rc, ok := oldState["retry_count"].(float64); ok {
+			existingState["retry_count"] = int(rc) + 1
+		} else {
+			existingState["retry_count"] = 1
+		}
+	} else {
+		existingState["retry_count"] = 1
+	}
+	tasksRaw[taskType] = existingState
+	metadata["tasks"] = tasksRaw
+
+	metaJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+	memory.Metadata = string(metaJSON)
+
+	// Recompute aggregated status
+	tasks := make(map[string]domain.SubTaskState)
+	for k, v := range tasksRaw {
+		if vm, ok := v.(map[string]interface{}); ok {
+			state := domain.SubTaskState{Status: "pending"}
+			if s, ok := vm["status"].(string); ok {
+				state.Status = s
+			}
+			tasks[k] = state
+		}
+	}
+	memory.ProcessingStatus = domain.AggregateStatus(tasks)
+
+	return s.repo.Update(ctx, memory)
 }

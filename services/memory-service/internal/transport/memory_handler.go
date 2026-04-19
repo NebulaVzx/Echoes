@@ -3,6 +3,7 @@ package transport
 
 import (
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
@@ -28,6 +29,12 @@ func (h *MemoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/memories/:id", h.Get)
 	router.PUT("/memories/:id", h.Update)
 	router.DELETE("/memories/:id", h.Delete)
+
+	// Internal API for service-to-service communication
+	internal := router.Group("/internal")
+	internal.Use(internalAuthMiddleware())
+	internal.PATCH("/memories/:id/tasks", h.UpdateTaskStatus)
+	internal.POST("/memories/:id/tasks/:task_type/retry", h.RetryTask)
 }
 
 // getUserID extracts user ID from X-User-ID header (set by Gateway JWT middleware).
@@ -162,6 +169,81 @@ func (h *MemoryHandler) Update(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": memory.SafeResponse()})
+}
+
+// internalAuthMiddleware validates the INTERNAL_API_TOKEN for service-to-service calls.
+func internalAuthMiddleware() gin.HandlerFunc {
+	expectedToken := os.Getenv("INTERNAL_API_TOKEN")
+	if expectedToken == "" {
+		// In development, allow if not configured (but log warning)
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" || authHeader != "Bearer "+expectedToken {
+			c.AbortWithStatusJSON(401, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid internal API token"}})
+			return
+		}
+		c.Next()
+	}
+}
+
+// UpdateTaskStatus handles PATCH /api/v1/internal/memories/:id/tasks
+func (h *MemoryHandler) UpdateTaskStatus(c *gin.Context) {
+	memoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid memory ID"}})
+		return
+	}
+
+	var req domain.TaskStatusUpdate
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		return
+	}
+
+	if err := h.memoryService.UpdateTaskStatus(c.Request.Context(), memoryID, req); err != nil {
+		switch err {
+		case service.ErrMemoryNotFound:
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "Memory not found"}})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// RetryTask handles POST /api/v1/internal/memories/:id/tasks/:task_type/retry
+// Per D-15: re-publishes a failed sub-task to Redis Stream for reprocessing.
+func (h *MemoryHandler) RetryTask(c *gin.Context) {
+	memoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid memory ID"}})
+		return
+	}
+
+	taskType := c.Param("task_type")
+	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true}
+	if !validTypes[taskType] {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid task_type"}})
+		return
+	}
+
+	if err := h.memoryService.RetryTask(c.Request.Context(), memoryID, taskType); err != nil {
+		switch err {
+		case service.ErrMemoryNotFound:
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "Memory not found"}})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // Delete handles deleting a memory.

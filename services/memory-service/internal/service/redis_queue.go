@@ -63,9 +63,8 @@ func (q *RedisTaskQueue) PublishTagGenerate(memoryID uuid.UUID, content string) 
 	})
 }
 
-// publish adds a message to a Redis Stream.
-func (q *RedisTaskQueue) publish(stream string, fields map[string]interface{}) error {
-	ctx := context.Background()
+// PublishTask publishes a generic task to a Redis Stream.
+func (q *RedisTaskQueue) PublishTask(ctx context.Context, stream string, fields map[string]interface{}) error {
 	_, err := q.client.XAdd(ctx, &redis.XAddArgs{
 		Stream: stream,
 		Values: fields,
@@ -74,4 +73,9 @@ func (q *RedisTaskQueue) publish(stream string, fields map[string]interface{}) e
 		return fmt.Errorf("failed to publish to stream %s: %w", stream, err)
 	}
 	return nil
+}
+
+// publish adds a message to a Redis Stream.
+func (q *RedisTaskQueue) publish(stream string, fields map[string]interface{}) error {
+	return q.PublishTask(context.Background(), stream, fields)
 }
