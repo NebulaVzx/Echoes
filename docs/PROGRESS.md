@@ -82,17 +82,19 @@
 
 ## Sprint 1：认证体系 (Week 2: 2026-04-26 ~ 2026-05-02)
 
-### 状态：进行中（2026-04-19 启动）
+### 状态：进行中（核心认证链路已完成，剩余：GitHub OAuth / Zod验证 / Auth状态管理）
 
 ### 目标
-- [ ] User Service - 用户注册/登录 API
-- [ ] User Service - JWT Token 体系
-- [ ] User Service - GitHub OAuth 集成
-- [ ] Gateway - 认证中间件
-- [ ] Gateway - 路由转发
-- [ ] 前端 - 登录页面
-- [ ] 前端 - 注册页面
-- [ ] 前端 - 路由保护
+- [x] User Service - 用户注册/登录 API
+- [x] User Service - JWT Token 体系（Access Token 15min + Refresh Token 7days）
+- [ ] User Service - GitHub OAuth 集成（Placeholder，待实现）
+- [x] Gateway - 认证中间件（JWT验证 + 公开路由白名单）
+- [x] Gateway - 路由转发（/api/v1/auth/* → User Service）
+- [x] 前端 - 登录页面
+- [x] 前端 - 注册页面
+- [x] 前端 - 路由保护（middleware.ts 未认证重定向至 /login）
+- [ ] 前端 - 表单验证（Zod，目前仅 HTML5 验证）
+- [ ] 前端 - 登录状态管理（React Context / Zustand）
 
 ### Day 1 (2026-04-19)
 
@@ -109,11 +111,12 @@
   - [x] 反向代理到 User Service
   - [x] 路由配置（/api/v1/auth/* → User Service）
 - 完成前端登录/注册页面：
-  - [x] API 客户端封装（lib/api.ts）
+  - [x] API 客户端封装（lib/api.ts，含 Token 自动注入）
   - [x] 登录页面（app/(auth)/login/page.tsx）
   - [x] 注册页面（app/(auth)/register/page.tsx）
-  - [x] 表单验证 + 错误提示
+  - [x] 表单验证（HTML5）+ 错误提示
   - [x] 登录后跳转首页
+  - [x] 路由保护中间件（web/middleware.ts）
 - 测试验证：
   - [x] 注册成功 → 返回 JWT Token + 用户信息
   - [x] 登录成功 → 返回新 Token
@@ -121,7 +124,15 @@
   - [x] 重复注册 → 返回 USER_EXISTS (409)
   - [x] 错误密码 → 返回 INVALID_CREDENTIALS (401)
   - [x] 无 Token 访问 → 返回 UNAUTHORIZED (401)
+  - [x] 未认证访问首页 → 307 重定向至 /login
 - Go 版本升级：1.22 → 1.23（解决依赖兼容问题）
+
+### 待完成（Sprint 1 收尾）
+- [ ] GitHub OAuth 完整实现（授权入口 + Callback + 用户绑定）
+- [ ] Zod 表单验证（替代 HTML5 验证）
+- [ ] React Context 登录状态管理（全局 auth state）
+- [ ] Logout 按钮（首页显示当前用户 + 登出功能）
+- [ ] 文档同步：PRD.md / PROGRESS.md / CHANGELOG.md / API.md
 
 ## Sprint 2：记忆捕获 (Week 3: 2026-05-03 ~ 2026-05-09)
 
