@@ -14,8 +14,8 @@ type User struct {
 	PasswordHash   string    `gorm:"type:varchar(255)" json:"-"` // never expose in JSON
 	Username       string    `gorm:"type:varchar(100)" json:"username"`
 	AvatarURL      string    `gorm:"type:text" json:"avatar_url"`
-	OAuthProvider  string    `gorm:"type:varchar(50)" json:"oauth_provider,omitempty"`
-	OAuthID        string    `gorm:"type:varchar(255)" json:"-"`
+	OAuthProvider  string    `gorm:"column:oauth_provider;type:varchar(50)" json:"oauth_provider,omitempty"`
+	OAuthID        string    `gorm:"column:oauth_id;type:varchar(255)" json:"-"`
 	IsActive       bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
