@@ -197,9 +197,11 @@ func (h *AuthHandler) GitHubCallback(c *gin.Context) {
 		return
 	}
 
-	// Redirect to frontend with token in URL hash (localStorage is port-isolated,
-	// so the backend cannot set it directly for the frontend on a different port).
-	frontendURL := "http://localhost:3000"
+	// Redirect to /login with token in URL hash.
+	// /login is a public route (middleware won't intercept), and AuthProvider
+	// on the login page will detect the hash, extract tokens, then auto-redirect
+	// to the home page.
+	frontendURL := "http://localhost:3000/login"
 	c.Redirect(http.StatusFound,
 		frontendURL+"#token="+resp.Token.AccessToken+
 			"&refresh_token="+resp.Token.RefreshToken)
