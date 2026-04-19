@@ -7,6 +7,7 @@ import { api, Memory } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
 import { useTheme } from '@/app/providers/theme-provider'
 import Logo from '@/components/logo'
+import { Toast, ToastContainer } from '@/components/ui/toast'
 
 function ThemeToggle() {
   const { resolvedTheme, toggleTheme } = useTheme()
@@ -50,6 +51,11 @@ export default function MemoryDetailPage() {
   const [error, setError] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Toast for delete errors
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const showToast = (message: string, type: 'success' | 'error') => setToast({ message, type })
+  const dismissToast = () => setToast(null)
+
   const memoryId = params.id as string
 
   useEffect(() => {
@@ -83,10 +89,10 @@ export default function MemoryDetailPage() {
       if (response.success) {
         router.push('/')
       } else {
-        setError(response.error?.message || '删除失败')
+        showToast(response.error?.message || '删除失败', 'error')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '删除失败')
+      showToast(err instanceof Error ? err.message : '删除失败', 'error')
     } finally {
       setIsDeleting(false)
     }
@@ -117,6 +123,12 @@ export default function MemoryDetailPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <ToastContainer>
+        {toast && (
+          <Toast message={toast.message} type={toast.type} onClose={dismissToast} />
+        )}
+      </ToastContainer>
+
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">

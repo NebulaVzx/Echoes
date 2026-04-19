@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { api } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
+import { Toast, ToastContainer } from '@/components/ui/toast'
 
 const registerSchema = z.object({
   username: z.string().min(2, '用户名至少需要2位字符').max(50, '用户名最多50位字符'),
@@ -18,7 +19,9 @@ type RegisterFormData = z.infer<typeof registerSchema>
 
 export default function RegisterPage() {
   const { login, isAuthenticated } = useAuth()
-  const [serverError, setServerError] = useState('')
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const showToast = (message: string, type: 'success' | 'error') => setToast({ message, type })
+  const dismissToast = () => setToast(null)
 
   // Redirect to home if already authenticated
   useEffect(() => {
@@ -36,22 +39,28 @@ export default function RegisterPage() {
   })
 
   const onSubmit = async (data: RegisterFormData) => {
-    setServerError('')
+    dismissToast()
     try {
       const response = await api.register(data.email, data.password, data.username)
       if (response.success && response.data) {
         login(response.data.token, response.data.user)
         window.location.href = '/'
       } else {
-        setServerError(response.error?.message || '注册失败')
+        showToast(response.error?.message || '注册失败', 'error')
       }
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : '发生错误')
+      showToast(err instanceof Error ? err.message : '发生错误', 'error')
     }
   }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+      <ToastContainer>
+        {toast && (
+          <Toast message={toast.message} type={toast.type} onClose={dismissToast} />
+        )}
+      </ToastContainer>
+
       <div className="w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-50 mb-2">
@@ -62,12 +71,6 @@ export default function RegisterPage() {
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {serverError && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-600 dark:text-red-400 text-sm">
-                {serverError}
-              </div>
-            )}
-
             <div>
               <label
                 htmlFor="username"

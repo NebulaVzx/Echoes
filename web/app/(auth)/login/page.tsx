@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { api, API_BASE } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
 import Logo from '@/components/logo'
+import { Toast, ToastContainer } from '@/components/ui/toast'
 
 const loginSchema = z.object({
   email: z.string().email('请输入有效的邮箱地址'),
@@ -18,8 +19,10 @@ type LoginFormData = z.infer<typeof loginSchema>
 
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth()
-  const [serverError, setServerError] = useState('')
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [githubAvailable, setGithubAvailable] = useState(true)
+  const showToast = (message: string, type: 'success' | 'error') => setToast({ message, type })
+  const dismissToast = () => setToast(null)
 
   // Redirect to home if already authenticated
   useEffect(() => {
@@ -51,22 +54,28 @@ export default function LoginPage() {
   })
 
   const onSubmit = async (data: LoginFormData) => {
-    setServerError('')
+    dismissToast()
     try {
       const response = await api.login(data.email, data.password)
       if (response.success && response.data) {
         login(response.data.token, response.data.user)
         window.location.href = '/'
       } else {
-        setServerError(response.error?.message || '登录失败')
+        showToast(response.error?.message || '登录失败', 'error')
       }
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : '发生错误')
+      showToast(err instanceof Error ? err.message : '发生错误', 'error')
     }
   }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+      <ToastContainer>
+        {toast && (
+          <Toast message={toast.message} type={toast.type} onClose={dismissToast} />
+        )}
+      </ToastContainer>
+
       <div className="w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
           <Logo size={64} className="mx-auto mb-3 text-gray-900 dark:text-gray-100" />
@@ -78,12 +87,6 @@ export default function LoginPage() {
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {serverError && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-600 dark:text-red-400 text-sm">
-                {serverError}
-              </div>
-            )}
-
             <div>
               <label
                 htmlFor="email"

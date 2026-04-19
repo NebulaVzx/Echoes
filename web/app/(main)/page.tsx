@@ -8,12 +8,17 @@ import Link from 'next/link'
 import ThemeToggle from '@/components/theme-toggle'
 import CreateMemoryForm from '@/components/memory/create-memory-form'
 import MemoryCard from '@/components/memory/memory-card'
+import { Toast, ToastContainer } from '@/components/ui/toast'
 
 export default function HomePage() {
   const { user, isLoading: authLoading, logout } = useAuth()
   const [memories, setMemories] = useState<Memory[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
+
+  // Toast
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const showToast = (message: string, type: 'success' | 'error') => setToast({ message, type })
+  const dismissToast = () => setToast(null)
 
   const loadMemories = useCallback(async () => {
     try {
@@ -23,7 +28,7 @@ export default function HomePage() {
         setMemories(response.data.memories)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败')
+      showToast(err instanceof Error ? err.message : '加载失败', 'error')
     } finally {
       setIsLoading(false)
     }
@@ -84,19 +89,18 @@ export default function HomePage() {
         </div>
       </header>
 
+      <ToastContainer>
+        {toast && (
+          <Toast message={toast.message} type={toast.type} onClose={dismissToast} />
+        )}
+      </ToastContainer>
+
       {/* Main content */}
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Create form */}
         <div className="mb-10">
           <CreateMemoryForm onSuccess={loadMemories} />
         </div>
-
-        {/* Error */}
-        {error && (
-          <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-600 dark:text-red-400 text-sm">
-            {error}
-          </div>
-        )}
 
         {/* Timeline */}
         <div>
@@ -125,7 +129,7 @@ export default function HomePage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-5">
+            <div className="flex flex-col gap-5">
               {memories.map((memory) => (
                 <MemoryCard key={memory.id} memory={memory} />
               ))}

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { api, LLMSettings } from '@/lib/api'
 import Link from 'next/link'
+import { Toast, ToastContainer } from '@/components/ui/toast'
 
 const settingsSchema = z.object({
   llm: z.object({
@@ -69,12 +70,16 @@ const PROVIDER_PRESETS: Record<string, { provider: string; protocol: 'openai' | 
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [saveError, setSaveError] = useState('')
-  const [saveSuccess, setSaveSuccess] = useState(false)
 
   // Test connection state
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
-  const [testError, setTestError] = useState('')
+
+  // Toast
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; duration?: number } | null>(null)
+  const showToast = (message: string, type: 'success' | 'error', duration?: number) => {
+    setToast({ message, type, duration })
+  }
+  const dismissToast = () => setToast(null)
 
   const {
     register,
@@ -145,7 +150,6 @@ export default function SettingsPage() {
           current?.base_url !== last.base_url
         ) {
           setTestStatus('idle')
-          setTestError('')
         }
       }
     })
@@ -160,12 +164,10 @@ export default function SettingsPage() {
     setValue('llm.llm_model', preset.models[0])
     setValue('llm.base_url', preset.base_url)
     setTestStatus('idle')
-    setTestError('')
   }
 
   const handleTest = async () => {
     const raw = getValues()
-    // HTML range input returns string; backend expects number
     const payload = {
       llm: {
         ...raw.llm,
@@ -176,36 +178,33 @@ export default function SettingsPage() {
       },
     }
     setTestStatus('testing')
-    setTestError('')
-    setSaveSuccess(false)
-    setSaveError('')
+    dismissToast()
 
     try {
       const response = await api.testLLMConnection(payload)
       if (response.success) {
         setTestStatus('success')
         lastTestedRef.current = raw
+        showToast('连接成功，可以保存设置', 'success', 6000)
       } else {
         setTestStatus('error')
-        setTestError(response.error?.message || '连接失败')
+        showToast(response.error?.message || '连接失败', 'error')
       }
     } catch (err) {
       setTestStatus('error')
-      setTestError(err instanceof Error ? err.message : '连接失败')
+      showToast(err instanceof Error ? err.message : '连接失败', 'error')
     }
   }
 
   const onSubmit = async (data: SettingsFormData) => {
     if (testStatus !== 'success') {
-      setSaveError('请先测试连接')
+      showToast('请先测试连接', 'error')
       return
     }
 
     setIsSaving(true)
-    setSaveError('')
-    setSaveSuccess(false)
+    dismissToast()
 
-    // Normalize temperature to number before sending
     const payload = {
       llm: {
         ...data.llm,
@@ -219,17 +218,17 @@ export default function SettingsPage() {
     try {
       const response = await api.updateSettings(payload)
       if (response.success) {
-        setSaveSuccess(true)
+        showToast('设置已保存', 'success')
         if (response.data) {
           reset({ llm: response.data })
           lastTestedRef.current = null
           setTestStatus('idle')
         }
       } else {
-        setSaveError(response.error?.message || '保存失败')
+        showToast(response.error?.message || '保存失败', 'error')
       }
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : '保存失败')
+      showToast(err instanceof Error ? err.message : '保存失败', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -256,34 +255,21 @@ export default function SettingsPage() {
         </div>
       </header>
 
+      <ToastContainer>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={dismissToast}
+            duration={toast.duration}
+          />
+        )}
+      </ToastContainer>
+
       <div className="max-w-2xl mx-auto px-4 py-8">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-50 mb-6">
           LLM 设置
         </h1>
-
-        {/* Test connection status */}
-        {testStatus === 'success' && (
-          <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md text-green-600 dark:text-green-400 text-sm">
-            连接成功，可以保存设置
-          </div>
-        )}
-        {testStatus === 'error' && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-600 dark:text-red-400 text-sm">
-            {testError}
-          </div>
-        )}
-
-        {saveSuccess && (
-          <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md text-green-600 dark:text-green-400 text-sm">
-            设置已保存
-          </div>
-        )}
-
-        {saveError && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-600 dark:text-red-400 text-sm">
-            {saveError}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Quick preset buttons */}
