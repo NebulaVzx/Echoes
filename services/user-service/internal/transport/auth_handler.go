@@ -69,6 +69,8 @@ func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup) {
 	auth := router.Group("")
 	auth.Use(h.AuthMiddleware())
 	auth.GET("/me", h.GetMe)
+	auth.GET("/me/settings", h.GetSettings)
+	auth.PUT("/me/settings", h.UpdateSettings)
 }
 
 // GetAuthProviders returns available authentication providers and their configuration status.
@@ -243,6 +245,68 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": user.SafeResponse()})
+}
+
+// GetSettings returns the current user's LLM settings.
+func (h *AuthHandler) GetSettings(c *gin.Context) {
+	userIDStr, ok := getUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		return
+	}
+
+	userIDUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid user ID format"}})
+		return
+	}
+
+	settings, err := h.authService.GetUserSettings(c.Request.Context(), userIDUUID)
+	if err != nil {
+		switch err {
+		case service.ErrUserNotFound:
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "User not found"}})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": "Failed to retrieve settings"}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": settings})
+}
+
+// UpdateSettings updates the current user's LLM settings.
+func (h *AuthHandler) UpdateSettings(c *gin.Context) {
+	userIDStr, ok := getUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		return
+	}
+
+	userIDUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid user ID format"}})
+		return
+	}
+
+	var req domain.UpdateSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		return
+	}
+
+	settings, err := h.authService.UpdateUserSettings(c.Request.Context(), userIDUUID, req)
+	if err != nil {
+		switch err {
+		case service.ErrUserNotFound:
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "User not found"}})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": "Failed to update settings"}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": settings})
 }
 
 // AuthMiddleware validates JWT access tokens and injects userID into context.

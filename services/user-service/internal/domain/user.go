@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 )
 
 // User represents a registered user in the Echoes system.
@@ -16,9 +17,10 @@ type User struct {
 	AvatarURL      string    `gorm:"type:text" json:"avatar_url"`
 	OAuthProvider  string    `gorm:"column:oauth_provider;type:varchar(50)" json:"oauth_provider,omitempty"`
 	OAuthID        string    `gorm:"column:oauth_id;type:varchar(255)" json:"-"`
-	IsActive       bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	IsActive       bool           `gorm:"default:true" json:"is_active"`
+	Settings       datatypes.JSON `gorm:"type:jsonb;default:'{}'" json:"settings,omitempty"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 // TableName specifies the table name for User.
@@ -35,6 +37,7 @@ func (u User) SafeResponse() map[string]interface{} {
 		"avatar_url":     u.AvatarURL,
 		"oauth_provider": u.OAuthProvider,
 		"is_active":      u.IsActive,
+		"settings":       u.Settings,
 		"created_at":     u.CreatedAt,
 	}
 }

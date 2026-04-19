@@ -32,8 +32,21 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
+// LLMSettings represents per-user LLM configuration.
+type LLMSettings struct {
+	Provider    string  `json:"llm_provider" binding:"omitempty,oneof=openai anthropic"`
+	Model       string  `json:"llm_model" binding:"omitempty,max=100"`
+	Temperature float64 `json:"llm_temperature" binding:"omitempty,gte=0,lte=2"`
+	APIKey      string  `json:"api_key,omitempty" binding:"omitempty"`
+}
+
+// UpdateSettingsRequest represents a request to update user settings.
+type UpdateSettingsRequest struct {
+	LLM LLMSettings `json:"llm" binding:"required"`
+}
+
 // GitHubOAuthState stores state for OAuth CSRF protection.
 type GitHubOAuthState struct {
-	State     string    `json:"state"`
-	ExpiresAt int64     `json:"expires_at"` // Unix timestamp
+	State     string `json:"state"`
+	ExpiresAt int64  `json:"expires_at"` // Unix timestamp
 }

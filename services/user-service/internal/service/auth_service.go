@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NebulaVzx/Echoes/services/user-service/internal/crypto"
 	"github.com/NebulaVzx/Echoes/services/user-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/user-service/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
@@ -113,6 +114,86 @@ func (s *AuthService) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.Us
 		return nil, err
 	}
 	return user, nil
+}
+
+// GetUserSettings retrieves a user's LLM settings.
+// The API key is decrypted and masked for safe display.
+func (s *AuthService) GetUserSettings(ctx context.Context, id uuid.UUID) (*domain.LLMSettings, error) {
+	user, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	var settings domain.LLMSettings
+	if len(user.Settings) > 0 && string(user.Settings) != "{}" && string(user.Settings) != "null" {
+		if err := json.Unmarshal(user.Settings, &settings); err != nil {
+			return &domain.LLMSettings{}, nil
+		}
+	}
+
+	// Decrypt and mask API key for display
+	if settings.APIKey != "" {
+		decrypted, err := crypto.Decrypt(settings.APIKey)
+		if err == nil && decrypted != "" {
+			settings.APIKey = crypto.MaskAPIKey(decrypted)
+		}
+	}
+	return &settings, nil
+}
+
+// UpdateUserSettings updates a user's LLM settings.
+// API keys are encrypted before storage. If the request contains a masked key,
+// the existing key is preserved.
+func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req domain.UpdateSettingsRequest) (*domain.LLMSettings, error) {
+	user, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	// Parse existing settings to preserve API key if masked in request
+	var existing domain.LLMSettings
+	if len(user.Settings) > 0 && string(user.Settings) != "{}" && string(user.Settings) != "null" {
+		_ = json.Unmarshal(user.Settings, &existing)
+	}
+
+	// Handle API key: if masked or empty, preserve existing encrypted key
+	newKey := req.LLM.APIKey
+	if newKey == "" || strings.Contains(newKey, "***") {
+		req.LLM.APIKey = existing.APIKey // keep encrypted value
+	} else {
+		// Encrypt the new API key
+		encrypted, err := crypto.Encrypt(newKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt API key: %w", err)
+		}
+		req.LLM.APIKey = encrypted
+	}
+
+	settingsJSON, err := json.Marshal(req.LLM)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	user.Settings = settingsJSON
+	if err := s.repo.Update(ctx, user); err != nil {
+		return nil, fmt.Errorf("failed to update user settings: %w", err)
+	}
+
+	// Return with masked key for response
+	resp := req.LLM
+	if resp.APIKey != "" {
+		decrypted, _ := crypto.Decrypt(resp.APIKey)
+		if decrypted != "" {
+			resp.APIKey = crypto.MaskAPIKey(decrypted)
+		}
+	}
+	return &resp, nil
 }
 
 // RefreshToken generates a new access token from a valid refresh token.
