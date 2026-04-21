@@ -70,6 +70,20 @@ export interface ListMemoriesResponse {
   limit: number
 }
 
+export interface SearchResult extends Memory {
+  similarity: number
+}
+
+export interface SearchResponse {
+  results: SearchResult[]
+  query: string
+}
+
+export interface RelatedResponse {
+  results: SearchResult[]
+  memory_id: string
+}
+
 class ApiClient {
   private baseURL: string
   private token: string | null = null
@@ -209,6 +223,20 @@ class ApiClient {
 
   async deleteMemory(id: string): Promise<ApiResponse<unknown>> {
     return this.request<unknown>('DELETE', `/api/v1/memories/${id}`)
+  }
+
+  async searchMemories(params: { q: string; limit?: number }): Promise<ApiResponse<SearchResponse>> {
+    const searchParams = new URLSearchParams()
+    searchParams.set('q', params.q)
+    if (params.limit) searchParams.set('limit', String(params.limit))
+    return this.request<SearchResponse>('GET', `/api/v1/search?${searchParams.toString()}`)
+  }
+
+  async getRelatedMemories(id: string, params?: { limit?: number }): Promise<ApiResponse<RelatedResponse>> {
+    const searchParams = new URLSearchParams()
+    if (params?.limit) searchParams.set('limit', String(params.limit))
+    const query = searchParams.toString()
+    return this.request<RelatedResponse>('GET', `/api/v1/memories/${id}/related${query ? '?' + query : ''}`)
   }
 }
 
