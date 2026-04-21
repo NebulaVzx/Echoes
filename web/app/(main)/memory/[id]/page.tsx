@@ -7,6 +7,7 @@ import { api, Memory } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
 import { useTheme } from '@/app/providers/theme-provider'
 import Logo from '@/components/logo'
+import RelatedMemories from '@/components/search/related-memories'
 import SearchInput from '@/components/search/search-input'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 
@@ -275,6 +276,9 @@ export default function MemoryDetailPage() {
               {isDeleting ? '删除中...' : '删除'}
             </button>
           </div>
+
+          {/* Related memories */}
+          <RelatedMemories memoryId={memoryId} />
         </div>
       </div>
     </main>
