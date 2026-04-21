@@ -216,7 +216,7 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-md text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-md text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-scale"
         >
           {isSubmitting ? '保存中...' : '保存记忆'}
         </button>

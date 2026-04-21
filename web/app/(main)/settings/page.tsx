@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { api, LLMSettings, UserSettings } from '@/lib/api'
 import Link from 'next/link'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 
 const settingsSchema = z.object({
@@ -302,8 +303,33 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-gray-500 dark:text-gray-400">加载中...</div>
+      <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
+          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link href="/" className="text-lg font-semibold text-gray-900 dark:text-gray-50 hover:opacity-80">
+                Echoes
+              </Link>
+              <span className="text-xs text-gray-400 dark:text-gray-500">设置</span>
+            </div>
+          </div>
+        </header>
+        <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <Skeleton className="h-6 w-32 mb-2" />
+            <Skeleton className="h-4 w-64 mb-6" />
+            <div className="space-y-5">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <div className="flex gap-4 pt-2">
+                <Skeleton className="h-9 w-24" />
+                <Skeleton className="h-9 w-28" />
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
     )
   }
