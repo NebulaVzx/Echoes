@@ -8,7 +8,7 @@ type: state
 
 **最后更新：** 2026-04-21
 **当前分支：** develop
-**当前阶段：** Sprint 4 已完成
+**当前阶段：** Sprint 5 进行中（05-05 已完成）
 
 ---
 
@@ -52,10 +52,13 @@ type: state
 ## 待办事项（下一步）
 
 ### Sprint 5：可观测性 + 打磨
-- [ ] Prometheus + OpenTelemetry 集成
-- [ ] 前端动画和加载状态
-- [ ] 错误处理和边界情况
-- [ ] 端到端测试
+- [x] 计划 05-01：Prometheus + OpenTelemetry 集成（Gateway / User Service / Memory Service）（已完成 2026-04-21）
+- [x] 计划 05-02：Python 服务可观测性（Processor / Vectorizer）（已完成 2026-04-21）
+- [x] 计划 05-03：OpenTelemetry 链路追踪（已完成 2026-04-21）
+- [x] 计划 05-04：Python 服务可观测性补充（已完成 2026-04-21）
+- [x] 计划 05-05：后端打磨 — 输入验证、统一错误响应、限流、CORS（已完成 2026-04-21）
+- [ ] 计划 05-06：前端错误处理和边界情况
+- [ ] 计划 05-07：端到端测试
 
 ### Sprint 6：Echo Assistant（规划中）
 
@@ -95,4 +98,4 @@ type: state
 
 ---
 
-*State tracking for Echoes project. Updated: 2026-04-19*
+*State tracking for Echoes project. Updated: 2026-04-21*
