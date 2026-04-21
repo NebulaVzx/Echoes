@@ -4,6 +4,7 @@ package transport
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,10 +15,55 @@ import (
 	"github.com/NebulaVzx/Echoes/services/user-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/user-service/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 )
+
+// ValidationError represents a single field validation failure.
+type ValidationError struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+// ErrorResponse is the unified error response format for all API errors.
+type ErrorResponse struct {
+	Success bool `json:"success"`
+	Error   struct {
+		Code    string            `json:"code"`
+		Message string            `json:"message"`
+		Details []ValidationError `json:"details,omitempty"`
+	} `json:"error"`
+}
+
+// respondWithError sends a unified error response.
+func respondWithError(c *gin.Context, status int, code, message string, details ...ValidationError) {
+	resp := ErrorResponse{Success: false}
+	resp.Error.Code = code
+	resp.Error.Message = message
+	if len(details) > 0 {
+		resp.Error.Details = details
+	}
+	c.JSON(status, resp)
+}
+
+// respondWithValidationError sends a validation error response with field-level details.
+func respondWithValidationError(c *gin.Context, err error) {
+	var ve validator.ValidationErrors
+	if errors.As(err, &ve) {
+		details := make([]ValidationError, 0, len(ve))
+		for _, e := range ve {
+			details = append(details, ValidationError{
+				Field:   e.Field(),
+				Message: fmt.Sprintf("validation failed on '%s'", e.Tag()),
+			})
+		}
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Request validation failed", details...)
+		return
+	}
+	respondWithError(c, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+}
 
 // In-memory state store for GitHub OAuth CSRF protection.
 // Production should use Redis with TTL.
@@ -85,8 +131,8 @@ func (h *AuthHandler) GetAuthProviders(c *gin.Context) {
 		"success": true,
 		"data": gin.H{
 			"providers": gin.H{
-				"email":    true,
-				"github":   githubAvailable,
+				"email":  true,
+				"github": githubAvailable,
 			},
 		},
 	})
@@ -100,7 +146,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	var req domain.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		respondWithValidationError(c, err)
 		return
 	}
 
@@ -108,9 +154,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case service.ErrEmailExists:
-			c.JSON(http.StatusConflict, gin.H{"success": false, "error": gin.H{"code": "USER_EXISTS", "message": "Email already registered"}})
+			respondWithError(c, http.StatusConflict, "USER_EXISTS", "Email already registered")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": "Failed to register user"}})
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to register user")
 		}
 		return
 	}
@@ -130,7 +176,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	var req domain.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		respondWithValidationError(c, err)
 		return
 	}
 
@@ -138,9 +184,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case service.ErrInvalidCredentials:
-			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "INVALID_CREDENTIALS", "message": "Invalid email or password"}})
+			respondWithError(c, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email or password")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": "Login failed"}})
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Login failed")
 		}
 		return
 	}
@@ -156,13 +202,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req domain.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		respondWithValidationError(c, err)
 		return
 	}
 
 	tokens, err := h.authService.RefreshToken(c.Request.Context(), req.RefreshToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "TOKEN_EXPIRED", "message": "Invalid or expired refresh token"}})
+		respondWithError(c, http.StatusUnauthorized, "TOKEN_EXPIRED", "Invalid or expired refresh token")
 		return
 	}
 
@@ -181,7 +227,7 @@ func (h *AuthHandler) GitHubOAuth(c *gin.Context) {
 	state := generateState()
 	authURL, err := h.authService.GetGitHubAuthURL(state)
 	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": gin.H{"code": "OAUTH_NOT_CONFIGURED", "message": "GitHub OAuth 未配置，请在环境变量中设置 GITHUB_CLIENT_ID 和 GITHUB_CLIENT_SECRET"}})
+		respondWithError(c, http.StatusServiceUnavailable, "OAUTH_NOT_CONFIGURED", "GitHub OAuth not configured. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables.")
 		return
 	}
 	c.Redirect(http.StatusFound, authURL)
@@ -193,14 +239,14 @@ func (h *AuthHandler) GitHubCallback(c *gin.Context) {
 	state := c.Query("state")
 
 	if code == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Missing authorization code"}})
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Missing authorization code")
 		return
 	}
 
 	if !validateState(state) {
 		// Strict state validation in production; relaxed in development for testing
 		if os.Getenv("ENV") == "production" {
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "INVALID_STATE", "message": "Invalid or expired state"}})
+			respondWithError(c, http.StatusBadRequest, "INVALID_STATE", "Invalid or expired state")
 			return
 		}
 		// In development, log but continue
@@ -209,7 +255,7 @@ func (h *AuthHandler) GitHubCallback(c *gin.Context) {
 
 	resp, err := h.authService.HandleGitHubCallback(c.Request.Context(), code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "OAUTH_ERROR", "message": err.Error()}})
+		respondWithError(c, http.StatusInternalServerError, "OAUTH_ERROR", "GitHub OAuth authentication failed")
 		return
 	}
 
@@ -242,19 +288,19 @@ func getUserID(c *gin.Context) (string, bool) {
 func (h *AuthHandler) GetMe(c *gin.Context) {
 	userIDStr, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
 	userIDUUID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid user ID format"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid user ID format")
 		return
 	}
 
 	user, err := h.authService.GetUserByID(c.Request.Context(), userIDUUID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "User not found"}})
+		respondWithError(c, http.StatusNotFound, "NOT_FOUND", "User not found")
 		return
 	}
 
@@ -265,13 +311,13 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 func (h *AuthHandler) GetSettings(c *gin.Context) {
 	userIDStr, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
 	userIDUUID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid user ID format"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid user ID format")
 		return
 	}
 
@@ -279,9 +325,9 @@ func (h *AuthHandler) GetSettings(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case service.ErrUserNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "User not found"}})
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "User not found")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": "Failed to retrieve settings"}})
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to retrieve settings")
 		}
 		return
 	}
@@ -293,19 +339,19 @@ func (h *AuthHandler) GetSettings(c *gin.Context) {
 func (h *AuthHandler) UpdateSettings(c *gin.Context) {
 	userIDStr, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
 	userIDUUID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid user ID format"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid user ID format")
 		return
 	}
 
 	var req domain.UpdateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		respondWithValidationError(c, err)
 		return
 	}
 
@@ -313,9 +359,9 @@ func (h *AuthHandler) UpdateSettings(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case service.ErrUserNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "User not found"}})
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "User not found")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": "Failed to update settings"}})
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update settings")
 		}
 		return
 	}
@@ -327,19 +373,19 @@ func (h *AuthHandler) UpdateSettings(c *gin.Context) {
 func (h *AuthHandler) TestSettings(c *gin.Context) {
 	userIDStr, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
 	userIDUUID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid user ID format"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid user ID format")
 		return
 	}
 
 	var req domain.TestLLMRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		respondWithValidationError(c, err)
 		return
 	}
 
@@ -354,11 +400,11 @@ func (h *AuthHandler) TestSettings(c *gin.Context) {
 	}
 
 	if err := h.authService.TestLLMConnection(c.Request.Context(), req.LLM); err != nil {
-		c.JSON(http.StatusOK, gin.H{"success": false, "error": gin.H{"code": "LLM_CONNECTION_FAILED", "message": err.Error()}})
+		respondWithError(c, http.StatusOK, "LLM_CONNECTION_FAILED", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "连接成功"})
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Connection successful"})
 }
 
 // AuthMiddleware validates JWT access tokens and injects userID into context.
@@ -366,7 +412,7 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Missing authorization header"}})
+			respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Missing authorization header")
 			c.Abort()
 			return
 		}
@@ -374,14 +420,14 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 		// Extract Bearer token
 		var tokenString string
 		if _, err := fmt.Sscanf(authHeader, "Bearer %s", &tokenString); err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid authorization header format"}})
+			respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid authorization header format")
 			c.Abort()
 			return
 		}
 
 		userID, err := h.authService.ValidateToken(tokenString)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "TOKEN_EXPIRED", "message": "Invalid or expired token"}})
+			respondWithError(c, http.StatusUnauthorized, "TOKEN_EXPIRED", "Invalid or expired token")
 			c.Abort()
 			return
 		}
@@ -390,4 +436,3 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
