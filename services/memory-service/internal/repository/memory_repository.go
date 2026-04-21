@@ -22,6 +22,8 @@ type MemoryRepository interface {
 	Update(ctx context.Context, memory *domain.Memory) error
 	UpdateVector(ctx context.Context, id uuid.UUID, vector string) error
 	Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
+	SearchByVector(ctx context.Context, userID uuid.UUID, vector string, limit int, threshold float64) ([]domain.SearchResult, error)
+	FindRelated(ctx context.Context, userID uuid.UUID, memoryID uuid.UUID, vector string, limit int, threshold float64) ([]domain.SearchResult, error)
 }
 
 // GormMemoryRepository implements MemoryRepository using GORM.
@@ -102,4 +104,82 @@ func (r *GormMemoryRepository) Delete(ctx context.Context, id uuid.UUID, userID 
 		return ErrMemoryNotFound
 	}
 	return nil
+}
+
+// SearchByVector performs semantic search using pgvector cosine similarity.
+// threshold 0.75 means distance <= 0.25 (pgvector <=> returns cosine distance).
+func (r *GormMemoryRepository) SearchByVector(ctx context.Context, userID uuid.UUID, vector string, limit int, threshold float64) ([]domain.SearchResult, error) {
+	var results []domain.SearchResult
+	distanceThreshold := 1.0 - threshold
+	query := `
+		SELECT id, user_id, content_type, text_content, link_url, link_title, link_summary,
+			   tags, note, processing_status, visibility, created_at, updated_at,
+			   1 - (vector <=> ?::vector) as similarity
+		FROM memories
+		WHERE user_id = ?
+		  AND vector IS NOT NULL
+		  AND processing_status = 'completed'
+		  AND (vector <=> ?::vector) <= ?
+		ORDER BY vector <=> ?::vector
+		LIMIT ?
+	`
+	rows, err := r.db.WithContext(ctx).Raw(query, vector, userID, vector, distanceThreshold, vector, limit).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var m domain.Memory
+		var similarity float64
+		err := rows.Scan(
+			&m.ID, &m.UserID, &m.ContentType, &m.TextContent, &m.LinkURL, &m.LinkTitle, &m.LinkSummary,
+			&m.Tags, &m.Note, &m.ProcessingStatus, &m.Visibility, &m.CreatedAt, &m.UpdatedAt,
+			&similarity,
+		)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, domain.SearchResult{Memory: m, Similarity: similarity})
+	}
+	return results, nil
+}
+
+// FindRelated finds memories similar to a given memory, excluding the memory itself.
+func (r *GormMemoryRepository) FindRelated(ctx context.Context, userID uuid.UUID, memoryID uuid.UUID, vector string, limit int, threshold float64) ([]domain.SearchResult, error) {
+	var results []domain.SearchResult
+	distanceThreshold := 1.0 - threshold
+	query := `
+		SELECT id, user_id, content_type, text_content, link_url, link_title, link_summary,
+			   tags, note, processing_status, visibility, created_at, updated_at,
+			   1 - (vector <=> ?::vector) as similarity
+		FROM memories
+		WHERE user_id = ?
+		  AND id != ?
+		  AND vector IS NOT NULL
+		  AND processing_status = 'completed'
+		  AND (vector <=> ?::vector) <= ?
+		ORDER BY vector <=> ?::vector
+		LIMIT ?
+	`
+	rows, err := r.db.WithContext(ctx).Raw(query, vector, userID, memoryID, vector, distanceThreshold, vector, limit).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var m domain.Memory
+		var similarity float64
+		err := rows.Scan(
+			&m.ID, &m.UserID, &m.ContentType, &m.TextContent, &m.LinkURL, &m.LinkTitle, &m.LinkSummary,
+			&m.Tags, &m.Note, &m.ProcessingStatus, &m.Visibility, &m.CreatedAt, &m.UpdatedAt,
+			&similarity,
+		)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, domain.SearchResult{Memory: m, Similarity: similarity})
+	}
+	return results, nil
 }

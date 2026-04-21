@@ -86,6 +86,24 @@ type SubTaskState struct {
 	RetryCount int    `json:"retry_count,omitempty"`
 }
 
+// SearchResult represents a memory with its similarity score from semantic search.
+type SearchResult struct {
+	Memory     Memory  `json:"memory"`
+	Similarity float64 `json:"similarity"`
+}
+
+// SearchResponse represents the response from semantic search.
+type SearchResponse struct {
+	Results []SearchResult `json:"results"`
+	Query   string         `json:"query"`
+}
+
+// RelatedResponse represents the response for similar memories.
+type RelatedResponse struct {
+	Results  []SearchResult `json:"results"`
+	MemoryID uuid.UUID      `json:"memory_id"`
+}
+
 // TaskStatusUpdate is the request body for the internal task status API.
 type TaskStatusUpdate struct {
 	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate"`
