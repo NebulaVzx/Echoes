@@ -10,19 +10,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RateLimiter implements per-IP token bucket rate limiting.
+// RateLimiter implements per-key token bucket rate limiting.
+// The key can be an IP address (for unauthenticated routes) or a user ID
+// (for authenticated routes), preventing a single user from exhausting
+// the global quota.
 type RateLimiter struct {
-	mu       sync.RWMutex
-	buckets  map[string]*bucket
-	rate     time.Duration
-	burst    int
-	cleanup  time.Duration
+	mu      sync.RWMutex
+	buckets map[string]*bucket
+	rate    time.Duration
+	burst   int
+	cleanup time.Duration
 }
 
 type bucket struct {
-	tokens    int
-	lastSeen  time.Time
-	lastFill  time.Time
+	tokens   int
+	lastSeen time.Time
+	lastFill time.Time
 }
 
 // NewRateLimiter creates a rate limiter with the given fill rate and burst size.
@@ -39,15 +42,15 @@ func NewRateLimiter(rate time.Duration, burst int) *RateLimiter {
 	return rl
 }
 
-// Allow checks if the given IP is allowed to make a request.
-func (rl *RateLimiter) Allow(ip string) bool {
+// Allow checks if the given key is allowed to make a request.
+func (rl *RateLimiter) Allow(key string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	b, exists := rl.buckets[ip]
+	b, exists := rl.buckets[key]
 	if !exists {
 		b = &bucket{tokens: rl.burst - 1, lastSeen: time.Now(), lastFill: time.Now()}
-		rl.buckets[ip] = b
+		rl.buckets[key] = b
 		return true
 	}
 
@@ -73,9 +76,9 @@ func (rl *RateLimiter) cleanupLoop() {
 	defer ticker.Stop()
 	for range ticker.C {
 		rl.mu.Lock()
-		for ip, b := range rl.buckets {
+		for key, b := range rl.buckets {
 			if time.Since(b.lastSeen) > rl.cleanup {
-				delete(rl.buckets, ip)
+				delete(rl.buckets, key)
 			}
 		}
 		rl.mu.Unlock()
@@ -107,11 +110,42 @@ func extractClientIP(c *gin.Context) string {
 	return host
 }
 
-// RateLimit returns a Gin middleware that applies rate limiting.
+// KeyExtractor defines a function that extracts a rate-limiting key from a Gin context.
+type KeyExtractor func(c *gin.Context) string
+
+// ipExtractor extracts the client IP for rate limiting unauthenticated routes.
+func ipExtractor(c *gin.Context) string {
+	return extractClientIP(c)
+}
+
+// userIDExtractor extracts the user ID from the X-User-ID header for per-user
+// rate limiting. Falls back to the client IP if the header is absent.
+func userIDExtractor(c *gin.Context) string {
+	if userID := c.GetHeader("X-User-ID"); userID != "" {
+		return "user:" + userID
+	}
+	return extractClientIP(c)
+}
+
+// RateLimit returns a Gin middleware that applies IP-based rate limiting.
+// This is the backward-compatible wrapper; it uses the client IP as the key.
 func RateLimit(limiter *RateLimiter) gin.HandlerFunc {
+	return RateLimitWithExtractor(limiter, ipExtractor)
+}
+
+// RateLimitByUser returns a Gin middleware that applies per-user rate limiting.
+// It uses the X-User-ID header set by the Gateway JWT middleware. If the header
+// is missing (e.g., unauthenticated request), it falls back to the client IP.
+func RateLimitByUser(limiter *RateLimiter) gin.HandlerFunc {
+	return RateLimitWithExtractor(limiter, userIDExtractor)
+}
+
+// RateLimitWithExtractor returns a Gin middleware that applies rate limiting
+// using a custom key extractor. This allows flexible per-IP or per-user limiting.
+func RateLimitWithExtractor(limiter *RateLimiter, extractor KeyExtractor) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := extractClientIP(c)
-		if !limiter.Allow(ip) {
+		key := extractor(c)
+		if !limiter.Allow(key) {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"success": false,
 				"error": gin.H{

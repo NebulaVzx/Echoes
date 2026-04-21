@@ -6,7 +6,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/NebulaVzx/Echoes/services/gateway/internal/middleware"
@@ -16,43 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// corsMiddleware handles CORS for cross-origin requests from the frontend.
-// Whitelist-based: only allows specific origins when credentials are enabled.
-func corsMiddleware() gin.HandlerFunc {
-	allowedOrigins := []string{
-		"http://localhost:3000",
-	}
-	// Add additional origins from env
-	if extra := os.Getenv("ALLOWED_ORIGINS"); extra != "" {
-		allowedOrigins = append(allowedOrigins, strings.Split(extra, ",")...)
-	}
-
-	return func(c *gin.Context) {
-		origin := c.Request.Header.Get("Origin")
-		allowed := false
-		for _, o := range allowedOrigins {
-			if strings.TrimSpace(o) == origin {
-				allowed = true
-				break
-			}
-		}
-
-		if allowed {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		}
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID")
-		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	}
-}
-
 // Setup configures all routes and returns the Gin engine.
 // Middleware chain per D-02/D-04/D-06: Recovery -> otelgin -> PrometheusMetrics -> ZapLogger -> CORS -> RateLimit -> JWTAuth
 func Setup(logger *zap.Logger) *gin.Engine {
@@ -61,7 +23,7 @@ func Setup(logger *zap.Logger) *gin.Engine {
 	router.Use(middleware.OTelGin("gateway"))
 	router.Use(middleware.PrometheusMetrics("gateway"))
 	router.Use(middleware.ZapLogger(logger))
-	router.Use(corsMiddleware())
+	router.Use(middleware.CORS())
 	router.RedirectTrailingSlash = false
 
 	// Register /metrics endpoint before route groups
@@ -94,10 +56,10 @@ func Setup(logger *zap.Logger) *gin.Engine {
 		userProxy.ServeHTTP(c.Writer, c.Request)
 	})
 
-	// Apply JWT auth + rate limit for protected routes
+	// Apply JWT auth + per-user rate limit for protected routes
 	protected := v1.Group("")
 	protected.Use(middleware.JWTAuth())
-	protected.Use(middleware.RateLimit(defaultLimiter))
+	protected.Use(middleware.RateLimitByUser(defaultLimiter))
 	memoryProxy := newReverseProxy("MEMORY_SERVICE_URL", "http://memory-service:8002")
 
 	// Memory routes → Memory Service
