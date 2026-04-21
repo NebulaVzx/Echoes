@@ -39,6 +39,7 @@ class OpenAIProvider(LLMProvider):
     async def generate_tags(self, content: str) -> List[str]:
         prompt = f"""Based on the following content, generate 3-5 concise Chinese tags (each 2-6 characters).
 Tags should be nouns or noun phrases that capture key topics.
+If the content includes user notes (marked with 备注:), consider them alongside the main content.
 Output format: comma-separated list only, no explanation.
 
 Content: {content[:2000]}"""

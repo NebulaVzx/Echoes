@@ -1,9 +1,12 @@
+import logging
 import redis.asyncio as redis
 from app.consumers.base import RedisStreamConsumer
 from app.clients.memory_client import MemoryServiceClient
 from app.services.llm.factory import LLMFactory
 from app.config import settings
 from app.crypto import decrypt
+
+logger = logging.getLogger(__name__)
 
 
 def _create_llm(fields: dict):
@@ -40,14 +43,19 @@ class TagConsumer(RedisStreamConsumer):
         # Append note to content if user enabled this option
         include_note = fields.get("include_note_in_analysis")
         note = fields.get("note", "")
+        original_content = content
         if include_note and note:
             content = f"{content}\n\n备注: {note}"
+            logger.info(f"[tag:generate] memory={memory_id} note_included=true note_length={len(note)}")
+        else:
+            logger.info(f"[tag:generate] memory={memory_id} note_included=false include_flag={include_note!r} has_note={bool(note)}")
 
         llm = _create_llm(fields)
         tags = await llm.generate_tags(content)
         if not tags:
             raise ValueError("LLM returned no tags")
 
+        logger.info(f"[tag:generate] memory={memory_id} tags={tags}")
         result = {"tags": tags}
         await self.memory_client.update_task_status(
             memory_id, "tag:generate", "completed", result=result

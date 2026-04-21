@@ -1,3 +1,4 @@
+import logging
 import redis.asyncio as redis
 from app.consumers.base import RedisStreamConsumer
 from app.clients.memory_client import MemoryServiceClient
@@ -5,6 +6,8 @@ from app.services.scraper import LinkScraper
 from app.services.llm.factory import LLMFactory
 from app.config import settings
 from app.crypto import decrypt
+
+logger = logging.getLogger(__name__)
 
 
 def _create_llm(fields: dict):
@@ -62,12 +65,14 @@ class LinkConsumer(RedisStreamConsumer):
             note = fields.get("note", "")
             note_section = ""
             if include_note and note:
-                note_section = f"\n\nUser Note: {note}"
-            prompt = f"""Summarize the following web page content in 2-3 concise Chinese sentences.
-Focus on the main points. Keep it under 200 characters.
+                note_section = f"\n\n用户备注（请结合以下内容进行总结）: {note}"
+                logger.info(f"[link:fetch] memory={memory_id} note_included=true note_length={len(note)}")
+            else:
+                logger.info(f"[link:fetch] memory={memory_id} note_included=false include_flag={include_note!r} has_note={bool(note)}")
+            prompt = f"""请用2-3句简洁的中文总结以下网页内容。如提供了用户备注，请结合备注中的关注点进行总结。控制在200字以内。
 
-Title: {title}
-Content: {content[:4000]}{note_section}"""
+标题: {title}
+内容: {content[:4000]}{note_section}"""
             summary = await llm.generate(prompt, temperature=0.5, max_tokens=200)
 
         # Report link:fetch completion
