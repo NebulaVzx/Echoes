@@ -10,6 +10,8 @@ import (
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // MemoryHandler handles HTTP requests for memory operations.
@@ -55,6 +57,10 @@ func getUserID(c *gin.Context) (uuid.UUID, bool) {
 
 // Create handles creating a new memory.
 func (h *MemoryHandler) Create(c *gin.Context) {
+	tracer := otel.Tracer("memory-service")
+	ctx, span := tracer.Start(c.Request.Context(), "CreateMemory")
+	defer span.End()
+
 	userID, ok := getUserID(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
@@ -67,12 +73,14 @@ func (h *MemoryHandler) Create(c *gin.Context) {
 		return
 	}
 
-	memory, err := h.memoryService.Create(c.Request.Context(), userID, req)
+	memory, err := h.memoryService.Create(ctx, userID, req)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
 		return
 	}
 
+	span.SetAttributes(attribute.String("memory_id", memory.ID.String()))
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": memory.SafeResponse()})
 }
 
@@ -251,6 +259,10 @@ func (h *MemoryHandler) RetryTask(c *gin.Context) {
 
 // Search handles semantic search for memories.
 func (h *MemoryHandler) Search(c *gin.Context) {
+	tracer := otel.Tracer("memory-service")
+	ctx, span := tracer.Start(c.Request.Context(), "SearchMemories")
+	defer span.End()
+
 	userID, ok := getUserID(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
@@ -262,6 +274,7 @@ func (h *MemoryHandler) Search(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Query parameter 'q' is required"}})
 		return
 	}
+	span.SetAttributes(attribute.String("query", query))
 
 	limit := 10
 	if l := c.Query("limit"); l != "" {
@@ -269,9 +282,11 @@ func (h *MemoryHandler) Search(c *gin.Context) {
 			limit = v
 		}
 	}
+	span.SetAttributes(attribute.Int("limit", limit))
 
-	resp, err := h.memoryService.Search(c.Request.Context(), userID, query, limit)
+	resp, err := h.memoryService.Search(ctx, userID, query, limit)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		if err.Error() == "搜索服务暂不可用" {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": gin.H{"code": "SERVICE_UNAVAILABLE", "message": err.Error()}})
 			return
@@ -279,6 +294,8 @@ func (h *MemoryHandler) Search(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
 		return
 	}
+
+	span.SetAttributes(attribute.Int("result_count", len(resp.Results)))
 
 	// Convert results to safe response format with similarity
 	items := make([]map[string]interface{}, len(resp.Results))
@@ -295,6 +312,10 @@ func (h *MemoryHandler) Search(c *gin.Context) {
 
 // GetRelated handles retrieving similar memories for a given memory.
 func (h *MemoryHandler) GetRelated(c *gin.Context) {
+	tracer := otel.Tracer("memory-service")
+	ctx, span := tracer.Start(c.Request.Context(), "GetRelatedMemories")
+	defer span.End()
+
 	userID, ok := getUserID(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
@@ -306,6 +327,7 @@ func (h *MemoryHandler) GetRelated(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid memory ID"}})
 		return
 	}
+	span.SetAttributes(attribute.String("memory_id", memoryID.String()))
 
 	limit := 3
 	if l := c.Query("limit"); l != "" {
@@ -313,9 +335,11 @@ func (h *MemoryHandler) GetRelated(c *gin.Context) {
 			limit = v
 		}
 	}
+	span.SetAttributes(attribute.Int("limit", limit))
 
-	resp, err := h.memoryService.Related(c.Request.Context(), memoryID, userID, limit)
+	resp, err := h.memoryService.Related(ctx, memoryID, userID, limit)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		switch err {
 		case service.ErrMemoryNotFound:
 			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "Memory not found"}})
@@ -326,6 +350,8 @@ func (h *MemoryHandler) GetRelated(c *gin.Context) {
 		}
 		return
 	}
+
+	span.SetAttributes(attribute.Int("result_count", len(resp.Results)))
 
 	items := make([]map[string]interface{}, len(resp.Results))
 	for i, r := range resp.Results {

@@ -15,6 +15,8 @@ import (
 	"github.com/NebulaVzx/Echoes/services/user-service/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // In-memory state store for GitHub OAuth CSRF protection.
@@ -92,13 +94,17 @@ func (h *AuthHandler) GetAuthProviders(c *gin.Context) {
 
 // Register handles user registration.
 func (h *AuthHandler) Register(c *gin.Context) {
+	tracer := otel.Tracer("user-service")
+	ctx, span := tracer.Start(c.Request.Context(), "Register")
+	defer span.End()
+
 	var req domain.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
 		return
 	}
 
-	resp, err := h.authService.Register(c.Request.Context(), req)
+	resp, err := h.authService.Register(ctx, req)
 	if err != nil {
 		switch err {
 		case service.ErrEmailExists:
@@ -109,6 +115,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	span.SetAttributes(attribute.String("user_id", resp.User.ID.String()))
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": gin.H{
 		"user":  resp.User.SafeResponse(),
 		"token": resp.Token,
@@ -117,13 +124,17 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 // Login handles user login.
 func (h *AuthHandler) Login(c *gin.Context) {
+	tracer := otel.Tracer("user-service")
+	ctx, span := tracer.Start(c.Request.Context(), "Login")
+	defer span.End()
+
 	var req domain.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
 		return
 	}
 
-	resp, err := h.authService.Login(c.Request.Context(), req)
+	resp, err := h.authService.Login(ctx, req)
 	if err != nil {
 		switch err {
 		case service.ErrInvalidCredentials:
@@ -134,6 +145,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	span.SetAttributes(attribute.String("user_id", resp.User.ID.String()))
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
 		"user":  resp.User.SafeResponse(),
 		"token": resp.Token,
