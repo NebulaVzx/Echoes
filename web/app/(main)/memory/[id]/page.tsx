@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { api, Memory } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
 import { useTheme } from '@/app/providers/theme-provider'
 import Logo from '@/components/logo'
 import RelatedMemories from '@/components/search/related-memories'
 import SearchInput from '@/components/search/search-input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 
 function ThemeToggle() {
@@ -17,7 +19,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
       aria-label={resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到暗黑模式'}
     >
       {resolvedTheme === 'dark' ? (
@@ -30,6 +32,36 @@ function ThemeToggle() {
         </svg>
       )}
     </button>
+  )
+}
+
+function MemoryDetailSkeleton() {
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 p-6">
+        {/* Meta skeleton */}
+        <div className="flex items-center justify-between mb-6">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        {/* Title skeleton */}
+        <Skeleton className="h-6 w-3/4 mb-4" />
+        {/* Content skeleton */}
+        <Skeleton className="h-4 w-full mb-2" />
+        <Skeleton className="h-4 w-5/6 mb-2" />
+        <Skeleton className="h-4 w-4/5 mb-6" />
+        {/* Tags skeleton */}
+        <div className="flex gap-2 mb-6">
+          <Skeleton className="h-6 w-16 rounded-full" />
+          <Skeleton className="h-6 w-14 rounded-full" />
+        </div>
+        {/* Actions skeleton */}
+        <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
+          <Skeleton className="h-9 w-16" />
+          <Skeleton className="h-9 w-16" />
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -123,8 +155,23 @@ export default function MemoryDetailPage() {
 
   if (authLoading || isLoading) {
     return (
-      <main className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-gray-500 dark:text-gray-400">加载中...</div>
+      <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Header */}
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
+          <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Logo size={28} className="text-gray-900 dark:text-gray-100" />
+              <Link href="/" className="text-lg font-semibold text-gray-900 dark:text-gray-50 hover:opacity-80 transition-opacity">
+                Echoes
+              </Link>
+            </div>
+            <SearchInput />
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <ThemeToggle />
+            </div>
+          </div>
+        </header>
+        <MemoryDetailSkeleton />
       </main>
     )
   }
@@ -132,12 +179,17 @@ export default function MemoryDetailPage() {
   if (error || !memory) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="max-w-3xl mx-auto px-4 py-12 text-center"
+        >
           <p className="text-red-600 dark:text-red-400 mb-4">{error || '记忆不存在'}</p>
-          <Link href="/" className="text-gray-900 dark:text-gray-100 hover:underline text-sm">
+          <Link href="/" className="text-gray-900 dark:text-gray-100 hover:underline text-sm btn-scale inline-block">
             返回首页
           </Link>
-        </div>
+        </motion.div>
       </main>
     )
   }
@@ -171,7 +223,7 @@ export default function MemoryDetailPage() {
                 </span>
                 <button
                   onClick={logout}
-                  className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                  className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors btn-scale"
                 >
                   退出
                 </button>
@@ -264,14 +316,14 @@ export default function MemoryDetailPage() {
           <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
             <Link
               href="/"
-              className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+              className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors btn-scale"
             >
               返回
             </Link>
             <button
               onClick={handleDelete}
               disabled={isDeleting}
-              className="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors disabled:opacity-50 btn-scale"
             >
               {isDeleting ? '删除中...' : '删除'}
             </button>
