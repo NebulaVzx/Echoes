@@ -4,8 +4,19 @@ import redis.asyncio as redis
 from abc import ABC, abstractmethod
 from typing import Optional
 from app.clients.memory_client import MemoryServiceClient
+from opentelemetry import trace
+from opentelemetry.propagate import extract
 
 logger = logging.getLogger(__name__)
+
+
+def _get_trace_id() -> str:
+    """Get current trace ID as hex string if a valid span is active."""
+    span = trace.get_current_span()
+    ctx = span.get_span_context()
+    if ctx.is_valid:
+        return format(ctx.trace_id, '032x')
+    return ""
 
 
 class RedisStreamConsumer(ABC):
@@ -74,34 +85,60 @@ class RedisStreamConsumer(ABC):
         retry_count = int(fields.get("retry_count", 0))
         memory_id = fields.get("memory_id", "")
 
-        # Report processing status
-        try:
-            await self.memory_client.update_task_status(
-                memory_id, self.stream, "processing"
-            )
-        except Exception as e:
-            logger.warning(f"Failed to report processing status for {memory_id}: {e}")
+        # Extract traceparent from message fields for distributed tracing
+        tracer = trace.get_tracer(__name__)
+        traceparent = fields.get("traceparent", "")
+        if traceparent:
+            carrier = {"traceparent": traceparent}
+            parent_context = extract(carrier)
+        else:
+            parent_context = None
 
-        for attempt in range(retry_count, self.max_retries):
+        with tracer.start_as_current_span(
+            "process_redis_task",
+            context=parent_context,
+            attributes={
+                "stream": self.stream,
+                "message_id": msg_id,
+                "memory_id": memory_id,
+            }
+        ) as span:
+            # Report processing status
             try:
-                await self.process_message(msg_id, fields)
-                await self.redis.xack(self.stream, self.group, msg_id)
-                logger.info(f"Successfully processed {self.stream} for memory {memory_id}")
-                return
+                await self.memory_client.update_task_status(
+                    memory_id, self.stream, "processing"
+                )
             except Exception as e:
-                logger.error(f"Error processing {self.stream} for memory {memory_id} (attempt {attempt + 1}/{self.max_retries}): {e}")
-                if attempt == self.max_retries - 1:
-                    # Report failure -- do NOT ack, keep in pending for manual retry
-                    try:
-                        await self.memory_client.update_task_status(
-                            memory_id, self.stream, "failed", error=str(e)
-                        )
-                        logger.info(f"Reported failure for {self.stream} memory {memory_id}")
-                    except Exception as report_err:
-                        logger.error(f"Failed to report failure status for {memory_id}: {report_err}")
+                tid = _get_trace_id()
+                logger.warning(f"[{tid}] Failed to report processing status for {memory_id}: {e}")
+
+            for attempt in range(retry_count, self.max_retries):
+                try:
+                    await self.process_message(msg_id, fields)
+                    await self.redis.xack(self.stream, self.group, msg_id)
+                    span.set_attribute("success", True)
+                    tid = _get_trace_id()
+                    logger.info(f"[{tid}] Successfully processed {self.stream} for memory {memory_id}")
                     return
-                wait = 2 ** attempt  # 1, 2, 4 seconds
-                await asyncio.sleep(wait)
+                except Exception as e:
+                    span.set_attribute("error", True)
+                    span.set_attribute("error.message", str(e))
+                    tid = _get_trace_id()
+                    logger.error(f"[{tid}] Error processing {self.stream} for memory {memory_id} (attempt {attempt + 1}/{self.max_retries}): {e}")
+                    if attempt == self.max_retries - 1:
+                        # Report failure -- do NOT ack, keep in pending for manual retry
+                        try:
+                            await self.memory_client.update_task_status(
+                                memory_id, self.stream, "failed", error=str(e)
+                            )
+                            tid = _get_trace_id()
+                            logger.info(f"[{tid}] Reported failure for {self.stream} memory {memory_id}")
+                        except Exception as report_err:
+                            tid = _get_trace_id()
+                            logger.error(f"[{tid}] Failed to report failure status for {memory_id}: {report_err}")
+                        return
+                    wait = 2 ** attempt  # 1, 2, 4 seconds
+                    await asyncio.sleep(wait)
 
     @abstractmethod
     async def process_message(self, msg_id: str, fields: dict):
