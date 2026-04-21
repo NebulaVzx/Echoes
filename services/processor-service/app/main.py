@@ -15,6 +15,8 @@ from app.config import settings
 from app.clients.memory_client import MemoryServiceClient
 from app.consumers.link_consumer import LinkConsumer
 from app.consumers.tag_consumer import TagConsumer
+from app.observability import setup_observability
+from opentelemetry import trace
 
 
 @asynccontextmanager
@@ -62,6 +64,12 @@ async def lifespan(app: FastAPI):
         await consumer.stop()
     await memory_client.close()
     await redis_client.aclose()
+
+    # Shutdown tracer provider
+    provider = trace.get_tracer_provider()
+    if hasattr(provider, 'shutdown'):
+        provider.shutdown()
+
     print(f"{settings.service_name} shut down")
 
 
@@ -71,6 +79,10 @@ app = FastAPI(
     version=settings.service_version,
     lifespan=lifespan,
 )
+
+# Setup observability at module level (NOT inside lifespan)
+# Per RESEARCH.md Pitfall 6: FastAPIInstrumentor must be called after app creation
+provider = setup_observability(app, "processor-service")
 
 
 @app.get("/health")
