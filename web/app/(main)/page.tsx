@@ -8,6 +8,7 @@ import Link from 'next/link'
 import ThemeToggle from '@/components/theme-toggle'
 import CreateMemoryForm from '@/components/memory/create-memory-form'
 import MemoryCard from '@/components/memory/memory-card'
+import SearchInput from '@/components/search/search-input'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 
 export default function HomePage() {
@@ -51,12 +52,13 @@ export default function HomePage() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Logo size={28} className="text-gray-900 dark:text-gray-100" />
             <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Echoes</h1>
             <span className="text-xs text-gray-400 dark:text-gray-500">拾忆</span>
           </div>
-          <div className="flex items-center gap-1">
+          <SearchInput />
+          <div className="flex items-center gap-1 flex-shrink-0">
             <ThemeToggle />
             {user && (
               <div className="flex items-center gap-1 ml-1">

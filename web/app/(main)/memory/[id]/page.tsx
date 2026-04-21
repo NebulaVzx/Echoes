@@ -7,6 +7,7 @@ import { api, Memory } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
 import { useTheme } from '@/app/providers/theme-provider'
 import Logo from '@/components/logo'
+import SearchInput from '@/components/search/search-input'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 
 function ThemeToggle() {
@@ -152,14 +153,15 @@ export default function MemoryDetailPage() {
 
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Logo size={28} className="text-gray-900 dark:text-gray-100" />
             <Link href="/" className="text-lg font-semibold text-gray-900 dark:text-gray-50 hover:opacity-80 transition-opacity">
               Echoes
             </Link>
           </div>
-          <div className="flex items-center gap-3">
+          <SearchInput />
+          <div className="flex items-center gap-3 flex-shrink-0">
             <ThemeToggle />
             {user && (
               <div className="flex items-center gap-3">
