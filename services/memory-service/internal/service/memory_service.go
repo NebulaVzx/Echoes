@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
+	"github.com/NebulaVzx/Echoes/services/memory-service/internal/middleware"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -352,6 +353,9 @@ func (s *MemoryService) UpdateTaskStatus(ctx context.Context, memoryID uuid.UUID
 	}
 	memory.Metadata = string(metaJSON)
 	memory.ProcessingStatus = aggregated
+
+	// Record processing status metric
+	middleware.RecordMemoryProcessing(aggregated)
 
 	// Apply result fields if present
 	if update.Result != nil {

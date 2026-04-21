@@ -29,9 +29,25 @@ var (
 	)
 )
 
+var (
+	memoryProcessingTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "memory_processing_total",
+			Help: "Total number of memory processing status transitions",
+		},
+		[]string{"status"},
+	)
+)
+
 func init() {
 	prometheus.MustRegister(httpRequestsTotal)
 	prometheus.MustRegister(httpRequestDuration)
+	prometheus.MustRegister(memoryProcessingTotal)
+}
+
+// RecordMemoryProcessing records a memory processing status transition.
+func RecordMemoryProcessing(status string) {
+	memoryProcessingTotal.WithLabelValues(status).Inc()
 }
 
 // PrometheusMetrics returns a Gin middleware that records HTTP request metrics.
