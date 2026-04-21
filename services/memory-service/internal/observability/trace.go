@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -23,6 +24,9 @@ func InitTracer(serviceName string) (func(context.Context) error, error) {
 	if endpoint == "" {
 		endpoint = "jaeger:4318"
 	}
+	// Strip http:// or https:// prefix; otlptracehttp.WithEndpoint expects host:port only.
+	endpoint = strings.TrimPrefix(endpoint, "http://")
+	endpoint = strings.TrimPrefix(endpoint, "https://")
 
 	exporter, err := otlptracehttp.New(ctx,
 		otlptracehttp.WithEndpoint(endpoint),

@@ -106,7 +106,7 @@ services:
 
   # Jaeger - Distributed Tracing
   jaeger:
-    image: jaegertracing/all-in-one:1.76
+    image: jaegertracing/all-in-one:1.76.0
     container_name: echoes-jaeger
     restart: unless-stopped
     environment:

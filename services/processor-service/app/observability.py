@@ -41,8 +41,9 @@ def setup_observability(app: FastAPI, service_name: str):
     provider = TracerProvider(resource=resource)
 
     # OTLP HTTP exporter -> Jaeger
-    otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4318/v1/traces")
-    exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
+    # Let OTLPSpanExporter read endpoint from OTEL_EXPORTER_OTLP_ENDPOINT env var
+    # and auto-append /v1/traces path.
+    exporter = OTLPSpanExporter()
     provider.add_span_processor(BatchSpanProcessor(exporter))
 
     trace.set_tracer_provider(provider)

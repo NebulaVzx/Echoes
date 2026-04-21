@@ -2,7 +2,7 @@
 # Multi-stage build for Go + GORM user management service
 
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ EXPOSE 8001
 CMD ["./user-service"]
 
 # Development stage
-FROM golang:1.23-alpine AS development
+FROM golang:1.25-alpine AS development
 
 WORKDIR /app
 
