@@ -38,8 +38,17 @@ export interface LLMSettings {
   include_note_in_analysis?: boolean
 }
 
+export interface SearchSettings {
+  similarity_threshold: number
+}
+
+export interface UserSettings extends LLMSettings {
+  search_similarity_threshold?: number
+}
+
 export interface UpdateSettingsRequest {
-  llm: LLMSettings
+  llm?: LLMSettings
+  search?: SearchSettings
 }
 
 export interface AuthResponse {
@@ -87,9 +96,15 @@ export interface RelatedResponse {
 class ApiClient {
   private baseURL: string
   private token: string | null = null
+  private refreshPromise: Promise<void> | null = null
+  private onAuthErrorCallback: (() => void) | null = null
 
   constructor(baseURL: string) {
     this.baseURL = baseURL
+  }
+
+  setOnAuthError(callback: () => void) {
+    this.onAuthErrorCallback = callback
   }
 
   setToken(token: string | null) {
@@ -114,7 +129,29 @@ class ApiClient {
     return this.token
   }
 
-  private async request<T>(
+  private async doRefresh(): Promise<void> {
+    const refreshToken = localStorage.getItem('echoes_refresh_token')
+    if (!refreshToken) {
+      throw new Error('No refresh token')
+    }
+
+    const response = await fetch(`${this.baseURL}/api/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+
+    const data = await response.json() as ApiResponse<TokenPair>
+
+    if (response.ok && data.success && data.data) {
+      this.setToken(data.data.access_token)
+      localStorage.setItem('echoes_refresh_token', data.data.refresh_token)
+    } else {
+      throw new Error(data.error?.message || 'Refresh failed')
+    }
+  }
+
+  private async requestWithToken<T>(
     method: string,
     path: string,
     body?: unknown,
@@ -141,13 +178,54 @@ class ApiClient {
     }
 
     const response = await fetch(url, options)
-    const data = await response.json()
+    const data = await response.json() as ApiResponse<T>
 
     if (!response.ok && !data.success) {
       throw new Error(data.error?.message || 'Request failed')
     }
 
     return data
+  }
+
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<T>> {
+    try {
+      return await this.requestWithToken<T>(method, path, body, signal)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : ''
+      // Check if this is an auth error (401 / TOKEN_EXPIRED / UNAUTHORIZED)
+      const isAuthError =
+        errorMessage.includes('TOKEN_EXPIRED') ||
+        errorMessage.includes('UNAUTHORIZED') ||
+        errorMessage.includes('Invalid or expired token') ||
+        errorMessage.includes('token')
+
+      if (!isAuthError) {
+        throw err
+      }
+
+      // Try refresh
+      if (!this.refreshPromise) {
+        this.refreshPromise = this.doRefresh().finally(() => {
+          this.refreshPromise = null
+        })
+      }
+
+      try {
+        await this.refreshPromise
+        // Retry original request
+        return await this.requestWithToken<T>(method, path, body, signal)
+      } catch {
+        // Refresh failed — clear auth state and notify
+        this.setToken(null)
+        this.onAuthErrorCallback?.()
+        throw new Error('登录已过期，请重新登录')
+      }
+    }
   }
 
   // Auth endpoints
@@ -183,15 +261,15 @@ class ApiClient {
   }
 
   // Settings endpoints
-  async getSettings(): Promise<ApiResponse<LLMSettings>> {
-    return this.request<LLMSettings>('GET', '/api/v1/auth/me/settings')
+  async getSettings(): Promise<ApiResponse<UserSettings>> {
+    return this.request<UserSettings>('GET', '/api/v1/auth/me/settings')
   }
 
-  async updateSettings(settings: UpdateSettingsRequest): Promise<ApiResponse<LLMSettings>> {
-    return this.request<LLMSettings>('PUT', '/api/v1/auth/me/settings', settings)
+  async updateSettings(settings: UpdateSettingsRequest): Promise<ApiResponse<UserSettings>> {
+    return this.request<UserSettings>('PUT', '/api/v1/auth/me/settings', settings)
   }
 
-  async testLLMConnection(settings: UpdateSettingsRequest): Promise<ApiResponse<unknown>> {
+  async testLLMConnection(settings: { llm: LLMSettings }): Promise<ApiResponse<unknown>> {
     return this.request<unknown>('POST', '/api/v1/auth/me/settings/test', settings)
   }
 

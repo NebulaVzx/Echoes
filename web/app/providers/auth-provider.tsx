@@ -18,6 +18,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Register auth error callback so api client can notify us when token refresh fails
+    api.setOnAuthError(() => {
+      setUser(null)
+      window.location.href = '/login'
+    })
+
     const initAuth = async () => {
       // Check for OAuth callback token in URL hash (backend redirects here with #token=...)
       const hash = window.location.hash
@@ -43,9 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(response.data)
           } else {
             api.setToken(null)
+            setUser(null)
           }
         } catch {
-          api.setToken(null)
+          // api client will have auto-refreshed the token on 401;
+          // if refresh also failed, onAuthError callback is already triggered.
+          // If it's a non-auth error, just leave state as-is.
+          setUser(null)
         }
       }
       setIsLoading(false)

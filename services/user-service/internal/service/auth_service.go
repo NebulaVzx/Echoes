@@ -117,9 +117,9 @@ func (s *AuthService) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.Us
 	return user, nil
 }
 
-// GetUserSettings retrieves a user's LLM settings.
+// GetUserSettings retrieves a user's settings (LLM + search preferences).
 // The API key is decrypted and masked for safe display.
-func (s *AuthService) GetUserSettings(ctx context.Context, id uuid.UUID) (*domain.LLMSettings, error) {
+func (s *AuthService) GetUserSettings(ctx context.Context, id uuid.UUID) (*domain.UserSettings, error) {
 	user, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
@@ -128,11 +128,11 @@ func (s *AuthService) GetUserSettings(ctx context.Context, id uuid.UUID) (*domai
 		return nil, err
 	}
 
-	var settings domain.LLMSettings
+	var settings domain.UserSettings
 	settingsStr := user.Settings.String()
 	if len(user.Settings) > 0 && settingsStr != "{}" && settingsStr != "null" {
 		if err := json.Unmarshal([]byte(settingsStr), &settings); err != nil {
-			return &domain.LLMSettings{}, nil
+			return &domain.UserSettings{}, nil
 		}
 	}
 
@@ -149,10 +149,10 @@ func (s *AuthService) GetUserSettings(ctx context.Context, id uuid.UUID) (*domai
 	return &settings, nil
 }
 
-// UpdateUserSettings updates a user's LLM settings.
+// UpdateUserSettings updates a user's settings.
 // API keys are encrypted before storage. If the request contains a masked key,
-// the existing key is preserved.
-func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req domain.UpdateSettingsRequest) (*domain.LLMSettings, error) {
+// the existing key is preserved. Only fields present in the request are updated.
+func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req domain.UpdateSettingsRequest) (*domain.UserSettings, error) {
 	user, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
@@ -161,30 +161,40 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 		return nil, err
 	}
 
-	// Parse existing settings to preserve API key if masked in request
-	var existing domain.LLMSettings
+	// Parse existing settings
+	var existing domain.UserSettings
 	settingsStr := user.Settings.String()
 	if len(user.Settings) > 0 && settingsStr != "{}" && settingsStr != "null" {
 		_ = json.Unmarshal([]byte(settingsStr), &existing)
 	}
 
-	// Normalize temperature to float64 before storage
-	req.LLM.Temperature = req.LLM.GetTemperature()
+	// Update LLM settings if provided
+	if req.LLM != nil {
+		// Normalize temperature to float64 before storage
+		req.LLM.Temperature = req.LLM.GetTemperature()
 
-	// Handle API key: if masked or empty, preserve existing encrypted key
-	newKey := req.LLM.APIKey
-	if newKey == "" || strings.Contains(newKey, "***") {
-		req.LLM.APIKey = existing.APIKey // keep encrypted value
-	} else {
-		// Encrypt the new API key
-		encrypted, err := crypto.Encrypt(newKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encrypt API key: %w", err)
+		// Handle API key: if masked or empty, preserve existing encrypted key
+		newKey := req.LLM.APIKey
+		if newKey == "" || strings.Contains(newKey, "***") {
+			req.LLM.APIKey = existing.APIKey // keep encrypted value
+		} else {
+			// Encrypt the new API key
+			encrypted, err := crypto.Encrypt(newKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to encrypt API key: %w", err)
+			}
+			req.LLM.APIKey = encrypted
 		}
-		req.LLM.APIKey = encrypted
+
+		existing.LLMSettings = *req.LLM
 	}
 
-	settingsJSON, err := json.Marshal(req.LLM)
+	// Update search settings if provided
+	if req.Search != nil {
+		existing.SearchSimilarityThreshold = req.Search.SimilarityThreshold
+	}
+
+	settingsJSON, err := json.Marshal(existing)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal settings: %w", err)
 	}
@@ -195,7 +205,8 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 	}
 
 	// Return with masked key for response
-	resp := req.LLM
+	resp := existing
+	resp.Temperature = resp.GetTemperature()
 	if resp.APIKey != "" {
 		decrypted, _ := crypto.Decrypt(resp.APIKey)
 		if decrypted != "" {

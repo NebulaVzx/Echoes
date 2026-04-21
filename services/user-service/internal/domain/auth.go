@@ -59,9 +59,21 @@ func (s LLMSettings) GetTemperature() float64 {
 	return 0.7
 }
 
+// SearchSettings represents per-user search configuration.
+type SearchSettings struct {
+	SimilarityThreshold float64 `json:"similarity_threshold,omitempty"`
+}
+
+// UserSettings represents the complete user settings.
+type UserSettings struct {
+	LLMSettings
+	SearchSimilarityThreshold float64 `json:"search_similarity_threshold,omitempty"`
+}
+
 // UpdateSettingsRequest represents a request to update user settings.
 type UpdateSettingsRequest struct {
-	LLM LLMSettings `json:"llm" binding:"required"`
+	LLM    *LLMSettings    `json:"llm,omitempty"`
+	Search *SearchSettings `json:"search,omitempty"`
 }
 
 // TestLLMRequest represents a request to test LLM connectivity.

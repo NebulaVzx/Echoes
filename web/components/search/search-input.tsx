@@ -1,11 +1,17 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, FormEvent } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function SearchInput() {
   const [query, setQuery] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const q = searchParams.get('q') || ''
+    setQuery(q)
+  }, [searchParams])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()

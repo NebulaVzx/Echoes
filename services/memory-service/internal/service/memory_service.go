@@ -399,6 +399,28 @@ func (s *MemoryService) UpdateMemoryVector(ctx context.Context, memoryID uuid.UU
 	return s.repo.UpdateVector(ctx, memoryID, vector)
 }
 
+// getUserSearchThreshold fetches the user's similarity threshold, defaulting to 0.40.
+func (s *MemoryService) getUserSearchThreshold(ctx context.Context, userID uuid.UUID) float64 {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return 0.40
+	}
+	settingsStr := user.Settings.String()
+	if len(user.Settings) == 0 || settingsStr == "{}" || settingsStr == "null" {
+		return 0.40
+	}
+	var settings struct {
+		SearchSimilarityThreshold float64 `json:"search_similarity_threshold"`
+	}
+	if err := json.Unmarshal([]byte(settingsStr), &settings); err != nil {
+		return 0.40
+	}
+	if settings.SearchSimilarityThreshold <= 0 || settings.SearchSimilarityThreshold > 1.0 {
+		return 0.40
+	}
+	return settings.SearchSimilarityThreshold
+}
+
 // Search performs semantic search using vector similarity.
 func (s *MemoryService) Search(ctx context.Context, userID uuid.UUID, query string, limit int) (*domain.SearchResponse, error) {
 	if limit < 1 || limit > 100 {
@@ -408,7 +430,8 @@ func (s *MemoryService) Search(ctx context.Context, userID uuid.UUID, query stri
 	if err != nil {
 		return nil, err
 	}
-	results, err := s.repo.SearchByVector(ctx, userID, vectorStr, limit, 0.75)
+	threshold := s.getUserSearchThreshold(ctx, userID)
+	results, err := s.repo.SearchByVector(ctx, userID, vectorStr, limit, threshold)
 	if err != nil {
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
@@ -442,7 +465,8 @@ func (s *MemoryService) Related(ctx context.Context, memoryID, userID uuid.UUID,
 	if vector == "" {
 		return nil, fmt.Errorf("memory has no vector")
 	}
-	results, err := s.repo.FindRelated(ctx, userID, memoryID, vector, limit, 0.7)
+	threshold := s.getUserSearchThreshold(ctx, userID)
+	results, err := s.repo.FindRelated(ctx, userID, memoryID, vector, limit, threshold)
 	if err != nil {
 		return nil, fmt.Errorf("related search failed: %w", err)
 	}
