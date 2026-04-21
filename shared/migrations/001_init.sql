@@ -4,7 +4,7 @@
 -- Description: Initial schema for users, memories, and supporting structures
 
 -- Enable pgvector extension for vector similarity search
-CREATE EXTENSION IF NOT EXISTS pgvector;
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -38,15 +38,15 @@ CREATE TABLE IF NOT EXISTS memories (
     ocr_text TEXT,
     transcript_text TEXT,
 
-    -- Vector embedding for semantic search (BGE-M3 produces 768-dim vectors)
-    vector VECTOR(768),
+    -- Vector embedding for semantic search (BGE-M3 produces 1024-dim vectors)
+    vector VECTOR(1024),
 
     -- Metadata
     tags VARCHAR(50)[] DEFAULT '{}',
     note TEXT,
     metadata JSONB DEFAULT '{}',
-    processing_status VARCHAR(20) DEFAULT 'pending',
-    visibility VARCHAR(20) DEFAULT 'private',
+    processing_status VARCHAR(20) DEFAULT 'pending' CHECK (processing_status IN ('pending', 'processing', 'completed', 'failed')),
+    visibility VARCHAR(20) DEFAULT 'private' CHECK (visibility IN ('private', 'public')),
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -84,5 +84,5 @@ CREATE TRIGGER update_memories_updated_at
 -- Comment on tables for documentation
 COMMENT ON TABLE users IS 'Registered users (email/password or OAuth)';
 COMMENT ON TABLE memories IS 'User saved content (text snippets, links, future media)';
-COMMENT ON COLUMN memories.vector IS 'BGE-M3 embedding (768 dimensions) for semantic search';
+COMMENT ON COLUMN memories.vector IS 'BGE-M3 embedding (1024 dimensions) for semantic search';
 COMMENT ON COLUMN memories.processing_status IS 'pending -> processing -> completed/failed';

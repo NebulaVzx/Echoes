@@ -347,8 +347,8 @@ CREATE TABLE memories (
     tags VARCHAR(50)[] DEFAULT '{}',
     note TEXT,
     metadata JSONB DEFAULT '{}',
-    processing_status VARCHAR(20) DEFAULT 'pending',
-    visibility VARCHAR(20) DEFAULT 'private',
+    processing_status VARCHAR(20) DEFAULT 'pending' CHECK (processing_status IN ('pending', 'processing', 'completed', 'failed')),
+    visibility VARCHAR(20) DEFAULT 'private' CHECK (visibility IN ('private', 'public')),
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -498,7 +498,7 @@ Write-Host "Run migrations in WSL2: wsl make migrate" -ForegroundColor Cyan
 Write-Host "Or manually: psql postgres://echoes_user:password@localhost:5432/echoes -f shared/migrations/001_init.sql" -ForegroundColor Cyan
 
 Write-Host "Environment ready!" -ForegroundColor Green
-Write-Host "API: http://localhost:8080" -ForegroundColor Cyan
+Write-Host "API Gateway: http://localhost:8088" -ForegroundColor Cyan
 ```
 
 ---
@@ -581,48 +581,51 @@ kubectl apply -f k8s/
 
 ### Sprint 1：认证体系（Week 2）
 
+**状态**：已完成
+
 **目标**：用户可注册、登录，JWT 认证链路贯穿 Gateway → User Service。
 
 **User Service（Go + GORM）：**
-- [ ] 数据库连接（GORM + PostgreSQL）
-- [ ] User domain 模型（与 `001_init.sql` 对应）
-- [ ] Repository 层（Create / GetByEmail / GetByID / Update）
-- [ ] Service 层：
-  - [ ] 注册（bcrypt 密码哈希，cost=12）
-  - [ ] 登录（密码校验 + JWT 签发）
-  - [ ] GitHub OAuth（授权入口 + Callback + 用户绑定）
-  - [ ] Token 刷新（Refresh Token 机制）
-- [ ] Transport 层（Gin HTTP Handler）：
-  - [ ] `POST /api/v1/auth/register`
-  - [ ] `POST /api/v1/auth/login`
-  - [ ] `GET /api/v1/auth/github`
-  - [ ] `GET /api/v1/auth/github/callback`
-  - [ ] `POST /api/v1/auth/refresh`
-  - [ ] `POST /api/v1/auth/logout`
-  - [ ] `GET /api/v1/auth/me`
+- [x] 数据库连接（GORM + PostgreSQL）
+- [x] User domain 模型（与 `001_init.sql` 对应）
+- [x] Repository 层（Create / GetByEmail / GetByID / Update）
+- [x] Service 层：
+  - [x] 注册（bcrypt 密码哈希，cost=12）
+  - [x] 登录（密码校验 + JWT 签发）
+  - [x] GitHub OAuth（授权入口 + Callback + 用户绑定）
+  - [x] Token 刷新（Refresh Token 机制）
+- [x] Transport 层（Gin HTTP Handler）：
+  - [x] `POST /api/v1/auth/register`
+  - [x] `POST /api/v1/auth/login`
+  - [x] `GET /api/v1/auth/github`
+  - [x] `GET /api/v1/auth/github/callback`
+  - [x] `POST /api/v1/auth/refresh`
+  - [x] `POST /api/v1/auth/logout`
+  - [x] `GET /api/v1/auth/me`
 
 **Gateway Service（Go + Gin）：**
-- [ ] 反向代理：认证路由 → User Service
-- [ ] JWT 认证中间件（验证 Access Token，透传 user_id）
+- [x] 反向代理：认证路由 → User Service
+- [x] JWT 认证中间件（验证 Access Token，透传 user_id）
 - [ ] 路由转发：记忆路由 → Memory Service（预留，Sprint 2 接入）
 
 **前端（Next.js）：**
-- [ ] 登录页面（`app/(auth)/login/page.tsx`）
-- [ ] 注册页面（`app/(auth)/register/page.tsx`）
-- [ ] 表单验证（Zod / React Hook Form）
-- [ ] API 客户端封装（fetch wrapper + token 自动注入）
-- [ ] 登录状态管理（React Context / Zustand）
+- [x] 登录页面（`app/(auth)/login/page.tsx`）
+- [x] 注册页面（`app/(auth)/register/page.tsx`）
+- [x] 表单验证（Zod / React Hook Form）
+- [x] API 客户端封装（fetch wrapper + token 自动注入）
+- [x] 登录状态管理（React Context / Zustand）
+- [x] 路由保护（middleware.ts 未认证重定向至登录页）
 
 **文档：**
-- [ ] 更新 docs/API.md（认证接口详细定义）
-- [ ] 更新 docs/PROGRESS.md（Sprint 1 完成标记）
-- [ ] 更新 CHANGELOG.md（v0.2.0）
+- [x] 更新 docs/API.md（认证接口详细定义：错误码表补充 OAUTH_ERROR/INVALID_STATE、GitHub OAuth 回调响应、健康检查版本 0.2.0）
+- [x] 更新 docs/PROGRESS.md（Sprint 1 完成标记）
+- [x] 更新 CHANGELOG.md（v0.2.0）
 
 **里程碑验证：**
-- 用户可通过邮箱注册、登录
-- 登录后获取 JWT Token
-- Gateway 中间件拒绝无 Token 请求
-- GitHub OAuth 可完成授权并创建/绑定用户
+- [x] 用户可通过邮箱注册、登录
+- [x] 登录后获取 JWT Token
+- [x] Gateway 中间件拒绝无 Token 请求
+- [x] GitHub OAuth 可完成授权并创建/绑定用户
 
 ---
 

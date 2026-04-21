@@ -23,7 +23,7 @@ web/out/
 services/*/vendor/
 
 ### Python
-services/*/__pycache__/
+**/__pycache__/
 services/*/.venv/
 services/*/.env
 
@@ -32,4 +32,10 @@ services/*/.env
 .idea/
 
 ### OS
-.DS_Store
+.DS_Storeservices/user-service/user-service-test
+web/package-lock.json
+
+### env
+.env
+services/vectorizer-service/verify_task1.py
+web/tsconfig.tsbuildinfo

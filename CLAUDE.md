@@ -12,16 +12,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Technology Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Next.js 14 (App Router), Tailwind CSS, shadcn/ui, Framer Motion |
-| API Gateway | Go + Gin |
-| Backend Services | Go + GORM |
-| Vector/ML Services | Python + FastAPI, BGE-M3 model |
-| Database | PostgreSQL 15 + pgvector extension |
-| Cache/Queue | Redis 7 (Stream for message queue) |
-| Object Storage | MinIO (S3-compatible) |
-| Deployment | Docker Compose (local), Kubernetes (production) |
+| Layer | Technology | Rationale |
+|-------|------------|-----------|
+| Frontend | Next.js 14 (App Router), Tailwind CSS, shadcn/ui, Framer Motion | SSR/SSG, RSC, Notion-like design system |
+| API Gateway | Go + Gin | v1.9+, lightweight, high performance |
+| Backend Services | Go + GORM | Standard microservice pattern, type-safe |
+| Vector/ML Services | Python + FastAPI, BGE-M3 model | FastAPI for async ML workloads, BGE-M3 optimized for Chinese |
+| LLM Provider | OpenAI / Anthropic | Factory pattern switch via `LLM_PROVIDER` env var. Lightweight abstraction (200 lines) instead of LangChain/LlamaIndex |
+| Database | PostgreSQL 15 + pgvector extension | Single database for relational + vector; IVFFlat index sufficient for 10k+ rows |
+| Cache/Queue | Redis 7 (Stream for message queue) | Lightweight, reliable, supports consumer groups |
+| Object Storage | MinIO (S3-compatible) | Compatible with AWS S3 SDK |
+| Observability | Prometheus + OpenTelemetry + Zap | Metrics/Tracing/Logging. Sprint 5 **must** implement. Alternative: StatsD + Zipkin/Jaeger |
+| Deployment | Docker Compose (local), Kubernetes (production) | Progressive deployment |
+
+### Tech Stack Selection Principle
+
+> **Capability > Tool Name.** If a preferred tool is unavailable, use a substitute that provides the same capability. Always document the substitution.
+
+| Capability | Primary | Alternatives | Key Requirements |
+|------------|---------|--------------|------------------|
+| ReAct Reasoning | Self-built Go | Any multi-step reasoning + tool-call framework | Agent think-act-observe loop |
+| MCP Protocol | Self-built | gRPC / HTTP / OpenAPI | Standardized interface |
+| LLM Framework | Lightweight abstraction | LangChain / LlamaIndex | Multi-model switch, RAG |
+| Vector DB | pgvector | Milvus / Pinecone / Weaviate | 768-dim, cosine, scalable |
+| Observability | Prometheus + OTel | StatsD + Zipkin / Jaeger | Metrics/Tracing/Logging |
+
+**Rationale for self-built over off-the-shelf:**
+- **ReAct / MCP**: Agent logic is lightweight (auto-tag + RAG QA). Self-built keeps code simple and controllable.
+- **LLM abstraction**: Only need multi-model switch + basic RAG. LangChain is overkill; 200 lines of custom code suffices.
+- **pgvector**: Same database as relational data, reduces ops complexity. IVFFlat performs well at 10k+ row scale.
 
 ## Architecture
 
@@ -175,6 +194,37 @@ Key tables: `users`, `memories`
 | Database | `echoes` |
 | Database user | `echoes_user` |
 | Kubernetes namespace | `echoes` |
+| Docker container prefix | `echoes-` |
+| Code package/module | `echoes` |
+| Web page title | `拾忆 - Echoes` (Chinese priority) or `Echoes` (English mode) |
+| API base path | `/api/v1/...` |
+
+## Git Conventions
+
+**Branch strategy:**
+- `main`: Stable branch, merged at end of each Sprint
+- `develop`: Development branch, daily commits
+- `feature/*`: Feature branches, single feature per branch
+
+**Commit frequency:** At least once per day when there is progress.
+
+**Commit format:** Conventional Commits
+- `feat:` New feature
+- `fix:` Bug fix
+- `docs:` Documentation update
+- `refactor:` Code refactoring
+- `test:` Test-related changes
+- `chore:` Build/config changes
+
+**Pre-commit checks:**
+- Code compiles/builds successfully
+- No sensitive info (grep for password/key/secret in diff)
+- All changed files reviewed in `git diff`
+
+**Push strategy:**
+- Sprint end: **must** push to GitHub
+- Key milestones: **must** push (DB model complete, auth working, search working, etc.)
+- Daily end: **should** push
 
 ## Development Plan (Sprint-Based)
 
@@ -187,7 +237,7 @@ The project is built in 6 one-week sprints:
 | 2 | 3 | Capture — Memory Service, text/link input, timeline UI |
 | 3 | 4 | Processing — Processor, Vectorizer, auto-tags, async queue |
 | 4 | 5 | Search — Semantic search, similar recommendations, dark mode |
-| 5 | 6 | Polish — Animations, responsive, error handling, self-testing |
+| 5 | 6 | Observability + Polish — Prometheus/OTel/Zap, animations, responsive, error handling, e2e testing |
 
 Each sprint must produce a runnable version. Check `PRD.md` for full API definitions, data models, and UI specifications.
 

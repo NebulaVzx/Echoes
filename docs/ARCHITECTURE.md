@@ -1,7 +1,7 @@
 # 架构说明 (ARCHITECTURE)
 
 > Echoes (拾忆) 系统架构设计文档
-> 版本：v1.0.0
+> 版本：v0.2.0（对应 Sprint 1：认证体系）
 > 日期：2026-04-18
 
 ## 1. 架构概述
@@ -18,6 +18,24 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
 | 异步消息 | Redis Stream | 轻量、可靠、支持消费组 |
 | 向量检索 | pgvector (IVFFlat) | 与 PostgreSQL 集成，无需额外向量数据库 |
 | 部署方式 | Docker Compose → K8s | 渐进式部署 |
+
+### 技术栈选型原则
+
+> **原则：能力 > 工具名称。** 有偏好的说明理由后可用平替。关键能力必须满足。
+
+| 能力需求 | 首选 | 可平替 | 关键要求 |
+|----------|------|--------|----------|
+| **ReAct 推理框架** | 自研 Go | 任何多步推理+工具调用框架 | Agent 思考-行动-观察循环 |
+| **MCP 协议** | 自研 | gRPC / HTTP / OpenAPI | 标准化接口 |
+| **LLM 框架** | 轻量抽象层 | LangChain / LlamaIndex | 多模型切换、RAG |
+| **向量数据库** | pgvector | Milvus / Pinecone / Weaviate | 768维、Cosine、可扩展 |
+| **可观测性** | Prometheus + OTel | StatsD + Zipkin / Jaeger | Metrics/Tracing/Logging |
+
+**选型理由：**
+- **自研 ReAct / MCP**：本项目 Agent 逻辑相对轻量（自动标签、RAG 问答），自研可保持代码简洁可控，避免引入过重的外部框架依赖。
+- **轻量 LLM 抽象层**：仅需要多模型切换和基础 RAG 能力，LangChain 过于庞大，自研 200 行代码即可满足。
+- **pgvector**：与 PostgreSQL 同一数据库，减少运维复杂度；IVFFlat 索引在万级数据量下性能足够。
+- **Prometheus + OTel**：云原生标准栈，Go 生态支持成熟，社区仪表盘模板丰富。Sprint 5 **必须**接入。 |
 
 ## 2. 微服务划分
 
@@ -68,7 +86,7 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
 
 #### Gateway Service
 - **职责**：统一入口，路由分发，认证鉴权
-- **端口**：8080
+- **端口**：8080（容器内），对外映射 8088
 - **路由规则**：
   - `/api/v1/auth/*` → User Service
   - `/api/v1/memories/*` → Memory Service
@@ -111,7 +129,7 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
 #### Processor Service
 - **职责**：内容处理与增强
 - **端口**：8003
-- **依赖**：LLM Provider（自动标签）
+- **依赖**：LLM Provider（自动标签）、Redis Stream
 - **核心功能**：
   - 链接抓取（HTTP 请求 + HTML 解析）
   - 内容摘要生成
@@ -121,6 +139,7 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
 #### Vectorizer Service
 - **职责**：文本向量化
 - **端口**：8004
+- **依赖**：Redis Stream
 - **模型**：BGE-M3（768 维向量，中文优化）
 - **核心功能**：
   - 文本编码为向量
@@ -215,7 +234,10 @@ tags: string[] (PostgreSQL array)
 note: text (nullable)
 metadata: jsonb
 processing_status: enum (pending, processing, completed, failed)
+  - DB-level: `VARCHAR(20) DEFAULT 'pending'` with CHECK constraint in migration
+  - App-level: Go enum / Python Literal type enforcement
 visibility: enum (private, public)
+  - DB-level: `VARCHAR(20) DEFAULT 'private'` with CHECK constraint in migration
 created_at: timestamp
 updated_at: timestamp
 ```
@@ -281,7 +303,7 @@ USING ivfflat (vector vector_cosine_ops);
 - JWT Token（HS256 签名）
 - Access Token：15 分钟有效期
 - Refresh Token：7 天有效期
-- Token 存储：HttpOnly Cookie
+- Token 存储：localStorage（开发）/ HttpOnly Cookie（生产预留）
 
 ### 6.2 密码存储
 - bcrypt 算法（cost factor 12）
@@ -289,8 +311,9 @@ USING ivfflat (vector vector_cosine_ops);
 
 ### 6.3 OAuth
 - GitHub OAuth 2.0
-- State 参数防止 CSRF
-- 仅请求必要权限（read:user, user:email）
+- State 参数防止 CSRF（10分钟过期，单次使用）
+- 仅请求必要权限（user:email）
+- 邮箱冲突自动关联（已有邮箱注册后OAuth登录自动绑定）
 
 ### 6.4 API 安全
 - Gateway 层限流（Rate Limiting）
@@ -351,18 +374,75 @@ K8s 配置位于 `k8s/` 目录，按编号顺序应用：
 7. `40-ingress.yaml` - 入口/SSL
 8. `50-hpa.yaml` - 自动扩缩容
 
-## 8. 监控与日志
+## 8. 可观测性（Sprint 5 必须实现）
 
-### 8.1 日志规范
-- 结构化 JSON 日志
-- 包含：timestamp, level, service, trace_id, message, context
-- Gateway 统一生成 trace_id，透传到下游服务
+> **硬性要求：Sprint 5 结束前必须接入可观测性三件套。** 本地环境通过 Docker Compose 部署 Prometheus + Jaeger + Grafana。
 
-### 8.2 健康检查
+### 8.1 Metrics（Prometheus）
+
+每个 Go 服务暴露 `/metrics` 端点。
+
+| 指标名 | 类型 | 说明 |
+|--------|------|------|
+| `http_requests_total` | Counter | 按 method、path、status 分桶 |
+| `http_request_duration_seconds` | Histogram | P50/P95/P99 分位 |
+| `memory_processing_status` | Gauge | 按状态计数：pending/processing/completed/failed |
+| `llm_requests_total` | Counter | 按 provider、状态分桶 |
+| `vector_embedding_duration_seconds` | Histogram | 向量化耗时 |
+
+### 8.2 Tracing（OpenTelemetry + Jaeger）
+
+- Gateway 生成 `trace_id`，透传到所有下游服务
+- 每个 HTTP/gRPC 调用生成 Span
+- Redis Stream 消费也记录 Span
+- 日志中写入 `trace_id` / `span_id` / `parent_span_id`
+
+### 8.3 Logging（Zap）
+
+结构化 JSON 日志，Go 标准。
+
+**必含字段：** `timestamp` / `level` / `service` / `trace_id` / `span_id` / `message` / `context`
+
+**级别：** DEBUG（开发）/ INFO（默认）/ WARN / ERROR
+
+### 8.4 可视化（Grafana）
+
+**预设面板：**
+- 服务 QPS / 延迟 / 错误率
+- Redis Stream 队列深度
+- PostgreSQL 连接数 / 慢查询
+- LLM 调用成功率 / 延迟
+
+### 8.5 部署
+
+| 环境 | 方式 |
+|------|------|
+| 本地 | Docker Compose（Prometheus + Jaeger + Grafana） |
+| 生产 | K8s（Sidecar 模式或 DaemonSet） |
+
+### 8.6 健康检查
+
 - 每个服务提供 `/health` 端点
 - Docker / K8s 使用健康检查决定容器状态
 
-### 8.3 未来扩展
-- Prometheus 指标收集
-- Grafana 可视化仪表盘
-- Jaeger 分布式链路追踪
+## 9. Phase 2/3 架构预留
+
+### 9.1 Phase 2：Echo Assistant
+
+基于 Sprint 3 的 LLMProvider 复用，无需新开发 LLM 模块。
+
+| 组件 | 说明 |
+|------|------|
+| Chat UI | Web 界面侧边栏组件 |
+| RAG 检索 | 用户问题 → 语义搜索 → 获取相关记忆 → LLM 生成回答 |
+| 引用来源 | LLM 回答中标注引用的记忆标题/链接 |
+| 对话历史 | 数据库存储，表结构预留 |
+
+### 9.2 Phase 3：Agent 平台
+
+**当前不实现，仅预留：**
+
+- 数据库字段预留：`memories.agent_id`、`memories.agent_type`
+- 预留 Agent 配置表结构
+- 微服务架构支持未来接入 Agent Service
+- **不做**：第三方 Agent 市场、SDK、沙盒

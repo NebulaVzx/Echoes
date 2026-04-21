@@ -7,7 +7,7 @@ version: "3.8"
 services:
   # PostgreSQL 15 with pgvector extension
   postgres:
-    image: ankane/pgvector:v0.5.1
+    image: pgvector/pgvector:pg15
     container_name: echoes-postgres
     restart: unless-stopped
     environment:
@@ -77,7 +77,7 @@ services:
       - PORT=8080
       - USER_SERVICE_URL=http://user-service:8001
       - MEMORY_SERVICE_URL=http://memory-service:8002
-      - JWT_SECRET=echoes_dev_secret_key_change_in_production
+      - JWT_SECRET=${JWT_SECRET:-echoes_dev_secret_key_change_in_production}
       - ENV=development
     ports:
       - "8088:8080"
@@ -100,10 +100,14 @@ services:
       - PORT=8001
       - DATABASE_URL=postgres://echoes_user:echoes_password@postgres:5432/echoes?sslmode=disable
       - REDIS_URL=redis://redis:6379/0
-      - JWT_SECRET=echoes_dev_secret_key_change_in_production
+      - JWT_SECRET=${JWT_SECRET:-echoes_dev_secret_key_change_in_production}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-}}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - GITHUB_REDIRECT_URI=http://localhost:8088/api/v1/auth/github/callback
       - ENV=development
+    volumes:
+      - ./services/user-service:/app
     depends_on:
       postgres:
         condition: service_healthy
@@ -123,9 +127,14 @@ services:
       - PORT=8002
       - DATABASE_URL=postgres://echoes_user:echoes_password@postgres:5432/echoes?sslmode=disable
       - REDIS_URL=redis://redis:6379/0
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-dev-internal-token}
       - VECTORIZER_SERVICE_URL=http://vectorizer-service:8004
       - PROCESSOR_SERVICE_URL=http://processor-service:8003
       - ENV=development
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./services/memory-service:/app
     depends_on:
       postgres:
         condition: service_healthy
@@ -139,15 +148,40 @@ services:
     build:
       context: ./services/processor-service
       dockerfile: Dockerfile
+      target: development
     container_name: echoes-processor
     restart: unless-stopped
     environment:
       - PORT=8003
       - REDIS_URL=redis://redis:6379/0
+      - MEMORY_SERVICE_URL=http://memory-service:8002
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-dev-internal-token}
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-${ANTHROPIC_API_KEY:-}}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-}}
+      - JWT_SECRET=${JWT_SECRET:-echoes_dev_secret_key_change_in_production}
+      - ENABLE_LINK_CONSUMER=true
+      - ENABLE_TAG_CONSUMER=true
       - ENV=development
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./services/processor-service:/app
+    command: ["sh", "-c", "pip install -r requirements.txt -q && uvicorn app.main:app --host 0.0.0.0 --port 8003"]
     depends_on:
       redis:
         condition: service_healthy
+      memory-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - echoes-network
 
@@ -161,10 +195,28 @@ services:
     environment:
       - PORT=8004
       - REDIS_URL=redis://redis:6379/0
+      - MEMORY_SERVICE_URL=http://memory-service:8002
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-dev-internal-token}
+      - MODEL_NAME=BAAI/bge-m3
+      - DEVICE=auto
+      - ENABLE_VECTORIZE_CONSUMER=true
       - ENV=development
+    ports:
+      - "8004:8004"
     depends_on:
       redis:
         condition: service_healthy
+      memory-service:
+        condition: service_started
+    volumes:
+      - ./services/vectorizer-service:/app
+    command: ["sh", "-c", "pip install -r requirements.txt -q && uvicorn app.main:app --host 0.0.0.0 --port 8004"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     networks:
       - echoes-network
 
@@ -177,7 +229,7 @@ services:
     container_name: echoes-web
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_API_URL=http://localhost:8088
       - API_URL=http://gateway:8080
     ports:
       - "3000:3000"
