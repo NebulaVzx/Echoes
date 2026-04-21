@@ -7,7 +7,9 @@ Consumes vectorization tasks from Redis Streams.
 import logging
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import redis.asyncio as redis
 from app.config import settings
 from app.services.embedder import BGEM3Embedder
@@ -71,6 +73,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+origins = [o.strip() for o in settings.cors_origins.split(",")]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/health")
 async def health_check():
@@ -88,3 +99,24 @@ async def root():
         "version": settings.service_version,
         "description": "BGE-M3 text vectorization service",
     }
+
+
+class EncodeRequest(BaseModel):
+    text: str
+
+
+class EncodeResponse(BaseModel):
+    vector: list
+    dimension: int
+
+
+@app.post("/encode", response_model=EncodeResponse)
+async def encode_text(request: EncodeRequest):
+    embedder = app.state.embedder
+    if not embedder.is_loaded:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    try:
+        vector = embedder.encode(request.text)
+        return EncodeResponse(vector=vector, dimension=embedder.dimension)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     model_name: str = "BAAI/bge-m3"
     device: str = "auto"  # auto, cpu, cuda
     enable_vectorize_consumer: bool = True
+    cors_origins: str = "*"
 
     class Config:
         env_file = ".env"
