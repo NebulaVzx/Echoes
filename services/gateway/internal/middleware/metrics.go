@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
+	otelgin "go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 var (
@@ -59,4 +60,9 @@ func PrometheusMetrics(service string) gin.HandlerFunc {
 		httpRequestsTotal.WithLabelValues(service, method, path, statusCode).Inc()
 		httpRequestDuration.WithLabelValues(service, method, path).Observe(duration)
 	}
+}
+
+// OTelGin returns the OpenTelemetry Gin middleware for trace generation/extraction.
+func OTelGin(serviceName string) gin.HandlerFunc {
+	return otelgin.Middleware(serviceName)
 }

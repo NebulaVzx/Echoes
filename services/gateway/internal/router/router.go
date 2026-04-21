@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"github.com/NebulaVzx/Echoes/services/gateway/internal/middleware"
+	"github.com/NebulaVzx/Echoes/services/gateway/internal/observability"
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.uber.org/zap"
 )
 
 // corsMiddleware handles CORS for cross-origin requests from the frontend.
@@ -51,12 +54,18 @@ func corsMiddleware() gin.HandlerFunc {
 }
 
 // Setup configures all routes and returns the Gin engine.
-func Setup() *gin.Engine {
+// Middleware chain per D-02/D-04/D-06: Recovery -> otelgin -> PrometheusMetrics -> ZapLogger -> CORS -> RateLimit -> JWTAuth
+func Setup(logger *zap.Logger) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(gin.Logger())
+	router.Use(middleware.OTelGin("gateway"))
+	router.Use(middleware.PrometheusMetrics("gateway"))
+	router.Use(middleware.ZapLogger(logger))
 	router.Use(corsMiddleware())
 	router.RedirectTrailingSlash = false
+
+	// Register /metrics endpoint before route groups
+	observability.RegisterMetricsEndpoint(router)
 
 	// Rate limiters: 5 req/min for auth, 60 req/min for memory APIs
 	authLimiter := middleware.NewRateLimiter(12*time.Second, 5)
@@ -121,12 +130,12 @@ func newReverseProxy(envKey, defaultURL string) *httputil.ReverseProxy {
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
-	// Custom transport with timeout
-	proxy.Transport = &http.Transport{
+	// Custom transport with timeout and OTel trace propagation to downstream services
+	proxy.Transport = otelhttp.NewTransport(&http.Transport{
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 10,
 		IdleConnTimeout:     90 * time.Second,
-	}
+	})
 
 	// Modify request to set correct host and path
 	originalDirector := proxy.Director
