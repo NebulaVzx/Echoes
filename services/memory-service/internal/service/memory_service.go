@@ -434,10 +434,15 @@ func (s *MemoryService) Related(ctx context.Context, memoryID, userID uuid.UUID,
 	if memory.UserID != userID {
 		return nil, ErrUnauthorized
 	}
-	if memory.Vector == "" {
+	// Fetch vector separately since GORM skips the vector field on read
+	vector, err := s.repo.GetVectorByID(ctx, memoryID)
+	if err != nil {
 		return nil, fmt.Errorf("memory has no vector")
 	}
-	results, err := s.repo.FindRelated(ctx, userID, memoryID, memory.Vector, limit, 0.7)
+	if vector == "" {
+		return nil, fmt.Errorf("memory has no vector")
+	}
+	results, err := s.repo.FindRelated(ctx, userID, memoryID, vector, limit, 0.7)
 	if err != nil {
 		return nil, fmt.Errorf("related search failed: %w", err)
 	}

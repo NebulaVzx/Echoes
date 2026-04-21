@@ -117,7 +117,8 @@ class ApiClient {
   private async request<T>(
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    signal?: AbortSignal
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${path}`
     const headers: Record<string, string> = {
@@ -132,6 +133,7 @@ class ApiClient {
     const options: RequestInit = {
       method,
       headers,
+      signal,
     }
 
     if (body) {
@@ -225,11 +227,11 @@ class ApiClient {
     return this.request<unknown>('DELETE', `/api/v1/memories/${id}`)
   }
 
-  async searchMemories(params: { q: string; limit?: number }): Promise<ApiResponse<SearchResponse>> {
+  async searchMemories(params: { q: string; limit?: number }, signal?: AbortSignal): Promise<ApiResponse<SearchResponse>> {
     const searchParams = new URLSearchParams()
     searchParams.set('q', params.q)
     if (params.limit) searchParams.set('limit', String(params.limit))
-    return this.request<SearchResponse>('GET', `/api/v1/search?${searchParams.toString()}`)
+    return this.request<SearchResponse>('GET', `/api/v1/search?${searchParams.toString()}`, undefined, signal)
   }
 
   async getRelatedMemories(id: string, params?: { limit?: number }): Promise<ApiResponse<RelatedResponse>> {

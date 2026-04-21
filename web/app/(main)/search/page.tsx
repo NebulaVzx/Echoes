@@ -22,24 +22,34 @@ function SearchResults() {
   useEffect(() => {
     if (!query) return
 
+    const abortController = new AbortController()
+
     const doSearch = async () => {
       setIsLoading(true)
       setError('')
       try {
-        const response = await api.searchMemories({ q: query, limit: 20 })
+        const response = await api.searchMemories({ q: query, limit: 20 }, abortController.signal)
+        if (abortController.signal.aborted) return
         if (response.success && response.data) {
           setResults(response.data.results)
         } else {
           setError(response.error?.message || '搜索失败')
         }
       } catch (err) {
+        if (abortController.signal.aborted) return
         setError(err instanceof Error ? err.message : '搜索失败')
       } finally {
-        setIsLoading(false)
+        if (!abortController.signal.aborted) {
+          setIsLoading(false)
+        }
       }
     }
 
     doSearch()
+
+    return () => {
+      abortController.abort()
+    }
   }, [query])
 
   return (

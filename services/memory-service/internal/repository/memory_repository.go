@@ -18,6 +18,7 @@ var (
 type MemoryRepository interface {
 	Create(ctx context.Context, memory *domain.Memory) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Memory, error)
+	GetVectorByID(ctx context.Context, id uuid.UUID) (string, error)
 	ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tag string) ([]domain.Memory, int64, error)
 	Update(ctx context.Context, memory *domain.Memory) error
 	UpdateVector(ctx context.Context, id uuid.UUID, vector string) error
@@ -94,6 +95,20 @@ func (r *GormMemoryRepository) UpdateVector(ctx context.Context, id uuid.UUID, v
 	return nil
 }
 
+// GetVectorByID retrieves just the vector field for a memory by its UUID.
+// Needed because the domain.Memory struct has Vector marked as read/write skip for GORM.
+func (r *GormMemoryRepository) GetVectorByID(ctx context.Context, id uuid.UUID) (string, error) {
+	var vector string
+	err := r.db.WithContext(ctx).Raw("SELECT vector::text FROM memories WHERE id = ?", id).Scan(&vector).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", ErrMemoryNotFound
+		}
+		return "", err
+	}
+	return vector, nil
+}
+
 // Delete removes a memory by ID, ensuring it belongs to the user.
 func (r *GormMemoryRepository) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
 	result := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&domain.Memory{})
@@ -118,7 +133,7 @@ func (r *GormMemoryRepository) SearchByVector(ctx context.Context, userID uuid.U
 		FROM memories
 		WHERE user_id = ?
 		  AND vector IS NOT NULL
-		  AND processing_status = 'completed'
+		  AND processing_status IN ('completed', 'partial_failed')
 		  AND (vector <=> ?::vector) <= ?
 		ORDER BY vector <=> ?::vector
 		LIMIT ?
@@ -142,6 +157,9 @@ func (r *GormMemoryRepository) SearchByVector(ctx context.Context, userID uuid.U
 		}
 		results = append(results, domain.SearchResult{Memory: m, Similarity: similarity})
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return results, nil
 }
 
@@ -157,7 +175,7 @@ func (r *GormMemoryRepository) FindRelated(ctx context.Context, userID uuid.UUID
 		WHERE user_id = ?
 		  AND id != ?
 		  AND vector IS NOT NULL
-		  AND processing_status = 'completed'
+		  AND processing_status IN ('completed', 'partial_failed')
 		  AND (vector <=> ?::vector) <= ?
 		ORDER BY vector <=> ?::vector
 		LIMIT ?
@@ -180,6 +198,9 @@ func (r *GormMemoryRepository) FindRelated(ctx context.Context, userID uuid.UUID
 			return nil, err
 		}
 		results = append(results, domain.SearchResult{Memory: m, Similarity: similarity})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return results, nil
 }
