@@ -1,28 +1,46 @@
 package main
 
 import (
-	"log"
+	"context"
 	"os"
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/config"
+	"github.com/NebulaVzx/Echoes/services/memory-service/internal/middleware"
+	"github.com/NebulaVzx/Echoes/services/memory-service/internal/observability"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/service"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/transport"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // main is the entry point for the Memory service.
-// Handles memory CRUD, tagging, search, and publishes async tasks to Redis Streams.
+// Initializes Zap logger, OTel tracer, and wires the router with observability middleware.
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8002"
 	}
 
+	// Initialize Zap logger
+	logger, err := observability.NewLogger("memory-service")
+	if err != nil {
+		panic(err)
+	}
+	defer logger.Sync()
+	zap.ReplaceGlobals(logger)
+
+	// Initialize OpenTelemetry tracer
+	shutdown, err := observability.InitTracer("memory-service")
+	if err != nil {
+		logger.Fatal("failed to initialize tracer", zap.Error(err))
+	}
+	defer shutdown(context.Background())
+
 	// Initialize database
 	db, err := config.NewDatabase()
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		logger.Fatal("failed to initialize database", zap.Error(err))
 	}
 
 	// Initialize repositories
@@ -41,9 +59,16 @@ func main() {
 	// Initialize handler
 	memoryHandler := transport.NewMemoryHandler(memoryService)
 
-	// Setup router
+	// Setup router with observability middleware
 	gin.SetMode(gin.DebugMode)
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(middleware.OTelGin("memory-service"))
+	router.Use(middleware.PrometheusMetrics("memory-service"))
+	router.Use(middleware.ZapLogger(logger))
+
+	// Register /metrics endpoint
+	observability.RegisterMetricsEndpoint(router)
 
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
@@ -58,8 +83,8 @@ func main() {
 	v1 := router.Group("/api/v1")
 	memoryHandler.RegisterRoutes(v1)
 
-	log.Printf("Memory service starting on port %s", port)
+	logger.Info("memory-service starting", zap.String("port", port))
 	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("Failed to start memory service: %v", err)
+		logger.Fatal("failed to start memory service", zap.Error(err))
 	}
 }
