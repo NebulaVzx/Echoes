@@ -6,9 +6,9 @@ type: state
 
 # 项目状态
 
-**最后更新：** 2026-04-19
+**最后更新：** 2026-04-21
 **当前分支：** develop
-**当前阶段：** Sprint 3 已完成
+**当前阶段：** Sprint 4 已完成
 
 ---
 
@@ -41,15 +41,23 @@ type: state
 - [x] 计划 03-03：Vectorizer Service：BGE-M3 模型 + 向量生成（已完成 2026-04-19）
 - [x] 计划 03-04：Integration - Docker Compose 集成 + Gateway 安全检查 + 冒烟测试 + e2e 验证脚本（已完成 2026-04-19）
 
+### Sprint 4：搜索与发现（已完成）
+- [x] 计划 04-01：Vectorizer Service POST /encode 端点 + CORS（已完成 2026-04-21）
+- [x] 计划 04-02：Memory Service 语义搜索 + 相似推荐 API（已完成 2026-04-21）
+- [x] 计划 04-03：前端搜索页面 + 导航搜索框 + 相似推荐组件（已完成 2026-04-21）
+- [x] 计划 04-04：E2E 验证脚本 + VERIFICATION.md（已完成 2026-04-21）
+
 ---
 
 ## 待办事项（下一步）
 
-### Sprint 4：搜索与发现（上下文已收集）
-- [ ] 语义搜索 API（向量相似度查询）
-- [ ] 相似内容推荐
-- [x] 暗黑模式支持（已在 Sprint 3 完成）
-- [ ] 前端搜索界面
+### Sprint 5：可观测性 + 打磨
+- [ ] Prometheus + OpenTelemetry 集成
+- [ ] 前端动画和加载状态
+- [ ] 错误处理和边界情况
+- [ ] 端到端测试
+
+### Sprint 6：Echo Assistant（规划中）
 
 ---
 
@@ -77,6 +85,7 @@ type: state
 - [x] Sprint 1 里程碑验证通过
 - [x] Sprint 2 里程碑验证通过
 - [x] Sprint 3 里程碑验证通过（2026-04-19）
+- [x] Sprint 4 里程碑验证通过（2026-04-21）
 
 ---
 
