@@ -30,6 +30,9 @@ func (h *MemoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.PUT("/memories/:id", h.Update)
 	router.DELETE("/memories/:id", h.Delete)
 
+	router.GET("/search", h.Search)
+	router.GET("/memories/:id/related", h.GetRelated)
+
 	// Internal API for service-to-service communication
 	internal := router.Group("/internal")
 	internal.Use(internalAuthMiddleware())
@@ -244,6 +247,96 @@ func (h *MemoryHandler) RetryTask(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// Search handles semantic search for memories.
+func (h *MemoryHandler) Search(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		return
+	}
+
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Query parameter 'q' is required"}})
+		return
+	}
+
+	limit := 10
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 100 {
+			limit = v
+		}
+	}
+
+	resp, err := h.memoryService.Search(c.Request.Context(), userID, query, limit)
+	if err != nil {
+		if err.Error() == "搜索服务暂不可用" {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": gin.H{"code": "SERVICE_UNAVAILABLE", "message": err.Error()}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+		return
+	}
+
+	// Convert results to safe response format with similarity
+	items := make([]map[string]interface{}, len(resp.Results))
+	for i, r := range resp.Results {
+		items[i] = r.Memory.SafeResponse()
+		items[i]["similarity"] = r.Similarity
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"results": items,
+		"query":   resp.Query,
+	}})
+}
+
+// GetRelated handles retrieving similar memories for a given memory.
+func (h *MemoryHandler) GetRelated(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		return
+	}
+
+	memoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid memory ID"}})
+		return
+	}
+
+	limit := 3
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 20 {
+			limit = v
+		}
+	}
+
+	resp, err := h.memoryService.Related(c.Request.Context(), memoryID, userID, limit)
+	if err != nil {
+		switch err {
+		case service.ErrMemoryNotFound:
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "Memory not found"}})
+		case service.ErrUnauthorized:
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": gin.H{"code": "FORBIDDEN", "message": "Access denied"}})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+		}
+		return
+	}
+
+	items := make([]map[string]interface{}, len(resp.Results))
+	for i, r := range resp.Results {
+		items[i] = r.Memory.SafeResponse()
+		items[i]["similarity"] = r.Similarity
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"results":   items,
+		"memory_id": resp.MemoryID,
+	}})
 }
 
 // Delete handles deleting a memory.

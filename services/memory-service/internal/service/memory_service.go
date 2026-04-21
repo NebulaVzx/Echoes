@@ -70,9 +70,10 @@ func validateLinkURL(rawURL string) error {
 
 // MemoryService handles memory CRUD business logic.
 type MemoryService struct {
-	repo     repository.MemoryRepository
-	userRepo repository.UserRepository
-	queue    TaskQueue
+	repo       repository.MemoryRepository
+	userRepo   repository.UserRepository
+	queue      TaskQueue
+	vectorizer *VectorizerClient
 }
 
 // TaskQueue defines the interface for publishing async tasks.
@@ -84,11 +85,12 @@ type TaskQueue interface {
 }
 
 // NewMemoryService creates a new memory service.
-func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue) *MemoryService {
+func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue, vectorizer *VectorizerClient) *MemoryService {
 	return &MemoryService{
-		repo:     repo,
-		userRepo: userRepo,
-		queue:    queue,
+		repo:       repo,
+		userRepo:   userRepo,
+		queue:      queue,
+		vectorizer: vectorizer,
 	}
 }
 
@@ -395,6 +397,54 @@ func (s *MemoryService) UpdateTaskStatus(ctx context.Context, memoryID uuid.UUID
 // UpdateMemoryVector updates the vector field directly (used by vectorizer).
 func (s *MemoryService) UpdateMemoryVector(ctx context.Context, memoryID uuid.UUID, vector string) error {
 	return s.repo.UpdateVector(ctx, memoryID, vector)
+}
+
+// Search performs semantic search using vector similarity.
+func (s *MemoryService) Search(ctx context.Context, userID uuid.UUID, query string, limit int) (*domain.SearchResponse, error) {
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+	vectorStr, err := s.vectorizer.EncodeQuery(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	results, err := s.repo.SearchByVector(ctx, userID, vectorStr, limit, 0.75)
+	if err != nil {
+		return nil, fmt.Errorf("search failed: %w", err)
+	}
+	return &domain.SearchResponse{
+		Results: results,
+		Query:   query,
+	}, nil
+}
+
+// Related finds memories similar to the given memory ID.
+func (s *MemoryService) Related(ctx context.Context, memoryID, userID uuid.UUID, limit int) (*domain.RelatedResponse, error) {
+	if limit < 1 || limit > 20 {
+		limit = 3
+	}
+	// Fetch the source memory to get its vector
+	memory, err := s.repo.GetByID(ctx, memoryID)
+	if err != nil {
+		if errors.Is(err, repository.ErrMemoryNotFound) {
+			return nil, ErrMemoryNotFound
+		}
+		return nil, err
+	}
+	if memory.UserID != userID {
+		return nil, ErrUnauthorized
+	}
+	if memory.Vector == "" {
+		return nil, fmt.Errorf("memory has no vector")
+	}
+	results, err := s.repo.FindRelated(ctx, userID, memoryID, memory.Vector, limit, 0.7)
+	if err != nil {
+		return nil, fmt.Errorf("related search failed: %w", err)
+	}
+	return &domain.RelatedResponse{
+		Results:  results,
+		MemoryID: memoryID,
+	}, nil
 }
 
 // RetryTask re-publishes a failed sub-task to the appropriate Redis Stream.

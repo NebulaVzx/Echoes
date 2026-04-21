@@ -32,8 +32,11 @@ func main() {
 	// Initialize Redis task queue
 	taskQueue := service.NewRedisTaskQueue()
 
+	// Initialize vectorizer client
+	vectorizerClient := service.NewVectorizerClient()
+
 	// Initialize service
-	memoryService := service.NewMemoryService(memoryRepo, userRepo, taskQueue)
+	memoryService := service.NewMemoryService(memoryRepo, userRepo, taskQueue, vectorizerClient)
 
 	// Initialize handler
 	memoryHandler := transport.NewMemoryHandler(memoryService)
