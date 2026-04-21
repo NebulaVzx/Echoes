@@ -15,6 +15,8 @@ from app.config import settings
 from app.services.embedder import BGEM3Embedder
 from app.clients.memory_client import MemoryServiceClient
 from app.consumers.vectorize_consumer import VectorizeConsumer
+from app.observability import setup_observability
+from opentelemetry import trace
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -63,6 +65,12 @@ async def lifespan(app: FastAPI):
         await consumer.stop()
     await memory_client.close()
     await redis_client.aclose()
+
+    # Shutdown tracer provider
+    provider = trace.get_tracer_provider()
+    if hasattr(provider, 'shutdown'):
+        provider.shutdown()
+
     print(f"{settings.service_name} shut down")
 
 
@@ -72,6 +80,10 @@ app = FastAPI(
     version=settings.service_version,
     lifespan=lifespan,
 )
+
+# Setup observability at module level (NOT inside lifespan)
+# Per RESEARCH.md Pitfall 6: FastAPIInstrumentor must be called after app creation
+provider = setup_observability(app, "vectorizer-service")
 
 origins = [o.strip() for o in settings.cors_origins.split(",")]
 app.add_middleware(
