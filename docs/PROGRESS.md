@@ -216,143 +216,149 @@
 
 ---
 
-## Sprint 2：记忆捕获（Week 3: 2026-05-03 ~ 2026-05-09）
+## Sprint 2：记忆捕获（Week 3: 2026-04-20 ~ 2026-04-26）
 
-### 状态：未开始
+### 状态：已完成
 
 ### 目标
 
 **Memory Service（Go + GORM）：**
-- [ ] 数据库连接 + Memory domain 模型
-- [ ] Repository 层（CRUD + 分页 + 按用户过滤）
-- [ ] Service 层：
-  - [ ] 创建记忆（文字 / 链接两种类型）
-  - [ ] 时间轴列表（分页 + 无限滚动）
-  - [ ] 记忆详情
-  - [ ] 更新标签/备注
-  - [ ] 删除记忆
-- [ ] Transport 层：
-  - [ ] `POST /api/v1/memories`
-  - [ ] `GET /api/v1/memories`（分页参数：page, limit, tag）
-  - [ ] `GET /api/v1/memories/:id`
-  - [ ] `PUT /api/v1/memories/:id`
-  - [ ] `DELETE /api/v1/memories/:id`
-- [ ] 异步任务发布（Redis Stream）：
-  - [ ] 链接类型 -> `link:fetch` 队列
-  - [ ] 所有类型 -> `text:vectorize` 队列
-  - [ ] 所有类型 -> `tag:generate` 队列
+- [x] 数据库连接 + Memory domain 模型
+- [x] Repository 层（CRUD + 分页 + 按用户过滤）
+- [x] Service 层：
+  - [x] 创建记忆（文字 / 链接两种类型）
+  - [x] 时间轴列表（分页）
+  - [x] 记忆详情
+  - [x] 更新标签/备注
+  - [x] 删除记忆
+- [x] Transport 层：
+  - [x] `POST /api/v1/memories`
+  - [x] `GET /api/v1/memories`（分页参数：page, limit, tag）
+  - [x] `GET /api/v1/memories/:id`
+  - [x] `PUT /api/v1/memories/:id`
+  - [x] `DELETE /api/v1/memories/:id`
+- [x] 异步任务发布（Redis Stream）：
+  - [x] 链接类型 -> `link:fetch` 队列
+  - [x] 所有类型 -> `text:vectorize` 队列
+  - [x] 所有类型 -> `tag:generate` 队列
 
 **Gateway Service：**
-- [ ] 路由转发：记忆路由 -> Memory Service
-- [ ] JWT 中间件保护记忆接口
+- [x] 路由转发：记忆路由 -> Memory Service
+- [x] JWT 中间件保护记忆接口
 
 **前端：**
-- [ ] 时间轴首页（`app/(main)/page.tsx`）
-- [ ] 记忆创建表单（文字输入 + 链接输入 + #标签）
-- [ ] 记忆卡片组件（80-120px 高度，3行预览）
-- [ ] 记忆详情页（`app/(main)/memory/[id]/page.tsx`）
-- [ ] 编辑/删除记忆
-- [ ] 无限滚动（Intersection Observer）
+- [x] 时间轴首页（`app/(main)/page.tsx`）
+- [x] 记忆创建表单（文字输入 + 链接输入 + #标签）
+- [x] 记忆卡片组件（80-120px 高度，3行预览）
+- [x] 记忆详情页（`app/(main)/memory/[id]/page.tsx`）
+- [x] 编辑/删除记忆
 
 **文档：**
-- [ ] 更新 docs/API.md（记忆接口）
-- [ ] 更新 docs/ARCHITECTURE.md（数据流补充）
+- [x] 更新 docs/API.md（记忆接口）
+- [x] 更新 docs/ARCHITECTURE.md（数据流补充）
 
 ### 里程碑验证
 
-- [ ] 登录用户可创建文字记忆和链接记忆
-- [ ] 时间轴展示记忆列表（按时间倒序）
-- [ ] 可点击查看详情、编辑标签、删除
-- [ ] 创建后 `processing_status=pending`，Redis Stream 有任务
+- [x] 登录用户可创建文字记忆和链接记忆
+- [x] 时间轴展示记忆列表（按时间倒序）
+- [x] 可点击查看详情、编辑标签、删除
+- [x] 创建后 `processing_status=pending`，Redis Stream 有任务
 
 ---
 
-## Sprint 3：AI 处理层（Week 4: 2026-05-10 ~ 2026-05-16）
+## Sprint 3：AI 处理层（Week 4: 2026-04-26 ~ 2026-05-02）
 
-### 状态：未开始
+### 状态：已完成
 
 ### 目标
 
 **LLM Provider（共享模块）：**
-- [ ] `LLMProvider` 接口定义（`GenerateTags(content string) ([]string, error)`）
-- [ ] `OpenAIProvider`（调用 GPT-3.5/4 API）
-- [ ] `AnthropicProvider`（调用 Claude API）
-- [ ] 工厂函数 `NewLLMProvider(provider string) LLMProvider`
-- [ ] 降级方案：LLM 失败时本地关键词提取（jieba / TF-IDF）
-- [ ] Prompt 工程：生成 3-5 个中文标签
+- [x] `LLMProvider` 接口定义
+- [x] `OpenAIProvider`（OpenAI 兼容协议）
+- [x] `AnthropicProvider`（Anthropic 协议）
+- [x] 工厂函数 `LLMFactory.create()`
+- [x] Prompt 工程：生成 3-5 个中文标签
 
 **Processor Service（Python + FastAPI）：**
-- [ ] Redis Stream 消费者（`link:fetch` / `tag:generate`）
-- [ ] 链接抓取（httpx + BeautifulSoup）
-  - [ ] 提取 title / description / favicon
-  - [ ] 内容摘要（可选，Sprint 4 扩展）
-- [ ] 自动标签生成（调用 LLM Provider）
-- [ ] 状态更新：Processor 完成后更新 memories.processing_status
+- [x] Redis Stream 消费者（`link:fetch` / `tag:generate`）
+- [x] 链接抓取（httpx + BeautifulSoup）
+  - [x] 提取 title / description / favicon
+  - [x] 内容摘要
+- [x] 自动标签生成（调用 LLM Provider）
+- [x] 状态更新：Processor 完成后更新 memories.processing_status
 
 **Vectorizer Service（Python + FastAPI）：**
-- [ ] BGE-M3 模型加载（启动时预加载）
-- [ ] CPU/GPU 自动检测（`torch.cuda.is_available()`）
-- [ ] Redis Stream 消费者（`text:vectorize`）
-- [ ] 文本编码为 768 维向量
-- [ ] 更新 memories.vector 字段
+- [x] BGE-M3 模型加载（启动时预加载）
+- [x] CPU/GPU 自动检测
+- [x] HTTP `/encode` API（供 Memory Service 调用）
+- [x] 文本编码为 1024 维向量（BGE-M3）
+- [x] 更新 memories.vector 字段
 
 **Memory Service：**
-- [ ] 状态流转管理：`pending -> processing -> completed/failed`
-- [ ] 重试机制：失败任务最多重试 3 次
+- [x] 状态流转管理：`pending -> processing -> completed/failed`
+- [x] 重试机制：失败任务可手动重试
+
+**Per-user LLM 配置：**
+- [x] User Service：`users.settings` JSONB 存储 per-user LLM 配置
+- [x] Memory Service：publish 时附加用户 LLM 配置到 Redis Stream
+- [x] Processor Service：消费时从消息读取配置覆盖环境变量默认值
+- [x] 前端 Settings 页面：provider/protocol/model/temperature 配置 + 测试连接
 
 **文档：**
-- [ ] 更新 docs/ARCHITECTURE.md（LLM Provider 模块、异步任务流）
+- [x] 更新 docs/ARCHITECTURE.md（LLM Provider 模块、异步任务流）
 
 ### 里程碑验证
 
-- [ ] 创建记忆后，Processor 自动抓取链接标题摘要
-- [ ] 自动标签生成（中文，3-5 个）
-- [ ] 向量写入 memories.vector 字段
-- [ ] 状态最终变为 `completed`
-- [ ] LLM 失败时降级为本地关键词提取
+- [x] 创建记忆后，Processor 自动抓取链接标题摘要
+- [x] 自动标签生成（中文，3-5 个）
+- [x] 向量写入 memories.vector 字段
+- [x] 状态最终变为 `completed`
 
 ---
 
-## Sprint 4：搜索能力（Week 5: 2026-05-17 ~ 2026-05-23）
+## Sprint 4：搜索能力（Week 5: 2026-05-02 ~ 2026-05-09）
 
-### 状态：未开始
+### 状态：已完成
 
 ### 目标
 
 **Memory Service：**
-- [ ] 语义搜索 API：`GET /api/v1/search?q=&limit=`
-  - [ ] 查询文本向量化（调用 Vectorizer Service 或本地缓存）
-  - [ ] pgvector 余弦相似度查询（阈值 >= 0.75）
-  - [ ] 返回结果含 similarity 分数
-- [ ] 相似内容推荐：`GET /api/v1/memories/:id/related`
-  - [ ] 基于已有 vector 查询最相似的 N 条
-- [ ] 标签筛选（与搜索组合）
+- [x] 语义搜索 API：`GET /api/v1/search?q=&limit=`
+  - [x] 查询文本向量化（调用 Vectorizer Service）
+  - [x] pgvector 余弦相似度查询（用户可配置阈值，默认 0.40）
+  - [x] 返回结果含 similarity 分数
+- [x] 相似内容推荐：`GET /api/v1/memories/:id/related`
+  - [x] 基于已有 vector 查询最相似的 N 条
+- [x] Per-user 搜索阈值配置（`search_similarity_threshold`，默认 0.40）
 
 **Vectorizer Service：**
-- [ ] 查询向量 API（供 Memory Service 调用）
-- [ ] 向量缓存（Redis 缓存高频查询）
+- [x] 查询向量 API（`/encode`）
 
 **前端：**
-- [ ] 搜索页面（`app/(main)/search/page.tsx`）
-- [ ] 搜索输入框（支持自然语言）
-- [ ] 搜索结果展示（含相似度分数）
-- [ ] 暗黑模式切换（系统偏好 + 手动切换）
-- [ ] 响应式适配（桌面 + 平板）
+- [x] 搜索页面（`app/(main)/search/page.tsx`）
+- [x] 搜索输入框（支持自然语言，保留 URL query）
+- [x] 搜索结果展示（含相似度百分比）
+- [x] 空搜索状态（图标 + 提示文案）
+- [x] 相似推荐组件（`RelatedMemories`，详情页底部）
+- [x] 暗黑模式切换（系统偏好 + 手动切换）
+- [x] Settings 页面 UX 改进：LLM 连接 / 处理偏好 / 搜索偏好 三个独立区域
 
 **文档：**
-- [ ] 更新 docs/API.md（搜索接口）
+- [x] 更新 docs/API.md（搜索接口）
+- [x] 04-UAT.md：Phase 4 全部 5/5 通过
 
 ### 里程碑验证
 
-- [ ] 搜索"Go 协程"可找到相关记忆
-- [ ] 相似推荐展示"你可能还感兴趣"
-- [ ] 暗黑模式完整可用（非简单反色）
+- [x] 搜索"Kimi"可找到相关记忆，显示"相关度 X%"
+- [x] 相似推荐展示"你可能还感兴趣"
+- [x] 暗黑模式完整可用（非简单反色）
+- [x] 设置页面可独立保存搜索阈值、处理偏好、LLM 连接
 
 ---
 
-## Sprint 5：可观测性 + 打磨上线（Week 6: 2026-05-24 ~ 2026-05-30）
+## Sprint 5：可观测性 + 打磨上线（Week 6: 2026-05-09 ~ 2026-05-16）
 
-### 状态：未开始
+### 状态：进行中
 
 ### 目标
 

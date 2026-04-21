@@ -2,7 +2,7 @@
 
 > 个人语义搜索引擎 - 拾起遗落的记忆
 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue)](CHANGELOG.md)
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://golang.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14.2-000?logo=next.js)](https://nextjs.org)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org)
@@ -20,13 +20,25 @@
 - **找回能力极强**：语义搜索，不用记得关键词
 - **发现意外关联**："原来我之前还存过类似的"
 
+**已实现功能：**
+- 邮箱注册/登录 + GitHub OAuth
+- 文字/链接记忆捕获（时间轴展示）
+- 自动标签生成（LLM）+ 链接抓取（标题/摘要）
+- BGE-M3 向量存储（pgvector）
+- **语义搜索**（自然语言查询，返回相似度百分比）
+- **相似内容推荐**（"你可能还感兴趣"）
+- **Per-user LLM 配置**（模型/温度/协议独立设置，API Key 加密存储）
+- **搜索相似度阈值可配置**（默认 40%，范围 0%-100%）
+- 暗黑模式（系统偏好 + 手动切换）
+- Token 自动刷新（15分钟 access token + 7天 refresh token）
+
 **目标用户：**
 - 信息囤积者：收藏100篇文章，需要时找不到
 - 知识工作者：需要建立个人知识库
 - 终身学习者：囤积课程/论文/教程
 
 **AI 层级：**
-- **Phase 1 (MVP)**：LLM 自动生成标签 + BGE-M3 向量化 + 语义搜索
+- **Phase 1 (MVP)**：LLM 自动生成标签 + BGE-M3 向量化 + 语义搜索（已实现）
 - **Phase 2 (Echo Assistant)**：对话式 AI 助手，基于 RAG 回答关于用户记忆的问题
 - **Phase 3 (Agent 平台)**：架构预留扩展性，支持未来第三方 Agent 接入
 
@@ -36,15 +48,15 @@
 |------|------|------|
 | 前端 | Next.js 14 + Tailwind CSS + shadcn/ui | App Router, RSC, Framer Motion |
 | API 网关 | Go + Gin | 路由、JWT 认证、限流 |
-| 用户服务 | Go + GORM | 注册/登录/GitHub OAuth/JWT |
-| 记忆服务 | Go + GORM | CRUD、标签、语义搜索 |
+| 用户服务 | Go + GORM | 注册/登录/GitHub OAuth/JWT/用户 LLM 设置 |
+| 记忆服务 | Go + GORM | CRUD、标签、语义搜索、相似推荐 |
 | 处理服务 | Python + FastAPI | 链接抓取、自动标签（LLM） |
 | 向量服务 | Python + FastAPI | BGE-M3 向量化 |
-| LLM Provider | OpenAI / Anthropic | 工厂模式切换 |
+| LLM Provider | OpenAI / Anthropic + 国产兼容 | 工厂模式切换，per-user 配置 |
 | 数据库 | PostgreSQL 15 + pgvector | 向量相似度搜索 |
 | 缓存/队列 | Redis 7 | Stream 消息队列 |
-| 对象存储 | MinIO | S3 兼容 |
-| 可观测性 | Prometheus + OTel + Zap | Metrics/Tracing/Logging |
+| 对象存储 | MinIO | S3 兼容（预留） |
+| 可观测性 | Prometheus + OTel + Zap | Metrics/Tracing/Logging（Sprint 5） |
 
 **选型原则：能力 > 工具名称。** 有偏好的说明理由后可用平替。关键能力必须满足：可观测性三件套（Metrics/Tracing/Logging）、向量数据库、LLM 多提供商切换。
 
@@ -118,20 +130,30 @@ Echoes/
 ├── dev-start.sh                # macOS/Linux 启动脚本
 ├── k8s/                        # Kubernetes 部署配置
 ├── web/                        # Next.js 前端
+│   ├── app/(auth)/             # 登录/注册
+│   ├── app/(main)/             # 首页/搜索/详情/设置
+│   ├── components/
+│   └── lib/api.ts              # API 客户端（含自动 token 刷新）
 ├── services/                   # 后端微服务
 │   ├── gateway/                # Go - API 网关
 │   ├── user-service/           # Go - 用户服务
 │   ├── memory-service/         # Go - 记忆服务
-│   ├── processor-service/      # Python - 链接处理
-│   └── vectorizer-service/     # Python - 向量化
+│   ├── processor-service/      # Python - 链接处理/LLM 标签
+│   └── vectorizer-service/     # Python - BGE-M3 向量化
 ├── shared/
 │   ├── migrations/             # 数据库迁移
 │   └── proto/                  # gRPC protobuf (预留)
-└── docs/                       # 文档
-    ├── PROGRESS.md             # 开发进度
-    ├── ARCHITECTURE.md         # 架构说明
+├── .planning/                  # 开发计划（GSD 工作流产物）
+│   ├── phases/
+│   │   ├── 02-memory-capture/
+│   │   ├── 03-processing/
+│   │   └── 04-search-capability/
+│   └── codebase/               # 代码库分析文档
+└── docs/                       # 项目文档
     ├── API.md                  # 接口文档
-    └── CHANGELOG.md            # 版本日志
+    ├── ARCHITECTURE.md         # 架构说明
+    ├── CHECKLIST.md            # 检查清单
+    └── PROGRESS.md             # 开发进度
 ```
 
 ### 常用命令
@@ -165,10 +187,10 @@ make fmt-web
 |--------|----|------|------|
 | 0 | 1 | 基础设施 - Docker Compose、数据库、目录结构 | 已完成 |
 | 1 | 2 | 认证体系 - User Service、Gateway、OAuth、Zod验证 | 已完成 |
-| 2 | 3 | 记忆捕获 - Memory Service、文字/链接、时间轴 | 未开始 |
-| 3 | 4 | 处理能力 - Processor、Vectorizer、自动标签 | 未开始 |
-| 4 | 5 | 搜索能力 - 语义搜索、相似推荐、暗黑模式 | 未开始 |
-| 5 | 6 | 可观测性 + 打磨上线 - Prometheus/OTel/Zap | 未开始 |
+| 2 | 3 | 记忆捕获 - Memory Service、文字/链接、时间轴 | 已完成 |
+| 3 | 4 | 处理能力 - Processor、Vectorizer、自动标签、async queue | 已完成 |
+| 4 | 5 | 搜索能力 - 语义搜索、相似推荐、暗黑模式、per-user LLM 配置 | 已完成 |
+| 5 | 6 | 可观测性 + 打磨上线 - Prometheus/OTel/Zap、动画、响应式、E2E 测试 | 进行中 |
 | Phase 2 | +1-2周 | Echo Assistant - 对话式 AI 助手，基于 RAG 回答记忆相关问题 | 未开始 |
 | Phase 3 | 预留 | Agent 平台 - 架构预留，支持第三方 Agent 接入 | 预留 |
 
