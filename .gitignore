@@ -38,3 +38,4 @@ web/package-lock.json
 ### env
 .env
 services/vectorizer-service/verify_task1.py
+web/tsconfig.tsbuildinfo
