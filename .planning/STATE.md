@@ -59,6 +59,12 @@ type: state
 
 ### Sprint 6：Echo Assistant（规划中）
 
+## 发布状态
+
+- **Phase 4 PR:** [#1](https://github.com/NebulaVzx/Echoes/pull/1) — develop → main
+- **提交日期:** 2026-04-21
+- **验证状态:** 12/12 automated + 5/5 UAT passed
+
 ---
 
 ## 技术债务（已修复）
