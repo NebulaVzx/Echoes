@@ -36,12 +36,13 @@ type RefreshRequest struct {
 
 // LLMSettings represents per-user LLM configuration.
 type LLMSettings struct {
-	Provider    string      `json:"llm_provider" binding:"omitempty"`
-	Protocol    string      `json:"llm_protocol" binding:"omitempty,oneof=openai anthropic"`
-	Model       string      `json:"llm_model" binding:"omitempty,max=100"`
-	Temperature interface{} `json:"llm_temperature" binding:"omitempty"`
-	APIKey      string      `json:"api_key,omitempty" binding:"omitempty"`
-	BaseURL     string      `json:"base_url,omitempty" binding:"omitempty,url"`
+	Provider               string      `json:"llm_provider" binding:"omitempty"`
+	Protocol               string      `json:"llm_protocol" binding:"omitempty,oneof=openai anthropic"`
+	Model                  string      `json:"llm_model" binding:"omitempty,max=100"`
+	Temperature            interface{} `json:"llm_temperature" binding:"omitempty"`
+	APIKey                 string      `json:"api_key,omitempty" binding:"omitempty"`
+	BaseURL                string      `json:"base_url,omitempty" binding:"omitempty,url"`
+	IncludeNoteInAnalysis  bool        `json:"include_note_in_analysis" binding:"omitempty"`
 }
 
 // GetTemperature returns the temperature as a float64, defaulting to 0.7.

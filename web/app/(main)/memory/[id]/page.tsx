@@ -80,6 +80,27 @@ export default function MemoryDetailPage() {
     loadMemory()
   }, [memoryId])
 
+  // Poll for processing status updates
+  useEffect(() => {
+    if (!memory || memory.processing_status !== 'pending') return
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await api.getMemory(memoryId)
+        if (response.success && response.data) {
+          setMemory(response.data)
+          if (response.data.processing_status !== 'pending') {
+            clearInterval(interval)
+          }
+        }
+      } catch {
+        // Silently fail on polling errors
+      }
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [memory?.processing_status, memoryId])
+
   const handleDelete = async () => {
     if (!confirm('确定要删除这条记忆吗？')) return
 

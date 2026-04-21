@@ -40,10 +40,13 @@ func NewRedisTaskQueue() *RedisTaskQueue {
 }
 
 // PublishLinkFetch publishes a link fetch task to Redis Stream with optional LLM config.
-func (q *RedisTaskQueue) PublishLinkFetch(memoryID uuid.UUID, linkURL string, llmConfig map[string]interface{}) error {
+func (q *RedisTaskQueue) PublishLinkFetch(memoryID uuid.UUID, linkURL string, note string, llmConfig map[string]interface{}) error {
 	fields := map[string]interface{}{
 		"memory_id": memoryID.String(),
 		"link_url":  linkURL,
+	}
+	if note != "" {
+		fields["note"] = note
 	}
 	mergeLLMConfig(fields, llmConfig)
 	return q.publish("link:fetch", fields)
@@ -60,10 +63,13 @@ func (q *RedisTaskQueue) PublishTextVectorize(memoryID uuid.UUID, content string
 }
 
 // PublishTagGenerate publishes a tag generation task with optional LLM config.
-func (q *RedisTaskQueue) PublishTagGenerate(memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error {
+func (q *RedisTaskQueue) PublishTagGenerate(memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error {
 	fields := map[string]interface{}{
 		"memory_id": memoryID.String(),
 		"content":   content,
+	}
+	if note != "" {
+		fields["note"] = note
 	}
 	mergeLLMConfig(fields, llmConfig)
 	return q.publish("tag:generate", fields)

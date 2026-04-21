@@ -16,6 +16,7 @@ const settingsSchema = z.object({
     llm_temperature: z.number().min(0).max(2),
     api_key: z.string().optional(),
     base_url: z.union([z.string().url('请输入有效的 URL'), z.literal('')]).optional(),
+    include_note_in_analysis: z.boolean().optional(),
   }),
 })
 
@@ -99,6 +100,7 @@ export default function SettingsPage() {
         llm_temperature: 0.7,
         api_key: '',
         base_url: '',
+        include_note_in_analysis: false,
       },
     },
   })
@@ -123,6 +125,7 @@ export default function SettingsPage() {
               llm_temperature: data.llm_temperature ?? 0.7,
               api_key: data.api_key || '',
               base_url: data.base_url || '',
+              include_note_in_analysis: data.include_note_in_analysis ?? false,
             },
           })
         }
@@ -147,7 +150,8 @@ export default function SettingsPage() {
           current?.llm_model !== last.llm_model ||
           current?.llm_temperature !== last.llm_temperature ||
           current?.api_key !== last.api_key ||
-          current?.base_url !== last.base_url
+          current?.base_url !== last.base_url ||
+          current?.include_note_in_analysis !== last.include_note_in_analysis
         ) {
           setTestStatus('idle')
         }
@@ -220,7 +224,12 @@ export default function SettingsPage() {
       if (response.success) {
         showToast('设置已保存', 'success')
         if (response.data) {
-          reset({ llm: response.data })
+          reset({
+            llm: {
+              ...response.data,
+              llm_protocol: (response.data.llm_protocol as 'openai' | 'anthropic') || 'openai',
+            },
+          })
           lastTestedRef.current = null
           setTestStatus('idle')
         }
@@ -410,6 +419,26 @@ export default function SettingsPage() {
             {errors.llm?.llm_temperature && (
               <p className="mt-1 text-xs text-red-500">{errors.llm.llm_temperature.message}</p>
             )}
+          </div>
+
+          {/* Include note in LLM analysis */}
+          <div className="flex items-center justify-between py-3 border-t border-gray-100 dark:border-gray-700">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                备注参与 LLM 分析
+              </label>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-500">
+                开启后，备注内容将一并发送给 LLM 用于生成标签和链接摘要
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                {...register('llm.include_note_in_analysis')}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gray-400 dark:peer-focus:ring-gray-500 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-500 peer-checked:bg-gray-900 dark:peer-checked:bg-gray-100" />
+            </label>
           </div>
 
           <div className="pt-4 flex items-center gap-4">

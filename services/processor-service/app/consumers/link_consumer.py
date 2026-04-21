@@ -24,7 +24,7 @@ def _create_llm(fields: dict):
 def _extract_llm_fields(fields: dict) -> dict:
     """Extract LLM config fields from message for propagation to derived tasks."""
     result = {}
-    for key in ["llm_protocol", "llm_provider", "llm_model", "llm_temperature", "api_key", "base_url"]:
+    for key in ["llm_protocol", "llm_provider", "llm_model", "llm_temperature", "api_key", "base_url", "include_note_in_analysis", "note"]:
         if key in fields:
             result[key] = fields[key]
     return result
@@ -58,11 +58,16 @@ class LinkConsumer(RedisStreamConsumer):
         llm = _create_llm(fields)
         summary = ""
         if content:
+            include_note = fields.get("include_note_in_analysis")
+            note = fields.get("note", "")
+            note_section = ""
+            if include_note and note:
+                note_section = f"\n\nUser Note: {note}"
             prompt = f"""Summarize the following web page content in 2-3 concise Chinese sentences.
 Focus on the main points. Keep it under 200 characters.
 
 Title: {title}
-Content: {content[:4000]}"""
+Content: {content[:4000]}{note_section}"""
             summary = await llm.generate(prompt, temperature=0.5, max_tokens=200)
 
         # Report link:fetch completion

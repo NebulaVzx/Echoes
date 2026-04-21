@@ -30,9 +30,12 @@ export interface User {
 
 export interface LLMSettings {
   llm_provider: string
+  llm_protocol?: string
   llm_model: string
   llm_temperature: number
   api_key?: string
+  base_url?: string
+  include_note_in_analysis?: boolean
 }
 
 export interface UpdateSettingsRequest {

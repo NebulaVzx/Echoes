@@ -151,22 +151,20 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
         </div>
 
         {/* Content input */}
-        <div className="mb-3">
+        <div className="mb-3 h-[120px] px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md focus-within:ring-2 focus-within:ring-gray-400 dark:focus-within:ring-gray-500 transition-colors flex flex-col">
           {contentType === 'text' ? (
             <textarea
               value={textContent}
               onChange={(e) => setTextContent(e.target.value)}
               placeholder="记下你的想法..."
-              rows={4}
-              className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 transition-colors resize-none text-sm"
+              className="w-full flex-1 bg-transparent outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none text-sm"
             />
           ) : (
-            <input
-              type="url"
+            <textarea
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}
               placeholder="https://..."
-              className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 transition-colors text-sm"
+              className="w-full flex-1 bg-transparent outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none text-sm"
             />
           )}
         </div>

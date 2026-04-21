@@ -77,9 +77,9 @@ type MemoryService struct {
 
 // TaskQueue defines the interface for publishing async tasks.
 type TaskQueue interface {
-	PublishLinkFetch(memoryID uuid.UUID, linkURL string, llmConfig map[string]interface{}) error
+	PublishLinkFetch(memoryID uuid.UUID, linkURL string, note string, llmConfig map[string]interface{}) error
 	PublishTextVectorize(memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
-	PublishTagGenerate(memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
+	PublishTagGenerate(memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
@@ -149,12 +149,13 @@ func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) 
 	}
 
 	var settings struct {
-		LLMProvider    string  `json:"llm_provider"`
-		LLMProtocol    string  `json:"llm_protocol"`
-		LLMModel       string  `json:"llm_model"`
-		LLMTemperature float64 `json:"llm_temperature"`
-		APIKey         string  `json:"api_key"`
-		BaseURL        string  `json:"base_url"`
+		LLMProvider           string  `json:"llm_provider"`
+		LLMProtocol           string  `json:"llm_protocol"`
+		LLMModel              string  `json:"llm_model"`
+		LLMTemperature        float64 `json:"llm_temperature"`
+		APIKey                string  `json:"api_key"`
+		BaseURL               string  `json:"base_url"`
+		IncludeNoteInAnalysis bool    `json:"include_note_in_analysis"`
 	}
 	if err := json.Unmarshal([]byte(settingsStr), &settings); err != nil {
 		return nil, err
@@ -179,6 +180,9 @@ func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) 
 	if settings.BaseURL != "" {
 		config["base_url"] = settings.BaseURL
 	}
+	if settings.IncludeNoteInAnalysis {
+		config["include_note_in_analysis"] = true
+	}
 	return config, nil
 }
 
@@ -186,14 +190,14 @@ func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) 
 func (s *MemoryService) publishTasks(memory *domain.Memory, llmConfig map[string]interface{}) {
 	// For link memories, publish link fetch task
 	if memory.ContentType == "link" && memory.LinkURL != "" {
-		_ = s.queue.PublishLinkFetch(memory.ID, memory.LinkURL, llmConfig)
+		_ = s.queue.PublishLinkFetch(memory.ID, memory.LinkURL, memory.Note, llmConfig)
 	}
 
 	// For all memories, publish text vectorization
 	content := s.extractContent(memory)
 	if content != "" {
 		_ = s.queue.PublishTextVectorize(memory.ID, content, llmConfig)
-		_ = s.queue.PublishTagGenerate(memory.ID, content, llmConfig)
+		_ = s.queue.PublishTagGenerate(memory.ID, content, memory.Note, llmConfig)
 	}
 }
 
@@ -427,6 +431,9 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 			return fmt.Errorf("memory has no link_url for link:fetch task")
 		}
 		data["link_url"] = memory.LinkURL
+		if memory.Note != "" {
+			data["note"] = memory.Note
+		}
 	case "text:vectorize":
 		content := memory.TextContent
 		if memory.LinkTitle != "" && memory.LinkSummary != "" {
@@ -445,6 +452,9 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 			return fmt.Errorf("memory has no content for tag:generate task")
 		}
 		data["content"] = content
+		if memory.Note != "" {
+			data["note"] = memory.Note
+		}
 	}
 
 	// Publish to Redis Stream

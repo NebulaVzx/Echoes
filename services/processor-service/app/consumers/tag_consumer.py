@@ -37,6 +37,12 @@ class TagConsumer(RedisStreamConsumer):
         if not content:
             raise ValueError("content is required")
 
+        # Append note to content if user enabled this option
+        include_note = fields.get("include_note_in_analysis")
+        note = fields.get("note", "")
+        if include_note and note:
+            content = f"{content}\n\n备注: {note}"
+
         llm = _create_llm(fields)
         tags = await llm.generate_tags(content)
         if not tags:
