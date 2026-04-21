@@ -13,8 +13,8 @@ type: roadmap
 | 阶段 0 | Sprint 0 | 基础设施 | Week 1 | 已完成 |
 | 阶段 1 | Sprint 1 | 认证体系 | Week 2 | 已完成 |
 | 阶段 2 | Sprint 2 | 记忆捕获 | Week 3 | 已完成 |
-| 阶段 3 | Sprint 3 | AI 处理层 | Week 4 | 进行中（03-02 完成） |
-| 阶段 4 | Sprint 4 | 搜索能力 | Week 5 | 待开发 |
+| 阶段 3 | Sprint 3 | AI 处理层 | Week 4 | 已完成 |
+| 阶段 4 | Sprint 4 | 搜索能力 | Week 5 | 计划中（4 plans） |
 | 阶段 5 | Sprint 5 | 可观测性 + 打磨 | Week 6 | 待开发 |
 | 阶段 6 | Phase 2 | Echo Assistant | +1-2 周 | 规划中 |
 
@@ -89,19 +89,26 @@ type: roadmap
 
 ## 阶段 4：搜索能力（Sprint 4）
 
-**目标：** 语义搜索可用，相似推荐可用，暗黑模式完成
+**目标：** 语义搜索可用，相似推荐可用，响应式适配完成
 
 **关键交付物：**
 - 语义搜索 API：`GET /api/v1/search?q=&limit=`
 - 相似推荐：`GET /api/v1/memories/:id/related`
 - 搜索页面（前端）
-- 暗黑模式切换
 - 响应式适配
 
 **验证标准：**
 - 搜索"Go 协程"可找到相关记忆
 - 相似推荐展示"你可能还感兴趣"
-- 暗黑模式完整可用
+- 暗黑模式兼容（已在 Sprint 3 完成）
+
+**Plans:**
+- [ ] 04-01-PLAN.md — Vectorizer Service POST /encode endpoint + CORS
+- [ ] 04-02-PLAN.md — Memory Service search + related APIs (repository, service, handler)
+- [ ] 04-03-PLAN.md — Frontend search page, nav search box, related memories component
+- [ ] 04-04-PLAN.md — End-to-end verification script + VERIFICATION.md
+
+**Requirements:** R4.1, R4.2, R4.3, R4.4, R4.5, R4.6, R4.7
 
 ---
 
@@ -141,10 +148,10 @@ type: roadmap
 
 ## 当前阶段
 
-**阶段 3 进行中（03-02 已完成 2026-04-19）**，下一步：**03-03 Vectorizer Service**
+**阶段 4 计划中**，下一步：执行 `/gsd-execute-phase 04-search-capability`
 
 见 `.planning/STATE.md` 获取最新状态。
 
 ---
 
-*Roadmap derived from PRD.md Sprint plan. Created: 2026-04-19*
+*Roadmap derived from PRD.md Sprint plan. Updated: 2026-04-21*
