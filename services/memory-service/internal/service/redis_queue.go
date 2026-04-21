@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 // RedisTaskQueue publishes async tasks to Redis Streams.
@@ -40,7 +42,8 @@ func NewRedisTaskQueue() *RedisTaskQueue {
 }
 
 // PublishLinkFetch publishes a link fetch task to Redis Stream with optional LLM config.
-func (q *RedisTaskQueue) PublishLinkFetch(memoryID uuid.UUID, linkURL string, note string, llmConfig map[string]interface{}) error {
+// Accepts context for trace propagation per D-02.
+func (q *RedisTaskQueue) PublishLinkFetch(ctx context.Context, memoryID uuid.UUID, linkURL string, note string, llmConfig map[string]interface{}) error {
 	fields := map[string]interface{}{
 		"memory_id": memoryID.String(),
 		"link_url":  linkURL,
@@ -49,21 +52,23 @@ func (q *RedisTaskQueue) PublishLinkFetch(memoryID uuid.UUID, linkURL string, no
 		fields["note"] = note
 	}
 	mergeLLMConfig(fields, llmConfig)
-	return q.publish("link:fetch", fields)
+	return q.PublishTask(ctx, "link:fetch", fields)
 }
 
 // PublishTextVectorize publishes a text vectorization task with optional LLM config.
-func (q *RedisTaskQueue) PublishTextVectorize(memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error {
+// Accepts context for trace propagation per D-02.
+func (q *RedisTaskQueue) PublishTextVectorize(ctx context.Context, memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error {
 	fields := map[string]interface{}{
 		"memory_id": memoryID.String(),
 		"content":   content,
 	}
 	mergeLLMConfig(fields, llmConfig)
-	return q.publish("text:vectorize", fields)
+	return q.PublishTask(ctx, "text:vectorize", fields)
 }
 
 // PublishTagGenerate publishes a tag generation task with optional LLM config.
-func (q *RedisTaskQueue) PublishTagGenerate(memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error {
+// Accepts context for trace propagation per D-02.
+func (q *RedisTaskQueue) PublishTagGenerate(ctx context.Context, memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error {
 	fields := map[string]interface{}{
 		"memory_id": memoryID.String(),
 		"content":   content,
@@ -72,7 +77,7 @@ func (q *RedisTaskQueue) PublishTagGenerate(memoryID uuid.UUID, content string, 
 		fields["note"] = note
 	}
 	mergeLLMConfig(fields, llmConfig)
-	return q.publish("tag:generate", fields)
+	return q.PublishTask(ctx, "tag:generate", fields)
 }
 
 // mergeLLMConfig merges LLM settings into the message fields if present.
@@ -88,7 +93,16 @@ func mergeLLMConfig(fields map[string]interface{}, llmConfig map[string]interfac
 }
 
 // PublishTask publishes a generic task to a Redis Stream.
+// Injects traceparent from context per D-02 for distributed trace propagation.
 func (q *RedisTaskQueue) PublishTask(ctx context.Context, stream string, fields map[string]interface{}) error {
+	// Inject trace context into message fields using W3C Trace Context propagator
+	carrier := propagation.MapCarrier{}
+	propagator := otel.GetTextMapPropagator()
+	propagator.Inject(ctx, carrier)
+	if traceparent := carrier["traceparent"]; traceparent != "" {
+		fields["traceparent"] = traceparent
+	}
+
 	_, err := q.client.XAdd(ctx, &redis.XAddArgs{
 		Stream: stream,
 		Values: fields,
@@ -97,9 +111,4 @@ func (q *RedisTaskQueue) PublishTask(ctx context.Context, stream string, fields 
 		return fmt.Errorf("failed to publish to stream %s: %w", stream, err)
 	}
 	return nil
-}
-
-// publish adds a message to a Redis Stream.
-func (q *RedisTaskQueue) publish(stream string, fields map[string]interface{}) error {
-	return q.PublishTask(context.Background(), stream, fields)
 }

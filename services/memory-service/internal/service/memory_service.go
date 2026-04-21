@@ -78,9 +78,9 @@ type MemoryService struct {
 
 // TaskQueue defines the interface for publishing async tasks.
 type TaskQueue interface {
-	PublishLinkFetch(memoryID uuid.UUID, linkURL string, note string, llmConfig map[string]interface{}) error
-	PublishTextVectorize(memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
-	PublishTagGenerate(memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error
+	PublishLinkFetch(ctx context.Context, memoryID uuid.UUID, linkURL string, note string, llmConfig map[string]interface{}) error
+	PublishTextVectorize(ctx context.Context, memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
+	PublishTagGenerate(ctx context.Context, memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
@@ -134,7 +134,7 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 
 	// Fetch user LLM settings and publish async tasks
 	llmConfig, _ := s.getUserLLMConfig(ctx, userID)
-	s.publishTasks(memory, llmConfig)
+	s.publishTasks(ctx, memory, llmConfig)
 
 	return memory, nil
 }
@@ -189,17 +189,18 @@ func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) 
 }
 
 // publishTasks publishes async processing tasks based on memory type.
-func (s *MemoryService) publishTasks(memory *domain.Memory, llmConfig map[string]interface{}) {
+// Accepts context for trace propagation to Redis Stream messages per D-02.
+func (s *MemoryService) publishTasks(ctx context.Context, memory *domain.Memory, llmConfig map[string]interface{}) {
 	// For link memories, publish link fetch task
 	if memory.ContentType == "link" && memory.LinkURL != "" {
-		_ = s.queue.PublishLinkFetch(memory.ID, memory.LinkURL, memory.Note, llmConfig)
+		_ = s.queue.PublishLinkFetch(ctx, memory.ID, memory.LinkURL, memory.Note, llmConfig)
 	}
 
 	// For all memories, publish text vectorization
 	content := s.extractContent(memory)
 	if content != "" {
-		_ = s.queue.PublishTextVectorize(memory.ID, content, llmConfig)
-		_ = s.queue.PublishTagGenerate(memory.ID, content, memory.Note, llmConfig)
+		_ = s.queue.PublishTextVectorize(ctx, memory.ID, content, llmConfig)
+		_ = s.queue.PublishTagGenerate(ctx, memory.ID, content, memory.Note, llmConfig)
 	}
 }
 
