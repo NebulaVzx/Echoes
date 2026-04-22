@@ -38,7 +38,7 @@ type: product
 | 数据库 | PostgreSQL 15 + pgvector |
 | 缓存/队列 | Redis 7 (Stream) |
 | 对象存储 | MinIO |
-| 可观测性 | Prometheus + OpenTelemetry + Zap (Sprint 5) |
+| 可观测性 | Prometheus + OpenTelemetry + Zap + Jaeger + Grafana |
 
 ## 架构模式
 
@@ -52,22 +52,41 @@ type: product
 ## 关键约束
 
 - LLM 提供商：OpenAI / Anthropic 可切换（工厂模式）
-- 向量模型：BGE-M3（768维，中文优化）
+- 向量模型：BGE-M3（1024维，中文优化）
 - 相似度阈值：0.75
 - 所有 LLM 调用必须异步，失败时降级为本地关键词提取
 - Windows 兼容（WSL2 / Docker Desktop）
 
 ## 项目状态
 
-当前处于 Sprint 2 完成阶段（2026-04-19），见 `STATE.md`。
+**v1.0 MVP 已发布**（2026-04-22）
+
+见 `.planning/MILESTONES.md` 和 `.planning/milestones/v1.0-ROADMAP.md`。
+
+### 已验证需求（v1.0）
+
+- 认证：邮箱注册/登录 + GitHub OAuth + JWT 双 Token
+- 记忆捕获：文字/链接保存，时间轴浏览，详情编辑删除
+- 搜索：语义搜索 + 相似推荐（BGE-M3 + pgvector）
+- AI：LLM 自动标签，Redis Stream 异步队列
+- 可观测性：Prometheus / Jaeger / Grafana / Zap
+- 前端：暗黑模式，Framer Motion 动效，骨架屏，Playwright E2E
+
+### 下一里程碑目标（v1.1 / Phase 2）
+
+- Echo Assistant：对话式 AI 助手，基于 RAG 回答记忆相关问题
+- 前端分页 UI
+- Gateway 后端健康检查
+- OAuth state 清理机制
 
 ## 相关文档
 
 - `PRD.md` — 完整产品需求、API 定义、数据库 Schema
 - `CLAUDE.md` — 项目开发指南和命令速查
-- `.planning/codebase/` — 代码库分析文档
+- `.planning/MILESTONES.md` — 里程碑记录
+- `.planning/milestones/` — 归档的路线图和需求
 - `README.md` — 快速开始指南
 
 ---
 
-*Project context created: 2026-04-19*
+*Project context updated: 2026-04-22 after v1.0 milestone*
