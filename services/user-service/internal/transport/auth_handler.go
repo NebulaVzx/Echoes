@@ -308,6 +308,7 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 }
 
 // GetSettings returns the current user's LLM settings.
+// When called internally (X-Internal-Request header), returns the raw decrypted API key.
 func (h *AuthHandler) GetSettings(c *gin.Context) {
 	userIDStr, ok := getUserID(c)
 	if !ok {
@@ -330,6 +331,14 @@ func (h *AuthHandler) GetSettings(c *gin.Context) {
 			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to retrieve settings")
 		}
 		return
+	}
+
+	// Internal service calls (e.g. Gateway) need the raw decrypted API key
+	if c.GetHeader("X-Internal-Request") == "true" {
+		decrypted, err := h.authService.GetUserAPIKeyForTesting(c.Request.Context(), userIDUUID)
+		if err == nil && decrypted != "" {
+			settings.APIKey = decrypted
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": settings})

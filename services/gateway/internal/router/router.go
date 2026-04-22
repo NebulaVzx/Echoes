@@ -87,6 +87,7 @@ func Setup(logger *zap.Logger, db *gorm.DB) *gin.Engine {
 		chatRepo,
 		os.Getenv("MEMORY_SERVICE_URL"),
 		os.Getenv("PROCESSOR_SERVICE_URL"),
+		os.Getenv("USER_SERVICE_URL"),
 		logger,
 	)
 	chatHandler := chatTransport.NewChatHandler(chatSvc, logger)

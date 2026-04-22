@@ -53,29 +53,44 @@ const systemPromptNoMemories = `你是用户的个人知识库助手"拾忆"。
 2. 【语言一致】使用与用户问题相同的语言回答
 3. 【禁止推测】不要推断、假设或添加任何外部知识`
 
+// userLLMConfig holds per-user LLM settings fetched from User Service.
+type userLLMConfig struct {
+	Provider    string  `json:"llm_provider"`
+	Protocol    string  `json:"llm_protocol"`
+	Model       string  `json:"llm_model"`
+	Temperature float64 `json:"llm_temperature"`
+	APIKey      string  `json:"api_key"`
+	BaseURL     string  `json:"base_url"`
+}
+
 // ChatService orchestrates RAG retrieval, prompt assembly, and LLM generation.
 type ChatService struct {
-	repo         repository.ConversationRepository
-	memoryURL    string
-	processorURL string
-	httpClient   *http.Client
-	logger       *zap.Logger
+	repo           repository.ConversationRepository
+	memoryURL      string
+	processorURL   string
+	userServiceURL string
+	httpClient     *http.Client
+	logger         *zap.Logger
 }
 
 // NewChatService creates a new chat service.
-func NewChatService(repo repository.ConversationRepository, memoryURL, processorURL string, logger *zap.Logger) *ChatService {
+func NewChatService(repo repository.ConversationRepository, memoryURL, processorURL, userServiceURL string, logger *zap.Logger) *ChatService {
 	if memoryURL == "" {
 		memoryURL = "http://memory-service:8002"
 	}
 	if processorURL == "" {
 		processorURL = "http://processor-service:8001"
 	}
+	if userServiceURL == "" {
+		userServiceURL = "http://user-service:8001"
+	}
 	return &ChatService{
-		repo:         repo,
-		memoryURL:    memoryURL,
-		processorURL: processorURL,
-		httpClient:   &http.Client{Timeout: 30 * time.Second},
-		logger:       logger,
+		repo:           repo,
+		memoryURL:      memoryURL,
+		processorURL:   processorURL,
+		userServiceURL: userServiceURL,
+		httpClient:     &http.Client{Timeout: 30 * time.Second},
+		logger:         logger,
 	}
 }
 
@@ -143,8 +158,15 @@ func (s *ChatService) SendMessage(ctx context.Context, userID uuid.UUID, req *do
 	// 5. Build messages array for LLM
 	messages := s.buildMessages(req.Content, memories, history)
 
+	// 5.5 Fetch user's LLM settings from User Service
+	llmConfig, err := s.getUserLLMConfig(ctx, userID, authHeader)
+	if err != nil {
+		s.logger.Warn("failed to fetch user LLM config, using defaults", zap.Error(err), zap.String("user_id", userID.String()))
+		llmConfig = nil
+	}
+
 	// 6. Call Processor Service LLM
-	llmResponse, err := s.callLLM(ctx, messages)
+	llmResponse, err := s.callLLM(ctx, messages, llmConfig)
 	var assistantContent string
 	var citations []domain.Citation
 	if err != nil {
@@ -412,11 +434,84 @@ func (s *ChatService) parseCitations(text string, memories []domain.SearchResult
 	return citations, text
 }
 
+// getUserLLMConfig fetches the user's LLM settings from User Service.
+func (s *ChatService) getUserLLMConfig(ctx context.Context, userID uuid.UUID, authHeader string) (*userLLMConfig, error) {
+	settingsURL := fmt.Sprintf("%s/api/v1/auth/me/settings", s.userServiceURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, settingsURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create settings request: %w", err)
+	}
+	if authHeader != "" {
+		req.Header.Set("Authorization", authHeader)
+	}
+	req.Header.Set("X-User-ID", userID.String())
+	req.Header.Set("X-Internal-Request", "true")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("user service request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("user service returned status %d", resp.StatusCode)
+	}
+
+	var settingsResp struct {
+		Success bool `json:"success"`
+		Data    struct {
+			LLMProvider    string  `json:"llm_provider"`
+			LLMProtocol    string  `json:"llm_protocol"`
+			LLMModel       string  `json:"llm_model"`
+			LLMTemperature float64 `json:"llm_temperature"`
+			APIKey         string  `json:"api_key"`
+			BaseURL        string  `json:"base_url"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&settingsResp); err != nil {
+		return nil, fmt.Errorf("failed to decode settings response: %w", err)
+	}
+
+	if !settingsResp.Success {
+		return nil, fmt.Errorf("user service returned success=false")
+	}
+
+	cfg := &userLLMConfig{
+		Provider:    settingsResp.Data.LLMProvider,
+		Protocol:    settingsResp.Data.LLMProtocol,
+		Model:       settingsResp.Data.LLMModel,
+		Temperature: settingsResp.Data.LLMTemperature,
+		APIKey:      settingsResp.Data.APIKey,
+		BaseURL:     settingsResp.Data.BaseURL,
+	}
+	return cfg, nil
+}
+
 // callLLM sends the messages array to the Processor Service for generation.
-func (s *ChatService) callLLM(ctx context.Context, messages []map[string]string) (string, error) {
+func (s *ChatService) callLLM(ctx context.Context, messages []map[string]string, cfg *userLLMConfig) (string, error) {
 	payload := map[string]interface{}{
 		"messages":   messages,
 		"max_tokens": MaxTokens,
+	}
+	if cfg != nil {
+		if cfg.Provider != "" {
+			payload["provider"] = cfg.Provider
+		}
+		if cfg.Protocol != "" {
+			payload["protocol"] = cfg.Protocol
+		}
+		if cfg.Model != "" {
+			payload["model"] = cfg.Model
+		}
+		if cfg.Temperature != 0 {
+			payload["temperature"] = cfg.Temperature
+		}
+		if cfg.APIKey != "" {
+			payload["api_key"] = cfg.APIKey
+		}
+		if cfg.BaseURL != "" {
+			payload["base_url"] = cfg.BaseURL
+		}
 	}
 
 	body, err := json.Marshal(payload)
@@ -442,18 +537,11 @@ func (s *ChatService) callLLM(ctx context.Context, messages []map[string]string)
 	}
 
 	var llmResp struct {
-		Success bool `json:"success"`
-		Data    struct {
-			Text string `json:"text"`
-		} `json:"data"`
+		Content string `json:"content"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&llmResp); err != nil {
 		return "", fmt.Errorf("failed to decode LLM response: %w", err)
 	}
 
-	if !llmResp.Success {
-		return "", fmt.Errorf("processor service returned success=false")
-	}
-
-	return llmResp.Data.Text, nil
+	return llmResp.Content, nil
 }

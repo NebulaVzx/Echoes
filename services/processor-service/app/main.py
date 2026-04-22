@@ -116,6 +116,11 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     temperature: float = 0.7
     max_tokens: int = 1000
+    provider: str = None
+    protocol: str = None
+    model: str = None
+    api_key: str = None
+    base_url: str = None
 
 
 class ChatResponse(BaseModel):
@@ -128,7 +133,14 @@ async def chat_generate(req: ChatRequest):
     from app.services.llm.factory import LLMFactory
 
     try:
-        llm = LLMFactory.create()
+        llm = LLMFactory.create(
+            protocol=req.protocol,
+            provider=req.provider,
+            model=req.model,
+            temperature=req.temperature,
+            api_key=req.api_key,
+            base_url=req.base_url,
+        )
     except Exception as e:
         logging.error(f"Failed to create LLM provider: {e}")
         raise HTTPException(status_code=500, detail=f"LLM provider error: {e}")
