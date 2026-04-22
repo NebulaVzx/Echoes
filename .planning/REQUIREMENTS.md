@@ -71,21 +71,21 @@ type: requirements
 
 | 需求 ID | 描述 | 所属阶段 | 状态 |
 |---------|------|----------|------|
-| CHAT-01 | Chat 侧边栏 UI | Phase 6 | 待实现 |
-| CHAT-02 | 对话历史列表 | Phase 6 | 待实现 |
-| CHAT-03 | 消息 Markdown 渲染 | Phase 6 | 待实现 |
-| CHAT-04 | 发送加载状态 | Phase 6 | 待实现 |
-| CHAT-05 | 暗黑模式 | Phase 6 | 待实现 |
-| CHAT-06 | RAG 语义检索 | Phase 6 | 待实现 |
-| CHAT-07 | Top N 排序 | Phase 6 | 待实现 |
-| CHAT-08 | 无结果提示 | Phase 6 | 待实现 |
-| CHAT-09 | LLM 回答生成 | Phase 6 | 待实现 |
-| CHAT-10 | Prompt 上下文 | Phase 6 | 待实现 |
-| CHAT-11 | 引用来源 | Phase 6 | 待实现 |
-| CHAT-12 | 多轮对话 | Phase 6 | 待实现 |
-| CHAT-13 | 对话持久化 | Phase 6 | 待实现 |
-| CHAT-14 | 历史对话列表 | Phase 6 | 待实现 |
-| CHAT-15 | 删除对话 | Phase 6 | 待实现 |
+| CHAT-01 | Chat 侧边栏 UI | Phase 6 | 已完成 (06-04) |
+| CHAT-02 | 对话历史列表 | Phase 6 | 已完成 (06-04) |
+| CHAT-03 | 消息 Markdown 渲染 | Phase 6 | 已完成 (06-04) |
+| CHAT-04 | 发送加载状态 | Phase 6 | 已完成 (06-04) |
+| CHAT-05 | 暗黑模式 | Phase 6 | 已完成 (06-04) |
+| CHAT-06 | RAG 语义检索 | Phase 6 | 已完成 (06-03) |
+| CHAT-07 | Top N 排序 | Phase 6 | 已完成 (06-03) |
+| CHAT-08 | 无结果提示 | Phase 6 | 已完成 (06-03) |
+| CHAT-09 | LLM 回答生成 | Phase 6 | 已完成 (06-02) |
+| CHAT-10 | Prompt 上下文 | Phase 6 | 已完成 (06-03) |
+| CHAT-11 | 引用来源 | Phase 6 | 已完成 (06-04) |
+| CHAT-12 | 多轮对话 | Phase 6 | 已完成 (06-03) |
+| CHAT-13 | 对话持久化 | Phase 6 | 已完成 (06-03) |
+| CHAT-14 | 历史对话列表 | Phase 6 | 已完成 (06-03) |
+| CHAT-15 | 删除对话 | Phase 6 | 已完成 (06-03) |
 | BUG-01 | OAuth state TTL | Phase 7 | 待实现 |
 | BUG-02 | 定期清理 | Phase 7 | 待实现 |
 | BUG-03 | Gateway 健康检查 | Phase 7 | 待实现 |

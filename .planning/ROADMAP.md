@@ -50,10 +50,10 @@ description: 拾忆产品开发路线图
 **计划：** 5 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — 数据库模型 + Go domain models（conversations/messages 表）
-- [ ] 06-02-PLAN.md — LLM Provider chat() 扩展（多轮对话支持）
-- [ ] 06-03-PLAN.md — Go Chat 服务（RAG 检索 + Prompt 组装 + API 路由）
-- [ ] 06-04-PLAN.md — 前端 Chat UI 组件（侧边栏、消息、Markdown、引用）
+- [x] 06-01-PLAN.md — 数据库模型 + Go domain models（conversations/messages 表）
+- [x] 06-02-PLAN.md — LLM Provider chat() 扩展（多轮对话支持）
+- [x] 06-03-PLAN.md — Go Chat 服务（RAG 检索 + Prompt 组装 + API 路由）
+- [x] 06-04-PLAN.md — 前端 Chat UI 组件（侧边栏、消息、Markdown、引用）
 - [ ] 06-05-PLAN.md — 集成层（API 客户端、ChatProvider、首页接入）
 
 #### Phase 7: Bug Fixes & Quality
@@ -85,7 +85,7 @@ Plans:
 | 4. AI Processing | v1.0 | 4/4 | Complete | 2026-04-19 |
 | 5. Search | v1.0 | 4/4 | Complete | 2026-04-21 |
 | 6. Observability + Polish | v1.0 | 7/7 | Complete | 2026-04-22 |
-| 6. Echo Assistant | v1.1 | 0/5 | Planned | — |
+| 6. Echo Assistant | v1.1 | 4/5 | In Progress | 2026-04-22 |
 | 7. Bug Fixes | v1.1 | 0/4 | Not started | — |
 
 ---
