@@ -19,18 +19,19 @@ export function MarkdownRenderer({ content, citations }: MarkdownRendererProps) 
   }
 
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeHighlight]}
-      className="prose prose-sm dark:prose-invert max-w-none"
-      components={{
-        a: ({ node, ...props }) => (
-          <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline" />
-        ),
-      }}
-    >
-      {content}
-    </ReactMarkdown>
+    <div className="prose prose-sm dark:prose-invert max-w-none">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+        components={{
+          a: ({ node, ...props }) => (
+            <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline" />
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   )
 }
 
@@ -60,20 +61,20 @@ function MarkdownWithCitations({ content, citations }: { content: string; citati
         }
         if (!part.trim()) return null
         return (
-          <ReactMarkdown
-            key={i}
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-            className="prose prose-sm dark:prose-invert max-w-none inline"
-            components={{
-              a: ({ node, ...props }) => (
-                <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline" />
-              ),
-              p: ({ children }) => <span>{children}</span>,
-            }}
-          >
-            {part}
-          </ReactMarkdown>
+          <div key={i} className="prose prose-sm dark:prose-invert max-w-none inline">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+              components={{
+                a: ({ node, ...props }) => (
+                  <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline" />
+                ),
+                p: ({ children }) => <span>{children}</span>,
+              }}
+            >
+              {part}
+            </ReactMarkdown>
+          </div>
         )
       })}
     </div>
