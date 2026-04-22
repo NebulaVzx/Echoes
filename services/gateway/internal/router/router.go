@@ -29,8 +29,10 @@ func Setup(logger *zap.Logger) *gin.Engine {
 	// Register /metrics endpoint before route groups
 	observability.RegisterMetricsEndpoint(router)
 
-	// Rate limiters: 5 req/min for auth, 60 req/min for memory APIs
-	authLimiter := middleware.NewRateLimiter(12*time.Second, 5)
+	// Rate limiters: 30 req/s for auth (relaxed for Docker shared IP), 60 req/s for APIs
+	// NOTE: In Docker all host requests share the same IP (e.g. 172.19.0.1), so auth
+	// burst must be high enough to avoid false-positive 429s across all users.
+	authLimiter := middleware.NewRateLimiter(time.Second, 30)
 	defaultLimiter := middleware.NewRateLimiter(time.Second, 60)
 
 	// Health check (no rate limit)
