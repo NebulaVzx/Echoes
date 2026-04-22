@@ -263,11 +263,8 @@ func (s *ChatService) searchMemories(ctx context.Context, query string, userID u
 	var searchResp struct {
 		Success bool `json:"success"`
 		Data    struct {
-			Results []struct {
-				Memory     map[string]interface{} `json:"memory"`
-				Similarity float64                `json:"similarity"`
-			} `json:"results"`
-			Query string `json:"query"`
+			Results []map[string]interface{} `json:"results"`
+			Query   string                   `json:"query"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&searchResp); err != nil {
@@ -280,16 +277,17 @@ func (s *ChatService) searchMemories(ctx context.Context, query string, userID u
 
 	memories := make([]domain.SearchResultMemory, 0, len(searchResp.Data.Results))
 	for _, r := range searchResp.Data.Results {
-		m := domain.SearchResultMemory{
-			Similarity: r.Similarity,
+		m := domain.SearchResultMemory{}
+		if sim, ok := r["similarity"].(float64); ok {
+			m.Similarity = sim
 		}
-		// Extract fields from map
-		if idStr, ok := r.Memory["id"].(string); ok {
+		// Extract fields directly from the result item
+		if idStr, ok := r["id"].(string); ok {
 			m.ID, _ = uuid.Parse(idStr)
 		}
-		if title, ok := r.Memory["link_title"].(string); ok && title != "" {
+		if title, ok := r["link_title"].(string); ok && title != "" {
 			m.Title = title
-		} else if text, ok := r.Memory["text_content"].(string); ok && text != "" {
+		} else if text, ok := r["text_content"].(string); ok && text != "" {
 			// Use first 50 chars of text content as title fallback
 			runes := []rune(text)
 			if len(runes) > 50 {
@@ -298,15 +296,15 @@ func (s *ChatService) searchMemories(ctx context.Context, query string, userID u
 				m.Title = text
 			}
 		}
-		if ct, ok := r.Memory["content_type"].(string); ok {
+		if ct, ok := r["content_type"].(string); ok {
 			m.ContentType = ct
 		}
-		if content, ok := r.Memory["text_content"].(string); ok {
+		if content, ok := r["text_content"].(string); ok && content != "" {
 			m.Content = content
-		} else if summary, ok := r.Memory["link_summary"].(string); ok {
+		} else if summary, ok := r["link_summary"].(string); ok && summary != "" {
 			m.Content = summary
 		}
-		if tags, ok := r.Memory["tags"].([]interface{}); ok {
+		if tags, ok := r["tags"].([]interface{}); ok {
 			m.Tags = make([]string, 0, len(tags))
 			for _, t := range tags {
 				if ts, ok := t.(string); ok {
@@ -314,10 +312,10 @@ func (s *ChatService) searchMemories(ctx context.Context, query string, userID u
 				}
 			}
 		}
-		if note, ok := r.Memory["note"].(string); ok {
+		if note, ok := r["note"].(string); ok {
 			m.Note = note
 		}
-		if createdAt, ok := r.Memory["created_at"].(string); ok {
+		if createdAt, ok := r["created_at"].(string); ok {
 			m.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 		}
 		memories = append(memories, m)
