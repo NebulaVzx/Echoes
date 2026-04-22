@@ -47,12 +47,14 @@ description: 拾忆产品开发路线图
 4. 对话历史可持久化、查看、删除
 5. Playwright E2E 测试覆盖核心 Chat 流程
 
-**计划（预估）：**
-- 06-01: 数据库模型 + API（conversations/messages 表，Chat API）
-- 06-02: RAG 检索逻辑（复用语义搜索 + Prompt 组装）
-- 06-03: LLM 回答生成（复用现有 Provider + 流式/非流式）
-- 06-04: 前端 Chat UI 侧边栏（消息列表、输入框、历史对话）
-- 06-05: 对话历史管理（创建、切换、删除）
+**计划：** 5 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — 数据库模型 + Go domain models（conversations/messages 表）
+- [ ] 06-02-PLAN.md — LLM Provider chat() 扩展（多轮对话支持）
+- [ ] 06-03-PLAN.md — Go Chat 服务（RAG 检索 + Prompt 组装 + API 路由）
+- [ ] 06-04-PLAN.md — 前端 Chat UI 组件（侧边栏、消息、Markdown、引用）
+- [ ] 06-05-PLAN.md — 集成层（API 客户端、ChatProvider、首页接入）
 
 #### Phase 7: Bug Fixes & Quality
 
@@ -83,7 +85,7 @@ description: 拾忆产品开发路线图
 | 4. AI Processing | v1.0 | 4/4 | Complete | 2026-04-19 |
 | 5. Search | v1.0 | 4/4 | Complete | 2026-04-21 |
 | 6. Observability + Polish | v1.0 | 7/7 | Complete | 2026-04-22 |
-| 6. Echo Assistant | v1.1 | 0/5 | Not started | — |
+| 6. Echo Assistant | v1.1 | 0/5 | Planned | — |
 | 7. Bug Fixes | v1.1 | 0/4 | Not started | — |
 
 ---
