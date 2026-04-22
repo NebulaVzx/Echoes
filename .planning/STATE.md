@@ -14,10 +14,10 @@ type: state
 
 ## 当前位置
 
-阶段：Phase 6 - Echo Assistant（执行中）
-计划：5 plans (4/5 完成)
-状态：执行 Wave 3 — Plan 4 完成，等待 Plan 5
-最近活动：2026-04-22 — Plan 4 (前端 Chat UI 组件) 完成
+阶段：Phase 6 - Echo Assistant（已完成）
+计划：5 plans (5/5 完成)
+状态：Phase 6 全部完成
+最近活动：2026-04-22 — Plan 5 (集成层) 完成
 
 ---
 
@@ -33,7 +33,7 @@ type: state
 - [x] 06-02 — LLM Provider chat() 扩展
 - [x] 06-03 — Go Chat 服务（RAG 检索 + Prompt 组装 + API 路由）
 - [x] 06-04 — 前端 Chat UI 组件（侧边栏、消息、Markdown、引用）
-- [ ] 06-05 — 集成层（API 客户端、ChatProvider、首页接入）
+- [x] 06-05 — 集成层（API 客户端、ChatProvider、首页接入）
 
 ---
 
