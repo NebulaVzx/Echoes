@@ -1,0 +1,15 @@
+# Next.js
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Playwright
+test-results/
+playwright/.auth/
+playwright/.cache/
+playwright-report/
+
+# Build
+tsconfig.tsbuildinfo
