@@ -2,7 +2,7 @@
 # Multi-stage build for Go + Gin API Gateway
 
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -38,7 +38,7 @@ EXPOSE 8080
 CMD ["./gateway"]
 
 # Development stage
-FROM golang:1.23-alpine AS development
+FROM golang:1.25-alpine AS development
 
 WORKDIR /app
 

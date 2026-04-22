@@ -14,8 +14,8 @@ type: roadmap
 | 阶段 1 | Sprint 1 | 认证体系 | Week 2 | 已完成 |
 | 阶段 2 | Sprint 2 | 记忆捕获 | Week 3 | 已完成 |
 | 阶段 3 | Sprint 3 | AI 处理层 | Week 4 | 已完成 |
-| 阶段 4 | Sprint 4 | 搜索能力 | Week 5 | 计划中（4 plans） |
-| 阶段 5 | Sprint 5 | 可观测性 + 打磨 | Week 6 | 待开发 |
+| 阶段 4 | Sprint 4 | 搜索能力 | Week 5 | 已完成 |
+| 阶段 5 | Sprint 5 | 可观测性 + 打磨 | Week 6 | 已完成 |
 | 阶段 6 | Phase 2 | Echo Assistant | +1-2 周 | 规划中 |
 
 ---
@@ -103,10 +103,10 @@ type: roadmap
 - 暗黑模式兼容（已在 Sprint 3 完成）
 
 **Plans:**
-- [ ] 04-01-PLAN.md — Vectorizer Service POST /encode endpoint + CORS
-- [ ] 04-02-PLAN.md — Memory Service search + related APIs (repository, service, handler)
-- [ ] 04-03-PLAN.md — Frontend search page, nav search box, related memories component
-- [ ] 04-04-PLAN.md — End-to-end verification script + VERIFICATION.md
+- [x] 04-01-PLAN.md — Vectorizer Service POST /encode endpoint + CORS
+- [x] 04-02-PLAN.md — Memory Service search + related APIs (repository, service, handler)
+- [x] 04-03-PLAN.md — Frontend search page, nav search box, related memories component
+- [x] 04-04-PLAN.md — End-to-end verification script + VERIFICATION.md
 
 **Requirements:** R4.1, R4.2, R4.3, R4.4, R4.5, R4.6, R4.7
 
@@ -130,6 +130,17 @@ type: roadmap
 - Grafana 仪表盘展示 QPS / 延迟 / 错误率
 - 端到端流程无阻塞通过
 
+**Plans:**
+- [x] 05-01-PLAN.md — Go Zap logging + Prometheus metrics (all 3 Go services)
+- [x] 05-02-PLAN.md — Frontend polish (Framer Motion, skeleton, toast, empty states)
+- [x] 05-03-PLAN.md — Go OpenTelemetry tracing (HTTP + Redis Stream propagation)
+- [x] 05-04-PLAN.md — Python observability (Prometheus + OTel for Processor/Vectorizer)
+- [x] 05-05-PLAN.md — Backend polish (validation, unified errors, rate limit, CORS)
+- [x] 05-06-PLAN.md — Docker Compose observability stack (Prometheus + Jaeger + Grafana)
+- [x] 05-07-PLAN.md — Grafana dashboard + Playwright E2E tests
+
+**Requirements:** R7.1, R7.2, R7.3, R7.4, R7.5, R7.6, R6.5, R6.6, R6.7
+
 ---
 
 ## 阶段 6：Echo Assistant（Phase 2）
@@ -148,7 +159,7 @@ type: roadmap
 
 ## 当前阶段
 
-**阶段 4 计划中**，下一步：执行 `/gsd-execute-phase 04-search-capability`
+**阶段 5 已完成**，下一步：规划 Sprint 6（Echo Assistant）或发布 v1.0.0
 
 见 `.planning/STATE.md` 获取最新状态。
 

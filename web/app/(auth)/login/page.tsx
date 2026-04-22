@@ -133,7 +133,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-md font-medium hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-2.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-md font-medium hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-scale"
             >
               {isSubmitting ? '登录中...' : '登录'}
             </button>
@@ -164,7 +164,7 @@ export default function LoginPage() {
                   window.location.href = `${API_BASE}/api/v1/auth/github`
                 }}
                 disabled={githubLoading}
-                className="flex w-full items-center justify-center gap-2 py-2.5 bg-gray-800 dark:bg-gray-700 text-white rounded-md font-medium hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex w-full items-center justify-center gap-2 py-2.5 bg-gray-800 dark:bg-gray-700 text-white rounded-md font-medium hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed btn-scale"
               >
                 {githubLoading ? (
                   <>

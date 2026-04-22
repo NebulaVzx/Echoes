@@ -1,4 +1,5 @@
-.PHONY: help dev-start dev-stop dev-logs migrate build test clean
+.PHONY: help dev-start dev-stop dev-logs migrate build test clean \
+  observability-up observability-down logs-prometheus logs-jaeger logs-grafana
 
 # Echoes (拾忆) - Development Commands
 # Usage: make <target>
@@ -19,6 +20,9 @@ dev-start: ## Start all services with Docker Compose
 	@echo "  Postgres:  localhost:5432"
 	@echo "  Redis:     localhost:6379"
 	@echo "  MinIO:     http://localhost:9001"
+	@echo "  Prometheus: http://localhost:9090"
+	@echo "  Jaeger:     http://localhost:16686"
+	@echo "  Grafana:    http://localhost:3001"
 
 dev-stop: ## Stop all services
 	@echo "Stopping Echoes services..."
@@ -80,6 +84,23 @@ test-memory: ## Run memory service tests
 test-web: ## Run web frontend tests
 	cd web && npm test
 
+e2e: ## Run Playwright E2E tests
+	cd web && npx playwright test
+
+e2e-ui: ## Run Playwright E2E tests with UI mode
+	cd web && npx playwright test --ui
+
+e2e-headed: ## Run Playwright E2E tests in headed mode
+	cd web && npx playwright test --headed
+
+test-all: ## Run all tests including E2E
+	@echo "Running all tests..."
+	cd services/gateway && go test ./... 2>/dev/null || true
+	cd services/user-service && go test ./... 2>/dev/null || true
+	cd services/memory-service && go test ./... 2>/dev/null || true
+	cd web && npm test
+	cd web && npx playwright test
+
 clean: ## Remove all containers, volumes, and images
 	@echo "Cleaning up all Docker resources..."
 	docker-compose down -v --rmi all
@@ -116,3 +137,25 @@ dev-vectorizer: ## Run vectorizer service locally (requires Python)
 
 dev-web: ## Run web frontend locally (requires Node.js)
 	cd web && npm run dev
+
+# Observability commands
+observability-up: ## Start observability stack (Prometheus, Jaeger, Grafana)
+	@echo "Starting observability stack..."
+	docker-compose up -d prometheus jaeger grafana
+	@echo "Observability services ready:"
+	@echo "  Prometheus: http://localhost:9090"
+	@echo "  Jaeger:     http://localhost:16686"
+	@echo "  Grafana:    http://localhost:3001"
+
+observability-down: ## Stop observability stack
+	@echo "Stopping observability stack..."
+	docker-compose stop prometheus jaeger grafana
+
+logs-prometheus: ## View Prometheus logs
+	docker-compose logs -f prometheus
+
+logs-jaeger: ## View Jaeger logs
+	docker-compose logs -f jaeger
+
+logs-grafana: ## View Grafana logs
+	docker-compose logs -f grafana

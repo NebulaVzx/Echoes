@@ -52,3 +52,12 @@
     transform: translateY(0);
   }
 }
+
+/* Button scale feedback — per D-05 */
+.btn-scale {
+  transition: transform 100ms ease-out;
+}
+
+.btn-scale:active {
+  transform: scale(0.97);
+}

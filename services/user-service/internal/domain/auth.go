@@ -5,15 +5,15 @@ import "strconv"
 
 // RegisterRequest represents a user registration request.
 type RegisterRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	Email    string `json:"email" binding:"required,email,max=255"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
 	Username string `json:"username" binding:"required,min=2,max=50"`
 }
 
 // LoginRequest represents a user login request.
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Email    string `json:"email" binding:"required,email,max=255"`
+	Password string `json:"password" binding:"required,max=128"`
 }
 
 // TokenPair contains access and refresh tokens.
@@ -36,13 +36,13 @@ type RefreshRequest struct {
 
 // LLMSettings represents per-user LLM configuration.
 type LLMSettings struct {
-	Provider               string      `json:"llm_provider" binding:"omitempty"`
-	Protocol               string      `json:"llm_protocol" binding:"omitempty,oneof=openai anthropic"`
-	Model                  string      `json:"llm_model" binding:"omitempty,max=100"`
-	Temperature            interface{} `json:"llm_temperature" binding:"omitempty"`
-	APIKey                 string      `json:"api_key,omitempty" binding:"omitempty"`
-	BaseURL                string      `json:"base_url,omitempty" binding:"omitempty,url"`
-	IncludeNoteInAnalysis  bool        `json:"include_note_in_analysis" binding:"omitempty"`
+	Provider              string      `json:"llm_provider" binding:"omitempty,oneof=openai anthropic"`
+	Protocol              string      `json:"llm_protocol" binding:"omitempty,oneof=openai anthropic"`
+	Model                 string      `json:"llm_model" binding:"omitempty,max=100"`
+	Temperature           interface{} `json:"llm_temperature" binding:"omitempty"`
+	APIKey                string      `json:"api_key,omitempty" binding:"omitempty,max=500"`
+	BaseURL               string      `json:"base_url,omitempty" binding:"omitempty,url,max=500"`
+	IncludeNoteInAnalysis bool        `json:"include_note_in_analysis" binding:"omitempty"`
 }
 
 // GetTemperature returns the temperature as a float64, defaulting to 0.7.
@@ -61,13 +61,13 @@ func (s LLMSettings) GetTemperature() float64 {
 
 // SearchSettings represents per-user search configuration.
 type SearchSettings struct {
-	SimilarityThreshold float64 `json:"similarity_threshold,omitempty"`
+	SimilarityThreshold float64 `json:"similarity_threshold,omitempty" binding:"omitempty,gte=0,lte=1"`
 }
 
 // UserSettings represents the complete user settings.
 type UserSettings struct {
 	LLMSettings
-	SearchSimilarityThreshold float64 `json:"search_similarity_threshold,omitempty"`
+	SearchSimilarityThreshold float64 `json:"search_similarity_threshold,omitempty" binding:"omitempty,gte=0,lte=1"`
 }
 
 // UpdateSettingsRequest represents a request to update user settings.

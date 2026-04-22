@@ -2,6 +2,8 @@
 package transport
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -9,8 +11,56 @@ import (
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/zap"
 )
+
+// ValidationError represents a single field validation failure.
+type ValidationError struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+// ErrorResponse is the unified error response format for all API errors.
+type ErrorResponse struct {
+	Success bool `json:"success"`
+	Error   struct {
+		Code    string            `json:"code"`
+		Message string            `json:"message"`
+		Details []ValidationError `json:"details,omitempty"`
+	} `json:"error"`
+}
+
+// respondWithError sends a unified error response.
+func respondWithError(c *gin.Context, status int, code, message string, details ...ValidationError) {
+	resp := ErrorResponse{Success: false}
+	resp.Error.Code = code
+	resp.Error.Message = message
+	if len(details) > 0 {
+		resp.Error.Details = details
+	}
+	c.JSON(status, resp)
+}
+
+// respondWithValidationError sends a validation error response with field-level details.
+func respondWithValidationError(c *gin.Context, err error) {
+	var ve validator.ValidationErrors
+	if errors.As(err, &ve) {
+		details := make([]ValidationError, 0, len(ve))
+		for _, e := range ve {
+			details = append(details, ValidationError{
+				Field:   e.Field(),
+				Message: fmt.Sprintf("validation failed on '%s'", e.Tag()),
+			})
+		}
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Request validation failed", details...)
+		return
+	}
+	respondWithError(c, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+}
 
 // MemoryHandler handles HTTP requests for memory operations.
 type MemoryHandler struct {
@@ -55,24 +105,30 @@ func getUserID(c *gin.Context) (uuid.UUID, bool) {
 
 // Create handles creating a new memory.
 func (h *MemoryHandler) Create(c *gin.Context) {
+	tracer := otel.Tracer("memory-service")
+	ctx, span := tracer.Start(c.Request.Context(), "CreateMemory")
+	defer span.End()
+
 	userID, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
 	var req domain.CreateMemoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		respondWithValidationError(c, err)
 		return
 	}
 
-	memory, err := h.memoryService.Create(c.Request.Context(), userID, req)
+	memory, err := h.memoryService.Create(ctx, userID, req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		span.SetAttributes(attribute.String("error", err.Error()))
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		return
 	}
 
+	span.SetAttributes(attribute.String("memory_id", memory.ID.String()))
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": memory.SafeResponse()})
 }
 
@@ -80,7 +136,7 @@ func (h *MemoryHandler) Create(c *gin.Context) {
 func (h *MemoryHandler) List(c *gin.Context) {
 	userID, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
@@ -101,7 +157,8 @@ func (h *MemoryHandler) List(c *gin.Context) {
 
 	resp, err := h.memoryService.List(c.Request.Context(), userID, page, limit, tag)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+		zap.L().Error("failed to list memories", zap.Error(err), zap.String("user_id", userID.String()))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 		return
 	}
 
@@ -112,13 +169,13 @@ func (h *MemoryHandler) List(c *gin.Context) {
 func (h *MemoryHandler) Get(c *gin.Context) {
 	userID, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
 	memoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid memory ID"}})
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
 		return
 	}
 
@@ -126,11 +183,12 @@ func (h *MemoryHandler) Get(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case service.ErrMemoryNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "Memory not found"}})
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Memory not found")
 		case service.ErrUnauthorized:
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": gin.H{"code": "FORBIDDEN", "message": "Access denied"}})
+			respondWithError(c, http.StatusForbidden, "FORBIDDEN", "Access denied")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+			zap.L().Error("failed to get memory", zap.Error(err), zap.String("memory_id", memoryID.String()))
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 		}
 		return
 	}
@@ -142,19 +200,19 @@ func (h *MemoryHandler) Get(c *gin.Context) {
 func (h *MemoryHandler) Update(c *gin.Context) {
 	userID, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
 	memoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid memory ID"}})
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
 		return
 	}
 
 	var req domain.UpdateMemoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		respondWithValidationError(c, err)
 		return
 	}
 
@@ -162,11 +220,12 @@ func (h *MemoryHandler) Update(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case service.ErrMemoryNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "Memory not found"}})
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Memory not found")
 		case service.ErrUnauthorized:
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": gin.H{"code": "FORBIDDEN", "message": "Access denied"}})
+			respondWithError(c, http.StatusForbidden, "FORBIDDEN", "Access denied")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+			zap.L().Error("failed to update memory", zap.Error(err), zap.String("memory_id", memoryID.String()))
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 		}
 		return
 	}
@@ -186,7 +245,8 @@ func internalAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" || authHeader != "Bearer "+expectedToken {
-			c.AbortWithStatusJSON(401, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "Invalid internal API token"}})
+			respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid internal API token")
+			c.Abort()
 			return
 		}
 		c.Next()
@@ -197,22 +257,23 @@ func internalAuthMiddleware() gin.HandlerFunc {
 func (h *MemoryHandler) UpdateTaskStatus(c *gin.Context) {
 	memoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid memory ID"}})
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
 		return
 	}
 
 	var req domain.TaskStatusUpdate
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		respondWithValidationError(c, err)
 		return
 	}
 
 	if err := h.memoryService.UpdateTaskStatus(c.Request.Context(), memoryID, req); err != nil {
 		switch err {
 		case service.ErrMemoryNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "Memory not found"}})
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Memory not found")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+			zap.L().Error("failed to update task status", zap.Error(err), zap.String("memory_id", memoryID.String()))
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 		}
 		return
 	}
@@ -225,23 +286,24 @@ func (h *MemoryHandler) UpdateTaskStatus(c *gin.Context) {
 func (h *MemoryHandler) RetryTask(c *gin.Context) {
 	memoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid memory ID"}})
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
 		return
 	}
 
 	taskType := c.Param("task_type")
 	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true}
 	if !validTypes[taskType] {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid task_type"}})
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid task_type")
 		return
 	}
 
 	if err := h.memoryService.RetryTask(c.Request.Context(), memoryID, taskType); err != nil {
 		switch err {
 		case service.ErrMemoryNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "Memory not found"}})
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Memory not found")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+			zap.L().Error("failed to retry task", zap.Error(err), zap.String("memory_id", memoryID.String()), zap.String("task_type", taskType))
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 		}
 		return
 	}
@@ -251,17 +313,22 @@ func (h *MemoryHandler) RetryTask(c *gin.Context) {
 
 // Search handles semantic search for memories.
 func (h *MemoryHandler) Search(c *gin.Context) {
+	tracer := otel.Tracer("memory-service")
+	ctx, span := tracer.Start(c.Request.Context(), "SearchMemories")
+	defer span.End()
+
 	userID, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Query parameter 'q' is required"}})
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Query parameter 'q' is required")
 		return
 	}
+	span.SetAttributes(attribute.String("query", query))
 
 	limit := 10
 	if l := c.Query("limit"); l != "" {
@@ -269,16 +336,21 @@ func (h *MemoryHandler) Search(c *gin.Context) {
 			limit = v
 		}
 	}
+	span.SetAttributes(attribute.Int("limit", limit))
 
-	resp, err := h.memoryService.Search(c.Request.Context(), userID, query, limit)
+	resp, err := h.memoryService.Search(ctx, userID, query, limit)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		if err.Error() == "搜索服务暂不可用" {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": gin.H{"code": "SERVICE_UNAVAILABLE", "message": err.Error()}})
+			respondWithError(c, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Search service temporarily unavailable")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+		zap.L().Error("search failed", zap.Error(err), zap.String("query", query))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 		return
 	}
+
+	span.SetAttributes(attribute.Int("result_count", len(resp.Results)))
 
 	// Convert results to safe response format with similarity
 	items := make([]map[string]interface{}, len(resp.Results))
@@ -295,17 +367,22 @@ func (h *MemoryHandler) Search(c *gin.Context) {
 
 // GetRelated handles retrieving similar memories for a given memory.
 func (h *MemoryHandler) GetRelated(c *gin.Context) {
+	tracer := otel.Tracer("memory-service")
+	ctx, span := tracer.Start(c.Request.Context(), "GetRelatedMemories")
+	defer span.End()
+
 	userID, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
 	memoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid memory ID"}})
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
 		return
 	}
+	span.SetAttributes(attribute.String("memory_id", memoryID.String()))
 
 	limit := 3
 	if l := c.Query("limit"); l != "" {
@@ -313,19 +390,24 @@ func (h *MemoryHandler) GetRelated(c *gin.Context) {
 			limit = v
 		}
 	}
+	span.SetAttributes(attribute.Int("limit", limit))
 
-	resp, err := h.memoryService.Related(c.Request.Context(), memoryID, userID, limit)
+	resp, err := h.memoryService.Related(ctx, memoryID, userID, limit)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		switch err {
 		case service.ErrMemoryNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "Memory not found"}})
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Memory not found")
 		case service.ErrUnauthorized:
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": gin.H{"code": "FORBIDDEN", "message": "Access denied"}})
+			respondWithError(c, http.StatusForbidden, "FORBIDDEN", "Access denied")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+			zap.L().Error("get related failed", zap.Error(err), zap.String("memory_id", memoryID.String()))
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 		}
 		return
 	}
+
+	span.SetAttributes(attribute.Int("result_count", len(resp.Results)))
 
 	items := make([]map[string]interface{}, len(resp.Results))
 	for i, r := range resp.Results {
@@ -343,22 +425,23 @@ func (h *MemoryHandler) GetRelated(c *gin.Context) {
 func (h *MemoryHandler) Delete(c *gin.Context) {
 	userID, ok := getUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": gin.H{"code": "UNAUTHORIZED", "message": "User not authenticated"}})
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
 		return
 	}
 
 	memoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "VALIDATION_ERROR", "message": "Invalid memory ID"}})
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
 		return
 	}
 
 	if err := h.memoryService.Delete(c.Request.Context(), memoryID, userID); err != nil {
 		switch err {
 		case service.ErrMemoryNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": "NOT_FOUND", "message": "Memory not found"}})
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Memory not found")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+			zap.L().Error("failed to delete memory", zap.Error(err), zap.String("memory_id", memoryID.String()))
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 		}
 		return
 	}

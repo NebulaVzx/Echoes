@@ -21,6 +21,7 @@ web/out/
 
 ### Go
 services/*/vendor/
+*.exe
 
 ### Python
 **/__pycache__/

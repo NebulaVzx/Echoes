@@ -6,9 +6,9 @@ type: state
 
 # 项目状态
 
-**最后更新：** 2026-04-21
+**最后更新：** 2026-04-22
 **当前分支：** develop
-**当前阶段：** Sprint 4 已完成
+**当前阶段：** Sprint 5 已完成
 
 ---
 
@@ -51,15 +51,22 @@ type: state
 
 ## 待办事项（下一步）
 
-### Sprint 5：可观测性 + 打磨
-- [ ] Prometheus + OpenTelemetry 集成
-- [ ] 前端动画和加载状态
-- [ ] 错误处理和边界情况
-- [ ] 端到端测试
+### Sprint 5：可观测性 + 打磨（已完成）
+- [x] 计划 05-01：Go Zap 日志 + Prometheus Metrics（3 个 Go 服务）（已完成 2026-04-21）
+- [x] 计划 05-02：前端打磨 — Framer Motion、骨架屏、空状态、Toast（已完成 2026-04-21）
+- [x] 计划 05-03：Go OpenTelemetry 链路追踪（已完成 2026-04-21）
+- [x] 计划 05-04：Python 服务可观测性（Prometheus + OTel）（已完成 2026-04-21）
+- [x] 计划 05-05：后端打磨 — 输入验证、统一错误响应、限流、CORS（已完成 2026-04-21）
+- [x] 计划 05-06：Docker Compose 扩展 — Prometheus + Jaeger + Grafana（已完成 2026-04-21）
+- [x] 计划 05-07：Grafana 仪表盘 + Playwright E2E 测试（已完成 2026-04-21）
 
 ### Sprint 6：Echo Assistant（规划中）
 
 ## 发布状态
+
+- **Phase 5 PR:** [#2](https://github.com/NebulaVzx/Echoes/pull/2) — develop → main
+- **提交日期:** 2026-04-22
+- **验证状态:** 17/17 automated + 10/10 UAT passed
 
 - **Phase 4 PR:** [#1](https://github.com/NebulaVzx/Echoes/pull/1) — develop → main
 - **提交日期:** 2026-04-21
@@ -78,7 +85,7 @@ type: state
 ## 已知问题
 
 1. ~~Vectorizer 是空壳~~：已修复（03-03 完成）
-2. **无测试文件**：Processor 和 Vectorizer 已有冒烟测试（03-04），Go 服务仍无测试
+2. ~~无测试文件~~：Playwright E2E 测试已添加（05-07 完成），Go 单元测试仍待补充
 3. **OAuth state 内存泄漏**：未清理过期 state 条目
 4. **Gateway 无后端健康检查**：服务宕机时返回 502/503
 5. **前端无分页 UI**：API 支持但 UI 硬编码 page=1
@@ -92,7 +99,8 @@ type: state
 - [x] Sprint 2 里程碑验证通过
 - [x] Sprint 3 里程碑验证通过（2026-04-19）
 - [x] Sprint 4 里程碑验证通过（2026-04-21）
+- [x] Sprint 5 里程碑验证通过（2026-04-21）
 
 ---
 
-*State tracking for Echoes project. Updated: 2026-04-19*
+*State tracking for Echoes project. Updated: 2026-04-21*

@@ -35,7 +35,18 @@ export default function RelatedMemories({ memoryId }: RelatedMemoriesProps) {
         <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">
           你可能还感兴趣
         </h3>
-        <div className="text-sm text-gray-400 dark:text-gray-500">加载中...</div>
+        <div className="flex flex-col gap-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              </div>
+              <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
+              <div className="h-4 w-2/3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }

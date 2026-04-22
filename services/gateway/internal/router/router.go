@@ -6,60 +6,33 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/NebulaVzx/Echoes/services/gateway/internal/middleware"
+	"github.com/NebulaVzx/Echoes/services/gateway/internal/observability"
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.uber.org/zap"
 )
 
-// corsMiddleware handles CORS for cross-origin requests from the frontend.
-// Whitelist-based: only allows specific origins when credentials are enabled.
-func corsMiddleware() gin.HandlerFunc {
-	allowedOrigins := []string{
-		"http://localhost:3000",
-	}
-	// Add additional origins from env
-	if extra := os.Getenv("ALLOWED_ORIGINS"); extra != "" {
-		allowedOrigins = append(allowedOrigins, strings.Split(extra, ",")...)
-	}
-
-	return func(c *gin.Context) {
-		origin := c.Request.Header.Get("Origin")
-		allowed := false
-		for _, o := range allowedOrigins {
-			if strings.TrimSpace(o) == origin {
-				allowed = true
-				break
-			}
-		}
-
-		if allowed {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		}
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID")
-		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	}
-}
-
 // Setup configures all routes and returns the Gin engine.
-func Setup() *gin.Engine {
+// Middleware chain per D-02/D-04/D-06: Recovery -> otelgin -> PrometheusMetrics -> ZapLogger -> CORS -> RateLimit -> JWTAuth
+func Setup(logger *zap.Logger) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(gin.Logger())
-	router.Use(corsMiddleware())
+	router.Use(middleware.OTelGin("gateway"))
+	router.Use(middleware.PrometheusMetrics("gateway"))
+	router.Use(middleware.ZapLogger(logger))
+	router.Use(middleware.CORS())
 	router.RedirectTrailingSlash = false
 
-	// Rate limiters: 5 req/min for auth, 60 req/min for memory APIs
-	authLimiter := middleware.NewRateLimiter(12*time.Second, 5)
+	// Register /metrics endpoint before route groups
+	observability.RegisterMetricsEndpoint(router)
+
+	// Rate limiters: 30 req/s for auth (relaxed for Docker shared IP), 60 req/s for APIs
+	// NOTE: In Docker all host requests share the same IP (e.g. 172.19.0.1), so auth
+	// burst must be high enough to avoid false-positive 429s across all users.
+	authLimiter := middleware.NewRateLimiter(time.Second, 30)
 	defaultLimiter := middleware.NewRateLimiter(time.Second, 60)
 
 	// Health check (no rate limit)
@@ -85,10 +58,10 @@ func Setup() *gin.Engine {
 		userProxy.ServeHTTP(c.Writer, c.Request)
 	})
 
-	// Apply JWT auth + rate limit for protected routes
+	// Apply JWT auth + per-user rate limit for protected routes
 	protected := v1.Group("")
 	protected.Use(middleware.JWTAuth())
-	protected.Use(middleware.RateLimit(defaultLimiter))
+	protected.Use(middleware.RateLimitByUser(defaultLimiter))
 	memoryProxy := newReverseProxy("MEMORY_SERVICE_URL", "http://memory-service:8002")
 
 	// Memory routes → Memory Service
@@ -121,12 +94,12 @@ func newReverseProxy(envKey, defaultURL string) *httputil.ReverseProxy {
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
-	// Custom transport with timeout
-	proxy.Transport = &http.Transport{
+	// Custom transport with timeout and OTel trace propagation to downstream services
+	proxy.Transport = otelhttp.NewTransport(&http.Transport{
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 10,
 		IdleConnTimeout:     90 * time.Second,
-	}
+	})
 
 	// Modify request to set correct host and path
 	originalDirector := proxy.Director
