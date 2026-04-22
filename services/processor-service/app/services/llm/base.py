@@ -1,5 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, TypedDict
+
+
+class LLMMessage(TypedDict):
+    role: str  # "system" | "user" | "assistant"
+    content: str
 
 
 class LLMProvider(ABC):
@@ -14,4 +19,9 @@ class LLMProvider(ABC):
     @abstractmethod
     async def generate_tags(self, content: str) -> List[str]:
         """Generate 3-5 concise Chinese tags (2-6 characters each)."""
+        pass
+
+    @abstractmethod
+    async def chat(self, messages: List[LLMMessage], temperature: float = None, max_tokens: int = 500) -> str:
+        """Generate a response given a conversation history."""
         pass
