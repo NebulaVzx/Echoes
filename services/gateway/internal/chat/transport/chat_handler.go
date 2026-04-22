@@ -38,7 +38,8 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.service.SendMessage(c.Request.Context(), userID, &req)
+	authHeader := c.GetHeader("Authorization")
+	resp, err := h.service.SendMessage(c.Request.Context(), userID, &req, authHeader)
 	if err != nil {
 		h.logger.Error("send message failed", zap.Error(err), zap.String("user_id", userID.String()))
 		if err == repository.ErrConversationNotFound {

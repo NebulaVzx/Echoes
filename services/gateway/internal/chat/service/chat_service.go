@@ -80,7 +80,7 @@ func NewChatService(repo repository.ConversationRepository, memoryURL, processor
 }
 
 // SendMessage handles a single chat turn: save user message, RAG search, LLM call, save response.
-func (s *ChatService) SendMessage(ctx context.Context, userID uuid.UUID, req *domain.SendMessageRequest) (*domain.ChatResponse, error) {
+func (s *ChatService) SendMessage(ctx context.Context, userID uuid.UUID, req *domain.SendMessageRequest, authHeader string) (*domain.ChatResponse, error) {
 	// 1. Determine or create conversation
 	var conversationID uuid.UUID
 	var isNewConversation bool
@@ -126,7 +126,7 @@ func (s *ChatService) SendMessage(ctx context.Context, userID uuid.UUID, req *do
 	}
 
 	// 3. Call Memory Service for RAG retrieval
-	memories, err := s.searchMemories(ctx, req.Content, userID)
+	memories, err := s.searchMemories(ctx, req.Content, userID, authHeader)
 	if err != nil {
 		s.logger.Error("memory search failed", zap.Error(err), zap.String("query", req.Content))
 		// Continue with empty memories — system prompt will handle it
@@ -210,7 +210,7 @@ func (s *ChatService) GetMessages(ctx context.Context, userID uuid.UUID, convers
 }
 
 // searchMemories calls the Memory Service search API for RAG retrieval.
-func (s *ChatService) searchMemories(ctx context.Context, query string, userID uuid.UUID) ([]domain.SearchResultMemory, error) {
+func (s *ChatService) searchMemories(ctx context.Context, query string, userID uuid.UUID, authHeader string) ([]domain.SearchResultMemory, error) {
 	searchURL := fmt.Sprintf("%s/api/v1/search?q=%s&limit=%d", s.memoryURL, url.QueryEscape(query), DefaultRAGLimit)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, searchURL, nil)
@@ -218,12 +218,11 @@ func (s *ChatService) searchMemories(ctx context.Context, query string, userID u
 		return nil, fmt.Errorf("failed to create search request: %w", err)
 	}
 
-	// Forward JWT token from incoming request context
-	// Extract Authorization from context if available
-	if authHeader, ok := ctx.Value("Authorization").(string); ok && authHeader != "" {
+	// Forward JWT token to Memory Service
+	if authHeader != "" {
 		req.Header.Set("Authorization", authHeader)
 	}
-	// Also set X-User-ID for internal auth
+	// Also set X-User-ID for internal auth fallback
 	req.Header.Set("X-User-ID", userID.String())
 
 	resp, err := s.httpClient.Do(req)
