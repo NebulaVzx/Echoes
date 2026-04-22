@@ -145,20 +145,23 @@ func (s *ChatService) SendMessage(ctx context.Context, userID uuid.UUID, req *do
 
 	// 6. Call Processor Service LLM
 	llmResponse, err := s.callLLM(ctx, messages)
+	var assistantContent string
+	var citations []domain.Citation
 	if err != nil {
 		s.logger.Error("llm call failed", zap.Error(err), zap.String("conversation_id", conversationID.String()))
-		return nil, fmt.Errorf("AI service temporarily unavailable, please try again later")
+		assistantContent = "抱歉，AI 服务暂时不可用，请稍后再试。"
+		citations = nil
+	} else {
+		// 7. Parse citations
+		citations, assistantContent = s.parseCitations(llmResponse, memories)
 	}
-
-	// 7. Parse citations
-	citations, cleanedText := s.parseCitations(llmResponse, memories)
 
 	// 8. Save assistant message
 	citationsJSON, _ := json.Marshal(citations)
 	assistantMsg := &domain.Message{
 		ConversationID: conversationID,
 		Role:           "assistant",
-		Content:        cleanedText,
+		Content:        assistantContent,
 		Citations:      datatypes.JSON(citationsJSON),
 	}
 	if err := s.repo.CreateMessage(ctx, assistantMsg); err != nil {

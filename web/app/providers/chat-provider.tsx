@@ -110,8 +110,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           // Refresh conversation list
           await loadConversations()
         }
+        // Keep the optimistic user message and append the assistant response
         setMessages(prev => [
           ...prev.filter(m => m.id !== tempUserMessage.id),
+          tempUserMessage,
           { ...message, citations: citations || [] },
         ])
       }

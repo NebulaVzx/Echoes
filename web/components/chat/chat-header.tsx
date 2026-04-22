@@ -20,6 +20,7 @@ export default function ChatHeader({ onClose, onToggleHistory, onNewChat }: Chat
           onClick={onNewChat}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
           title="新对话"
+          aria-label="新对话"
         >
           <Sparkles className="w-4 h-4" />
         </button>
@@ -27,6 +28,7 @@ export default function ChatHeader({ onClose, onToggleHistory, onNewChat }: Chat
           onClick={onToggleHistory}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
           title="历史对话"
+          aria-label="历史对话"
         >
           <History className="w-4 h-4" />
         </button>
@@ -34,6 +36,7 @@ export default function ChatHeader({ onClose, onToggleHistory, onNewChat }: Chat
           onClick={onClose}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
           title="关闭"
+          aria-label="关闭"
         >
           <X className="w-4 h-4" />
         </button>

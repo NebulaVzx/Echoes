@@ -117,6 +117,7 @@ function HomePage() {
                 onClick={toggleChat}
                 className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
                 title="Echo Assistant"
+                aria-label="AI 助手"
               >
                 <Sparkles className="w-4 h-4" />
                 <span className="hidden sm:inline">AI</span>

@@ -56,6 +56,7 @@ export default function ChatSidebar({
             exit={{ x: '100%' }}
             transition={{ type: 'tween', duration: 0.3, ease: 'easeOut' }}
             className="fixed top-0 right-0 h-full w-full sm:w-[400px] bg-white dark:bg-gray-800 border-l border-gray-100 dark:border-gray-700 z-50 flex flex-col shadow-xl"
+            data-testid="chat-sidebar"
           >
             <ChatHeader
               onClose={onClose}

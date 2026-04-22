@@ -33,10 +33,12 @@ export default defineConfig({
       dependencies: ['setup'],
     },
   ],
+  /* webServer disabled for manual testing — services already running
   webServer: {
     command: 'cd .. && docker-compose up -d',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
+  */
 })

@@ -14,7 +14,7 @@ test.describe('Chat', () => {
     await expect(sidebar).toBeVisible()
 
     // Type and send a message
-    const input = page.getByPlaceholder('向拾忆提问...')
+    const input = page.getByPlaceholder('问点什么...')
     await input.fill('你好')
     await page.keyboard.press('Enter')
 
@@ -35,19 +35,19 @@ test.describe('Chat', () => {
     await page.getByRole('button', { name: '新对话' }).click()
 
     // Send a message to create a conversation
-    const input = page.getByPlaceholder('向拾忆提问...')
+    const input = page.getByPlaceholder('问点什么...')
     await input.fill('Test conversation')
     await page.keyboard.press('Enter')
 
     // Wait for conversation to appear in history
     await expect(page.getByText('Test conversation')).toBeVisible()
 
-    // Delete the conversation
-    const deleteButton = page.locator('[data-testid="delete-conversation"]').first()
-    await deleteButton.click()
+    // Open history panel
+    await page.getByRole('button', { name: '历史对话' }).click()
 
-    // Confirm delete
-    await page.getByRole('button', { name: '删除' }).click()
+    // Delete the first conversation
+    const deleteButton = page.locator('button[title="删除对话"]').first()
+    await deleteButton.click()
 
     // Conversation should be removed
     await expect(page.getByText('Test conversation')).not.toBeVisible()
@@ -57,7 +57,7 @@ test.describe('Chat', () => {
     await page.goto('/')
 
     // Toggle dark mode
-    await page.getByRole('button', { name: '切换主题' }).click()
+    await page.getByRole('button', { name: '切换到暗黑模式' }).click()
 
     // Open sidebar
     await page.getByRole('button', { name: 'AI 助手' }).click()
