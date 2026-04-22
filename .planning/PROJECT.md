@@ -57,13 +57,21 @@ type: product
 - 所有 LLM 调用必须异步，失败时降级为本地关键词提取
 - Windows 兼容（WSL2 / Docker Desktop）
 
-## 项目状态
+## 当前里程碑：v1.1 Echo Assistant
 
-**v1.0 MVP 已发布**（2026-04-22）
+**目标：** 对话式 AI 助手，基于 RAG 回答用户记忆相关问题 + 修复 v1.0 已知问题
 
-见 `.planning/MILESTONES.md` 和 `.planning/milestones/v1.0-ROADMAP.md`。
+**目标功能：**
+- Chat UI 侧边栏（Notion-like 风格）
+- RAG 检索逻辑（语义搜索 + LLM 生成回答）
+- 引用来源展示（显示答案来自哪些记忆）
+- 对话历史管理（多轮对话上下文）
+- 修复 OAuth state 内存泄漏
+- Gateway 后端健康检查
+- 前端分页 UI
+- Go 单元测试补充
 
-### 已验证需求（v1.0）
+## 已验证需求（v1.0）
 
 - 认证：邮箱注册/登录 + GitHub OAuth + JWT 双 Token
 - 记忆捕获：文字/链接保存，时间轴浏览，详情编辑删除
@@ -71,13 +79,6 @@ type: product
 - AI：LLM 自动标签，Redis Stream 异步队列
 - 可观测性：Prometheus / Jaeger / Grafana / Zap
 - 前端：暗黑模式，Framer Motion 动效，骨架屏，Playwright E2E
-
-### 下一里程碑目标（v1.1 / Phase 2）
-
-- Echo Assistant：对话式 AI 助手，基于 RAG 回答记忆相关问题
-- 前端分页 UI
-- Gateway 后端健康检查
-- OAuth state 清理机制
 
 ## 相关文档
 
