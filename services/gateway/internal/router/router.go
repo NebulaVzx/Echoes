@@ -8,16 +8,20 @@ import (
 	"os"
 	"time"
 
+	chatRepository "github.com/NebulaVzx/Echoes/services/gateway/internal/chat/repository"
+	chatService "github.com/NebulaVzx/Echoes/services/gateway/internal/chat/service"
+	chatTransport "github.com/NebulaVzx/Echoes/services/gateway/internal/chat/transport"
 	"github.com/NebulaVzx/Echoes/services/gateway/internal/middleware"
 	"github.com/NebulaVzx/Echoes/services/gateway/internal/observability"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 // Setup configures all routes and returns the Gin engine.
 // Middleware chain per D-02/D-04/D-06: Recovery -> otelgin -> PrometheusMetrics -> ZapLogger -> CORS -> RateLimit -> JWTAuth
-func Setup(logger *zap.Logger) *gin.Engine {
+func Setup(logger *zap.Logger, db *gorm.DB) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(middleware.OTelGin("gateway"))
@@ -76,6 +80,21 @@ func Setup(logger *zap.Logger) *gin.Engine {
 	protected.Any("/search", func(c *gin.Context) {
 		memoryProxy.ServeHTTP(c.Writer, c.Request)
 	})
+
+	// Chat routes — handled by Gateway directly (not proxied)
+	chatRepo := chatRepository.NewGormConversationRepository(db)
+	chatSvc := chatService.NewChatService(
+		chatRepo,
+		os.Getenv("MEMORY_SERVICE_URL"),
+		os.Getenv("PROCESSOR_SERVICE_URL"),
+		logger,
+	)
+	chatHandler := chatTransport.NewChatHandler(chatSvc, logger)
+
+	protected.POST("/chat/messages", chatHandler.SendMessage)
+	protected.GET("/chat/conversations", chatHandler.ListConversations)
+	protected.DELETE("/chat/conversations/:id", chatHandler.DeleteConversation)
+	protected.GET("/chat/conversations/:id/messages", chatHandler.GetMessages)
 
 	return router
 }
