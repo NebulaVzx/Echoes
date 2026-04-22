@@ -3,7 +3,7 @@ from typing import List
 import asyncio
 from anthropic import AsyncAnthropic
 from anthropic import RateLimitError as AnthropicRateLimitError
-from .base import LLMProvider
+from .base import LLMProvider, LLMMessage
 
 
 def _normalize_base_url(base_url: str | None) -> str | None:
@@ -58,3 +58,39 @@ Content: {content[:2000]}"""
         result = await self.generate(prompt, temperature=0.3, max_tokens=100)
         tags = [t.strip() for t in result.split(",") if t.strip()]
         return tags[:5]
+
+    async def chat(self, messages: List[LLMMessage], temperature: float = None, max_tokens: int = 500) -> str:
+        temp = temperature if temperature is not None else self.temperature
+        # Anthropic uses "system" as top-level param, not in messages array
+        system_msg = None
+        chat_messages = []
+        for m in messages:
+            if m["role"] == "system":
+                system_msg = m["content"]
+            else:
+                chat_messages.append({"role": m["role"], "content": m["content"]})
+
+        for attempt in range(3):
+            try:
+                kwargs = {
+                    "model": self.model,
+                    "max_tokens": max_tokens,
+                    "temperature": temp,
+                    "messages": chat_messages,
+                }
+                if system_msg:
+                    kwargs["system"] = system_msg
+
+                resp = await asyncio.wait_for(
+                    self.client.messages.create(**kwargs),
+                    timeout=30.0,
+                )
+                return resp.content[0].text
+            except AnthropicRateLimitError:
+                wait = 2 ** attempt
+                await asyncio.sleep(wait)
+            except asyncio.TimeoutError:
+                if attempt == 2:
+                    raise
+                await asyncio.sleep(1)
+        raise RuntimeError("Anthropic chat failed after 3 attempts")
