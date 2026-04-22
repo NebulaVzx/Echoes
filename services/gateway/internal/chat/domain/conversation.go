@@ -56,6 +56,18 @@ type SendMessageRequest struct {
 	Content        string `json:"content" binding:"required,max=10000"`
 }
 
+// SearchResultMemory represents a single memory search result from the Memory Service.
+type SearchResultMemory struct {
+	ID          uuid.UUID `json:"id"`
+	Title       string    `json:"title"`
+	ContentType string    `json:"content_type"`
+	Content     string    `json:"content"`
+	Tags        []string  `json:"tags"`
+	Note        string    `json:"note"`
+	CreatedAt   time.Time `json:"created_at"`
+	Similarity  float64   `json:"similarity"`
+}
+
 // ChatResponse represents the response from the chat API.
 type ChatResponse struct {
 	Message   *Message   `json:"message"`
