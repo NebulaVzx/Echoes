@@ -37,7 +37,7 @@ func main() {
 	// Initialize database connection for chat persistence
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-		dsn = "host=postgres user=echoes_user password=password dbname=echoes port=5432 sslmode=disable"
+		dsn = "host=postgres user=echoes_user password=echoes_password dbname=echoes port=5432 sslmode=disable"
 	}
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
