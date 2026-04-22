@@ -36,7 +36,7 @@ type RefreshRequest struct {
 
 // LLMSettings represents per-user LLM configuration.
 type LLMSettings struct {
-	Provider              string      `json:"llm_provider" binding:"omitempty,oneof=openai anthropic"`
+	Provider              string      `json:"llm_provider" binding:"omitempty,max=50"`
 	Protocol              string      `json:"llm_protocol" binding:"omitempty,oneof=openai anthropic"`
 	Model                 string      `json:"llm_model" binding:"omitempty,max=100"`
 	Temperature           interface{} `json:"llm_temperature" binding:"omitempty"`
