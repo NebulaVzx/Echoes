@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/app/providers/auth-provider'
+import { ChatProvider, useChat } from '@/app/providers/chat-provider'
 import { api, Memory } from '@/lib/api'
 import Logo from '@/components/logo'
 import Link from 'next/link'
@@ -10,8 +11,10 @@ import CreateMemoryForm from '@/components/memory/create-memory-form'
 import MemoryList from '@/components/memory/memory-list'
 import SearchInput from '@/components/search/search-input'
 import EmptyState from '@/components/empty-state'
+import ChatSidebar from '@/components/chat/chat-sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
+import { Sparkles } from 'lucide-react'
 
 function TimelineSkeleton() {
   return (
@@ -37,8 +40,29 @@ function TimelineSkeleton() {
   )
 }
 
-export default function HomePage() {
+export default function HomePageWrapper() {
+  return (
+    <ChatProvider>
+      <HomePage />
+    </ChatProvider>
+  )
+}
+
+function HomePage() {
   const { user, isLoading: authLoading, logout } = useAuth()
+  const {
+    isOpen,
+    closeChat,
+    toggleChat,
+    messages,
+    isLoading: chatLoading,
+    sendMessage,
+    conversations,
+    activeConversationId,
+    selectConversation,
+    newConversation,
+    deleteConversation,
+  } = useChat()
   const [memories, setMemories] = useState<Memory[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -88,6 +112,16 @@ export default function HomePage() {
           </div>
           <SearchInput />
           <div className="flex items-center gap-1 flex-shrink-0">
+            {user && (
+              <button
+                onClick={toggleChat}
+                className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
+                title="Echo Assistant"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="hidden sm:inline">AI</span>
+              </button>
+            )}
             <ThemeToggle />
             {user && (
               <div className="flex items-center gap-1 ml-1">
@@ -160,6 +194,21 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {user && (
+        <ChatSidebar
+          isOpen={isOpen}
+          onClose={closeChat}
+          messages={messages}
+          isLoading={chatLoading}
+          onSendMessage={sendMessage}
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelectConversation={selectConversation}
+          onNewConversation={newConversation}
+          onDeleteConversation={deleteConversation}
+        />
+      )}
     </main>
   )
 }
