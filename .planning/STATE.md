@@ -6,7 +6,7 @@ type: state
 
 # 项目状态
 
-**最后更新：** 2026-04-21
+**最后更新：** 2026-04-22
 **当前分支：** develop
 **当前阶段：** Sprint 5 已完成
 
@@ -63,6 +63,10 @@ type: state
 ### Sprint 6：Echo Assistant（规划中）
 
 ## 发布状态
+
+- **Phase 5 PR:** [#2](https://github.com/NebulaVzx/Echoes/pull/2) — develop → main
+- **提交日期:** 2026-04-22
+- **验证状态:** 17/17 automated + 10/10 UAT passed
 
 - **Phase 4 PR:** [#1](https://github.com/NebulaVzx/Echoes/pull/1) — develop → main
 - **提交日期:** 2026-04-21
