@@ -6,7 +6,7 @@ type: state
 
 # 项目状态
 
-**最后更新：** 2026-04-22
+**最后更新：** 2026-04-23
 **当前分支：** develop
 **当前里程碑：** v1.1 Echo Assistant
 
@@ -14,10 +14,11 @@ type: state
 
 ## 当前位置
 
-阶段：Phase 6 - Echo Assistant（已完成）
-计划：5 plans (5/5 完成)
-状态：Phase 6 全部完成
-最近活动：2026-04-22 — Plan 5 (集成层) 完成
+阶段：Phase 7 - Bug Fixes & Quality（待开始）
+上一阶段：Phase 6 - Echo Assistant（已完成并通过验证）
+计划：4 plans (0/4 完成)
+状态：Phase 6 验证通过，准备进入 Phase 7
+最近活动：2026-04-23 — Phase 6 后验证修复完成（E2E 测试扩展、VERIFICATION.md 更新）
 
 ---
 
@@ -55,4 +56,21 @@ type: state
 
 ---
 
-*State tracking for Echoes project. Updated: 2026-04-22*
+## Phase 6 后验证修复（2026-04-23）
+
+Phase 6 初始验证后，在 E2E 测试和实际使用中发现的以下问题已全部修复：
+
+| 问题 | 修复内容 | 涉及文件 |
+|------|----------|----------|
+| Processor chat 端点缺失 | FastAPI `POST /api/v1/generate/chat` 添加，支持 per-request LLM 配置 | `processor-service/app/main.py` |
+| Chat 使用全局 LLM 配置 | Gateway 从 User Service 获取用户设置并传给 Processor | `gateway/chat/service/chat_service.go` |
+| Memory search 解析错误 | 从嵌套结构改为扁平结构解析 | `gateway/chat/service/chat_service.go` |
+| NULL created_at 导致 500 | 数据库修复 + Gateway 容错处理 | 多文件 |
+| 引用标注换行显示 | 前端改为 inline 渲染 + 系统提示优化 | `web/lib/markdown.tsx`, `chat_service.go` |
+| RAG limit 硬编码为 5 | 支持用户可配置（1-20，Settings 页面滑块） | `user-service`, `gateway`, `web/settings` |
+| Chat input placeholder 不对齐 | CSS 调整 | `web/components/chat/chat-input.tsx` |
+| E2E 测试覆盖不足 | 从 3 个扩展到 8 个测试，全部通过 | `web/e2e/specs/chat.spec.ts` |
+
+---
+
+*State tracking for Echoes project. Updated: 2026-04-23*
