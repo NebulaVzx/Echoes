@@ -60,13 +60,31 @@ type: context
   - 反向代理增加连接超时和错误处理（非无限阻塞）
 
 ### 前端分页交互模式
-- **D-03: "加载更多" 按钮模式**
-  - 时间轴页面每次加载固定数量（如 10-20 条），底部显示 "加载更多" 按钮
-  - 理由：与 Notion-like 极简美学一致；保留用户滚动位置；比无限滚动更可控
-  - 不采用页码组件（移动端体验差，不符合 Notion 风格）
+- **D-03: 双模式分页（默认"加载更多"，可在 Settings 切换为页码组件）**
+  - **默认模式**："加载更多" 按钮 — 每次加载固定数量（如 10-20 条），底部显示按钮
+    - 与 Notion-like 极简美学一致，保留用户滚动位置
+  - **可选模式**：页码组件 — 在 Settings 页面提供切换开关
+    - 适合记忆数量较多（>100 条）时快速跳转
+    - 移动端仍显示简洁页码（上一页 / 页码 / 下一页）
   - 不采用无限滚动（难以实现 BUG-08 的"保留滚动位置"需求）
-  - API 分页参数：`page` + `limit` 或 `cursor` + `limit`
-  - 鉴于现有 API 使用 offset/limit，继续沿用：GET `/api/v1/memories?page=1&limit=20`
+  - 用户偏好存储在 `users.settings` JSONB 字段（复用现有用户设置系统）
+  - API 分页参数：`page` + `limit`（offset/limit 模式）
+    - 请求：`GET /api/v1/memories?page=1&limit=20`
+    - 响应：保留现有格式，新增 `pagination` 字段
+      ```json
+      {
+        "success": true,
+        "data": {
+          "memories": [...],
+          "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 156,
+            "has_more": true
+          }
+        }
+      }
+      ```
 
 ### Go 单元测试范围与策略
 - **D-04: 聚焦 Service 层，Mock Repository 接口**
