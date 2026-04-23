@@ -69,11 +69,13 @@ Plans:
 4. User/Memory/Gateway 核心逻辑有单元测试覆盖
 5. 所有修复通过 Playwright E2E 回归测试
 
-**计划（预估）：**
-- 07-01: OAuth state TTL + 定期清理
-- 07-02: Gateway 下游健康检查 + 超时重试
-- 07-03: 前端分页 UI
-- 07-04: Go 单元测试（User/Memory/Gateway）
+**计划：** 4 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — OAuth State TTL + 定期清理（BUG-01, BUG-02）
+- [ ] 07-02-PLAN.md — Gateway 健康检查 + 反向代理超时 + 路径遍历修复（BUG-03, BUG-04, BUG-05, CR-02）
+- [ ] 07-03-PLAN.md — 前端分页 UI + 设置切换（BUG-06, BUG-07, BUG-08）
+- [ ] 07-04-PLAN.md — Go 单元测试 + Chat Service 修复（BUG-09, BUG-10, BUG-11, WR-01, WR-02, IN-01）
 
 ## 进度
 
@@ -90,4 +92,4 @@ Plans:
 
 ---
 
-*Roadmap updated: 2026-04-22 for v1.1 milestone*
+*Roadmap updated: 2026-04-23 for Phase 7 planning*
