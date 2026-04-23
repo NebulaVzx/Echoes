@@ -38,7 +38,7 @@ const systemPromptTemplate = `你是用户的个人知识库助手"拾忆"。你
 
 ## 约束
 1. 【严格基于记忆】只使用提供的记忆片段中的信息回答问题
-2. 【引用标注】每个事实性陈述必须标注来源，格式为 [1]、[2] 等
+2. 【引用标注】每个事实性陈述必须紧跟标注来源，格式为 [1]、[2] 等，标注必须紧跟在对应的事实文字之后，不要换行单独放置
 3. 【信息不足】如果记忆片段不足以回答问题，明确说明"根据您的记忆，我找不到相关信息"
 4. 【语言一致】使用与用户问题相同的语言回答
 5. 【禁止推测】不要推断、假设或添加记忆片段中未明确提及的信息
@@ -55,12 +55,13 @@ const systemPromptNoMemories = `你是用户的个人知识库助手"拾忆"。
 
 // userLLMConfig holds per-user LLM settings fetched from User Service.
 type userLLMConfig struct {
-	Provider    string  `json:"llm_provider"`
-	Protocol    string  `json:"llm_protocol"`
-	Model       string  `json:"llm_model"`
-	Temperature float64 `json:"llm_temperature"`
-	APIKey      string  `json:"api_key"`
-	BaseURL     string  `json:"base_url"`
+	Provider       string  `json:"llm_provider"`
+	Protocol       string  `json:"llm_protocol"`
+	Model          string  `json:"llm_model"`
+	Temperature    float64 `json:"llm_temperature"`
+	APIKey         string  `json:"api_key"`
+	BaseURL        string  `json:"base_url"`
+	RAGMemoryLimit int     `json:"rag_memory_limit"`
 }
 
 // ChatService orchestrates RAG retrieval, prompt assembly, and LLM generation.
@@ -140,8 +141,21 @@ func (s *ChatService) SendMessage(ctx context.Context, userID uuid.UUID, req *do
 		return nil, fmt.Errorf("failed to save user message: %w", err)
 	}
 
-	// 3. Call Memory Service for RAG retrieval
-	memories, err := s.searchMemories(ctx, req.Content, userID, authHeader)
+	// 3. Fetch user's LLM settings from User Service (before RAG to get limit)
+	llmConfig, err := s.getUserLLMConfig(ctx, userID, authHeader)
+	if err != nil {
+		s.logger.Warn("failed to fetch user LLM config, using defaults", zap.Error(err), zap.String("user_id", userID.String()))
+		llmConfig = nil
+	}
+
+	// Determine RAG limit: user setting > default
+	ragLimit := DefaultRAGLimit
+	if llmConfig != nil && llmConfig.RAGMemoryLimit > 0 {
+		ragLimit = llmConfig.RAGMemoryLimit
+	}
+
+	// 4. Call Memory Service for RAG retrieval
+	memories, err := s.searchMemories(ctx, req.Content, userID, authHeader, ragLimit)
 	if err != nil {
 		s.logger.Error("memory search failed", zap.Error(err), zap.String("query", req.Content))
 		// Continue with empty memories — system prompt will handle it
@@ -157,13 +171,6 @@ func (s *ChatService) SendMessage(ctx context.Context, userID uuid.UUID, req *do
 
 	// 5. Build messages array for LLM
 	messages := s.buildMessages(req.Content, memories, history)
-
-	// 5.5 Fetch user's LLM settings from User Service
-	llmConfig, err := s.getUserLLMConfig(ctx, userID, authHeader)
-	if err != nil {
-		s.logger.Warn("failed to fetch user LLM config, using defaults", zap.Error(err), zap.String("user_id", userID.String()))
-		llmConfig = nil
-	}
 
 	// 6. Call Processor Service LLM
 	llmResponse, err := s.callLLM(ctx, messages, llmConfig)
@@ -235,8 +242,11 @@ func (s *ChatService) GetMessages(ctx context.Context, userID uuid.UUID, convers
 }
 
 // searchMemories calls the Memory Service search API for RAG retrieval.
-func (s *ChatService) searchMemories(ctx context.Context, query string, userID uuid.UUID, authHeader string) ([]domain.SearchResultMemory, error) {
-	searchURL := fmt.Sprintf("%s/api/v1/search?q=%s&limit=%d", s.memoryURL, url.QueryEscape(query), DefaultRAGLimit)
+func (s *ChatService) searchMemories(ctx context.Context, query string, userID uuid.UUID, authHeader string, limit int) ([]domain.SearchResultMemory, error) {
+	if limit < 1 {
+		limit = DefaultRAGLimit
+	}
+	searchURL := fmt.Sprintf("%s/api/v1/search?q=%s&limit=%d", s.memoryURL, url.QueryEscape(query), limit)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, searchURL, nil)
 	if err != nil {
@@ -464,6 +474,7 @@ func (s *ChatService) getUserLLMConfig(ctx context.Context, userID uuid.UUID, au
 			LLMTemperature float64 `json:"llm_temperature"`
 			APIKey         string  `json:"api_key"`
 			BaseURL        string  `json:"base_url"`
+			RAGMemoryLimit int     `json:"rag_memory_limit"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&settingsResp); err != nil {
@@ -475,12 +486,13 @@ func (s *ChatService) getUserLLMConfig(ctx context.Context, userID uuid.UUID, au
 	}
 
 	cfg := &userLLMConfig{
-		Provider:    settingsResp.Data.LLMProvider,
-		Protocol:    settingsResp.Data.LLMProtocol,
-		Model:       settingsResp.Data.LLMModel,
-		Temperature: settingsResp.Data.LLMTemperature,
-		APIKey:      settingsResp.Data.APIKey,
-		BaseURL:     settingsResp.Data.BaseURL,
+		Provider:       settingsResp.Data.LLMProvider,
+		Protocol:       settingsResp.Data.LLMProtocol,
+		Model:          settingsResp.Data.LLMModel,
+		Temperature:    settingsResp.Data.LLMTemperature,
+		APIKey:         settingsResp.Data.APIKey,
+		BaseURL:        settingsResp.Data.BaseURL,
+		RAGMemoryLimit: settingsResp.Data.RAGMemoryLimit,
 	}
 	return cfg, nil
 }

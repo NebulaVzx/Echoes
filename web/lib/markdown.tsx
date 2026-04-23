@@ -39,7 +39,7 @@ function MarkdownWithCitations({ content, citations }: { content: string; citati
   const parts = content.split(/(\[\d+\])/g)
 
   return (
-    <div className="space-y-2">
+    <span className="inline">
       {parts.map((part, i) => {
         const match = part.match(/\[(\d+)\]/)
         if (match) {
@@ -50,7 +50,7 @@ function MarkdownWithCitations({ content, citations }: { content: string; citati
               <a
                 key={i}
                 href={`/memory/${citation.memory_id}`}
-                className="inline-flex items-center px-1 py-0.5 text-xs font-medium bg-blue-50 text-blue-600 rounded hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 mx-0.5"
+                className="inline items-center px-1 py-0.5 text-xs font-medium bg-blue-50 text-blue-600 rounded hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 mx-0.5 align-middle"
                 title={`${citation.title} (相似度: ${(citation.similarity * 100).toFixed(1)}%)`}
               >
                 [{idx}]
@@ -61,7 +61,7 @@ function MarkdownWithCitations({ content, citations }: { content: string; citati
         }
         if (!part.trim()) return null
         return (
-          <div key={i} className="prose prose-sm dark:prose-invert max-w-none inline">
+          <span key={i} className="prose prose-sm dark:prose-invert max-w-none inline">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
@@ -74,9 +74,9 @@ function MarkdownWithCitations({ content, citations }: { content: string; citati
             >
               {part}
             </ReactMarkdown>
-          </div>
+          </span>
         )
       })}
-    </div>
+    </span>
   )
 }

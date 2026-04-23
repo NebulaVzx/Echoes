@@ -64,16 +64,23 @@ type SearchSettings struct {
 	SimilarityThreshold float64 `json:"similarity_threshold,omitempty" binding:"omitempty,gte=0,lte=1"`
 }
 
+// RAGSettings represents per-user RAG configuration.
+type RAGSettings struct {
+	MemoryLimit int `json:"rag_memory_limit,omitempty" binding:"omitempty,gte=1,lte=20"`
+}
+
 // UserSettings represents the complete user settings.
 type UserSettings struct {
 	LLMSettings
 	SearchSimilarityThreshold float64 `json:"search_similarity_threshold,omitempty" binding:"omitempty,gte=0,lte=1"`
+	RAGMemoryLimit            int     `json:"rag_memory_limit,omitempty" binding:"omitempty,gte=1,lte=20"`
 }
 
 // UpdateSettingsRequest represents a request to update user settings.
 type UpdateSettingsRequest struct {
 	LLM    *LLMSettings    `json:"llm,omitempty"`
 	Search *SearchSettings `json:"search,omitempty"`
+	RAG    *RAGSettings    `json:"rag,omitempty"`
 }
 
 // TestLLMRequest represents a request to test LLM connectivity.

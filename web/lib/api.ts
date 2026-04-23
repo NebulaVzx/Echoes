@@ -49,13 +49,19 @@ export interface SearchSettings {
   similarity_threshold: number
 }
 
+export interface RAGSettings {
+  rag_memory_limit: number
+}
+
 export interface UserSettings extends LLMSettings {
   search_similarity_threshold?: number
+  rag_memory_limit?: number
 }
 
 export interface UpdateSettingsRequest {
   llm?: LLMSettings
   search?: SearchSettings
+  rag?: RAGSettings
 }
 
 export interface AuthResponse {
