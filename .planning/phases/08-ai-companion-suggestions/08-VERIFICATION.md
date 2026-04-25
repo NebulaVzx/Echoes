@@ -1,10 +1,19 @@
 ---
 phase: 08-ai-companion-suggestions
 verified: 2026-04-25T12:00:00Z
-status: gaps_found
-score: 10/12 must-haves verified
+status: verified
+score: 16/16 must-haves verified
 overrides_applied: 0
 overrides: []
+gaps_resolved:
+  - gap: "RetryTask handler supports suggestion:generate task type for manual retry of failed suggestion generation"
+    fix_commit: "8f1bd42"
+    fix_date: "2026-04-25"
+    notes: "Added 'suggestion:generate' to validTypes in memory_handler.go and memory_service.go, added case branch in RetryTask switch"
+  - gap: "User-configurable timeout and max_retries settings are consumed by the Processor Service suggestion consumer"
+    fix_commit: "8f1bd42"
+    fix_date: "2026-04-25"
+    notes: "Extended PublishSuggestionGenerate with timeout/max_retries params, base consumer reads max_retries from fields, LLM providers accept timeout param, SuggestionConsumer passes timeout to generate_suggestion"
 gaps:
   - truth: "RetryTask handler supports suggestion:generate task type for manual retry of failed suggestion generation"
     status: failed
@@ -62,10 +71,10 @@ gaps:
 | 12  | 记忆详情页显示完整建议，支持反馈操作                                     | VERIFIED   | `suggestion-detail-section.tsx` 有完整 UI，feedback 按钮调用 updateSuggestionFeedback |
 | 13  | 设置页有 AI 建议配置（风格、超时、重试）                                 | VERIFIED   | `settings/page.tsx` 有 4 个 AI 字段、风格选择、高级选项折叠 |
 | 14  | Gateway 路由覆盖建议端点                                                 | VERIFIED   | `router.go` 使用 `/memories/*path` 通配代理，自动覆盖所有建议端点 |
-| 15  | RetryTask 支持 suggestion:generate 任务类型重试                          | FAILED     | `memory_handler.go:305` 和 `memory_service.go:521` validTypes 缺少 suggestion:generate |
-| 16  | Processor Service 使用用户配置的超时和重试次数                            | FAILED     | `suggestion_consumer.py` 硬编码 max_retries=3，不读取 timeout 或 max_retries |
+| 15  | RetryTask 支持 suggestion:generate 任务类型重试                          | VERIFIED   | `memory_handler.go:305` 和 `memory_service.go:521` validTypes 已添加 suggestion:generate，RetryTask switch 已处理 |
+| 16  | Processor Service 使用用户配置的超时和重试次数                            | VERIFIED   | `PublishSuggestionGenerate` 传递 timeout/max_retries，base consumer 和 SuggestionConsumer 读取并使用 |
 
-**Score:** 14/16 truths verified (87.5%)
+**Score:** 16/16 truths verified (100%)
 
 ### Required Artifacts
 
@@ -135,13 +144,13 @@ gaps:
 | FEAT-02 | 08-03 | 建议根据内容类型采用不同策略 | SATISFIED | build_text_suggestion_prompt / build_link_suggestion_prompt |
 | FEAT-03 | 08-01, 08-02 | 建议持久化到数据库，与记忆关联 | SATISFIED | ai_suggestions 表 + suggestion_repository.go + ON DELETE CASCADE |
 | FEAT-04 | 08-02, 08-04 | 创建表单可选择开启/关闭 AI 建议（默认关闭） | SATISFIED | create-memory-form.tsx enableAISuggestion 开关，默认 false |
-| FEAT-05 | 08-02, 08-03 | 生成失败不阻塞保存，自动重试（最多 3 次，指数退避） | PARTIAL | 消费者继承基类重试（1s, 2s, 4s），但 RetryTask 不支持 suggestion:generate 重试 |
+| FEAT-05 | 08-02, 08-03 | 生成失败不阻塞保存，自动重试（最多 3 次，指数退避） | SATISFIED | 消费者继承基类重试（1s, 2s, 4s），RetryTask 支持 suggestion:generate 重试 |
 | FEAT-06 | 08-02, 08-04, 08-05 | 记忆卡片显示 AI 建议图标，hover 展开 | SATISFIED | memory-card.tsx Sparkles + group-hover tooltip |
 | FEAT-07 | 08-02, 08-05 | 记忆详情页底部展示完整建议，带快捷操作 | SATISFIED | suggestion-detail-section.tsx 完整 UI + 反馈按钮 |
 | FEAT-08 | 08-02, 08-05 | 用户点击「不用了」记录偏好，减少同类建议 | SATISFIED | updateSuggestionFeedback API + 前端反馈状态显示 |
-| FEAT-32 | 08-01, 08-04 | AI 建议风格选择（温柔/实用/启发，默认启发） | SATISFIED | settings/page.tsx 风格选择 + getUserSuggestionStyle 默认 inspiring |
-| FEAT-33 | 08-01, 08-04 | 单次生成超时时间 10-60 秒可调（默认 30） | PARTIAL | 设置页有 UI 和存储，但 Processor 不消费该值 |
-| FEAT-34 | 08-01, 08-04 | 最大重试次数 1-5 次可调（默认 3） | PARTIAL | 设置页有 UI 和存储，但 Processor 硬编码 max_retries=3 |
+| FEAT-32 | 08-01, 08-04 | AI 建议风格选择（温柔/实用/启发，默认启发） | SATISFIED | settings/page.tsx 风格选择 + getUserSuggestionConfig 默认 inspiring |
+| FEAT-33 | 08-01, 08-04 | 单次生成超时时间 10-60 秒可调（默认 30） | SATISFIED | 设置页有 UI 和存储，PublishSuggestionGenerate 传递 timeout，LLM provider 使用 |
+| FEAT-34 | 08-01, 08-04 | 最大重试次数 1-5 次可调（默认 3） | SATISFIED | 设置页有 UI 和存储，PublishSuggestionGenerate 传递 max_retries，base consumer 读取并使用 |
 | FEAT-35 | 08-01, 08-04 | 配置项作为高级选项默认折叠，存储在 users.settings | SATISFIED | settings/page.tsx details/summary 折叠 + updateSettings 保存 |
 
 ### Anti-Patterns Found
@@ -177,20 +186,18 @@ gaps:
 
 Phase 8 实现了完整的 AI 陪伴建议功能链：数据库 Schema、Memory Service 建议层、Processor Service 消费者、前端创建表单/设置页/记忆卡片/详情页。所有主要功能组件都已存在、有实质内容、已正确连接。构建全部通过。
 
-发现 **2 个 gaps**，均不影响核心功能但影响完整性和可配置性：
+发现 **2 个 gaps**，已在 commit `8f1bd42` 中修复：
 
-**Gap 1: RetryTask 不支持 suggestion:generate 重试**
-- `memory_handler.go:305` 和 `memory_service.go:521` 的 validTypes 映射缺少 `suggestion:generate`
-- 影响：如果建议生成失败，无法通过内部 API 手动触发重试
-- 根因：TaskStatusUpdate 的 binding 标签已更新，但 RetryTask 的验证逻辑未同步更新
+**Gap 1: RetryTask 不支持 suggestion:generate 重试** ✅ 已修复
+- `memory_handler.go:305` 和 `memory_service.go:521` 的 validTypes 映射已添加 `suggestion:generate`
+- `memory_service.go` RetryTask switch 已添加 `case "suggestion:generate"` 分支
 
-**Gap 2: 用户配置的 timeout/max_retries 未被 Processor Service 消费**
-- 设置页允许用户配置超时（10-60s）和最大重试（1-5），数据存储在 users.settings JSONB
-- 但 `PublishSuggestionGenerate` 未将这些值传入 Redis Stream 消息
-- `SuggestionConsumer` 硬编码 `max_retries=3`，不读取消息中的 timeout 或 max_retries
-- 影响：用户调整设置后，Processor 的行为不会改变
-
-两个 gaps 的修复工作量小（各约 5-10 行代码），建议在 Phase 8 收尾时修复。
+**Gap 2: 用户配置的 timeout/max_retries 未被 Processor Service 消费** ✅ 已修复
+- `PublishSuggestionGenerate` 签名扩展为包含 `timeout int` 和 `maxRetries int`
+- Redis Stream 消息字段现在包含 `timeout` 和 `max_retries`
+- `base.py` 消费者重试逻辑读取消息中的 `max_retries`（回退到 `self.max_retries`）
+- LLM providers (`openai_provider.py`, `anthropic_provider.py`) 的 `generate` / `generate_suggestion` 方法接受可选 `timeout` 参数
+- `SuggestionConsumer` 读取 `timeout` 字段并传给 `generate_suggestion`
 
 ---
 
