@@ -57,7 +57,7 @@ func main() {
 
 	// Initialize services
 	memoryService := service.NewMemoryService(memoryRepo, userRepo, taskQueue, vectorizerClient, suggestionRepo)
-	tagService := service.NewTagService(tagRepo)
+	tagService := service.NewTagService(tagRepo, userRepo)
 
 	// Initialize handlers
 	memoryHandler := transport.NewMemoryHandler(memoryService)

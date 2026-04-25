@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/providers/auth-provider'
 import { ChatProvider, useChat } from '@/app/providers/chat-provider'
 import { api, Memory } from '@/lib/api'
@@ -51,6 +52,7 @@ export default function HomePageWrapper() {
 }
 
 function HomePage() {
+  const searchParams = useSearchParams()
   const { user, isLoading: authLoading, logout } = useAuth()
   const {
     isOpen,
@@ -154,6 +156,19 @@ function HomePage() {
       return [...prev, tag]
     })
   }, [])
+
+  // Sync selectedTags from URL query params on mount / external navigation
+  useEffect(() => {
+    const tagsParam = searchParams.getAll('tags')
+    if (tagsParam.length > 0) {
+      setSelectedTags(tagsParam)
+    } else {
+      const singleTag = searchParams.get('tag')
+      if (singleTag) {
+        setSelectedTags([singleTag])
+      }
+    }
+  }, [searchParams])
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || isLoadingMore) return

@@ -26,6 +26,7 @@ func (h *TagHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/tags/:name/related", h.GetRelated)
 	router.POST("/tags/merge", h.Merge)
 	router.GET("/tags/similar", h.FindSimilar)
+	router.POST("/tags/categorize", h.Categorize)
 }
 
 // List handles retrieving all tags for the authenticated user.
@@ -119,4 +120,22 @@ func (h *TagHandler) FindSimilar(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"pairs": results}})
+}
+
+// Categorize handles POST /api/v1/tags/categorize — uses LLM to auto-group tags.
+func (h *TagHandler) Categorize(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	resp, err := h.tagService.CategorizeTags(c.Request.Context(), userID)
+	if err != nil {
+		zap.L().Error("failed to categorize tags", zap.Error(err))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": resp})
 }

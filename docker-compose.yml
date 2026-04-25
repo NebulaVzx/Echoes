@@ -182,6 +182,11 @@ services:
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-dev-internal-token}
       - VECTORIZER_SERVICE_URL=http://vectorizer-service:8004
       - PROCESSOR_SERVICE_URL=http://processor-service:8003
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-${ANTHROPIC_API_KEY:-}}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ENV=development
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - LOG_LEVEL=info

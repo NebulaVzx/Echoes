@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { api, TagInfo } from '@/lib/api'
+import { api, TagInfo, TagCategory } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
 import Logo from '@/components/logo'
 import SearchInput from '@/components/search/search-input'
@@ -21,6 +21,8 @@ import {
   ChevronLeft,
   Wand2,
   Tag,
+  Sparkles,
+  FolderOpen,
 } from 'lucide-react'
 
 type ViewMode = 'cloud' | 'cards'
@@ -52,7 +54,8 @@ export default function TagsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('cloud')
   const [tagColors, setTagColors] = useState<Record<string, string>>({})
-  const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const [tagCategories, setTagCategories] = useState<TagCategory[] | null>(null)
+  const [isCategorizing, setIsCategorizing] = useState(false)
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
   const [mergeSource, setMergeSource] = useState('')
   const [mergeTarget, setMergeTarget] = useState('')
@@ -148,6 +151,23 @@ export default function TagsPage() {
     }
   }
 
+  const handleCategorize = async () => {
+    setIsCategorizing(true)
+    try {
+      const response = await api.categorizeTags()
+      if (response.success && response.data) {
+        setTagCategories(response.data.categories)
+        showToast('分类完成', 'success')
+      } else {
+        showToast(response.error?.message || '分类失败', 'error')
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '分类失败', 'error')
+    } finally {
+      setIsCategorizing(false)
+    }
+  }
+
   const openMergeDialog = (source: string, target: string) => {
     setMergeSource(source)
     setMergeTarget(target)
@@ -158,6 +178,24 @@ export default function TagsPage() {
   const getFontSize = (count: number) => {
     return Math.min(24, 12 + Math.log2(count + 1) * 2)
   }
+
+  // Build a tag lookup map for quick access
+  const tagMap = tags.reduce((acc, t) => {
+    acc[t.name] = t
+    return acc
+  }, {} as Record<string, TagInfo>)
+
+  // If categorized, build grouped tags; otherwise show all tags flat
+  const hasCategories = tagCategories && tagCategories.length > 0
+
+  // Collect uncategorized tags
+  const categorizedTagNames = new Set<string>()
+  if (hasCategories) {
+    tagCategories!.forEach((cat) => cat.tags.forEach((t) => categorizedTagNames.add(t)))
+  }
+  const uncategorizedTags = hasCategories
+    ? tags.filter((t) => !categorizedTagNames.has(t.name))
+    : []
 
   if (authLoading) {
     return (
@@ -208,6 +246,14 @@ export default function TagsPage() {
             <span className="text-xs text-gray-400 dark:text-gray-500">{tags.length} 个标签</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleCategorize}
+              disabled={isCategorizing || tags.length === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors disabled:opacity-50"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {isCategorizing ? '分类中...' : '自动分类'}
+            </button>
             <button
               onClick={handleFindSimilar}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
@@ -279,7 +325,109 @@ export default function TagsPage() {
             <Tag className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <p className="text-gray-500 dark:text-gray-400">还没有标签，保存第一条记忆后会自动生成</p>
           </div>
+        ) : hasCategories ? (
+          /* Categorized view */
+          <div className="space-y-8">
+            {tagCategories!.map((category) => (
+              <div key={category.name}>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  {category.name}
+                  <span className="text-xs text-gray-300 dark:text-gray-600">({category.tags.length})</span>
+                </h3>
+                {viewMode === 'cloud' ? (
+                  <div className="flex flex-wrap gap-3 items-center py-2">
+                    {category.tags.map((tagName) => {
+                      const tag = tagMap[tagName]
+                      if (!tag) return null
+                      return (
+                        <motion.button
+                          key={tagName}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => router.push(`/?tags=${encodeURIComponent(tagName)}`)}
+                          className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors hover:opacity-80 ${getTagStyle(
+                            tagColors[tagName],
+                            false
+                          )}`}
+                          style={{ fontSize: `${getFontSize(tag.count)}px` }}
+                        >
+                          {tagName}
+                          <span className="text-[10px] opacity-60 ml-0.5">{tag.count}</span>
+                        </motion.button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {category.tags.map((tagName) => {
+                      const tag = tagMap[tagName]
+                      if (!tag) return null
+                      return (
+                        <TagCard
+                          key={tagName}
+                          tag={tag}
+                          tagColors={tagColors}
+                          onColorChange={handleColorChange}
+                          onRemoveColor={handleRemoveColor}
+                        />
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+            {/* Uncategorized tags */}
+            {uncategorizedTags.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  其他
+                  <span className="text-xs text-gray-300 dark:text-gray-600">({uncategorizedTags.length})</span>
+                </h3>
+                {viewMode === 'cloud' ? (
+                  <div className="flex flex-wrap gap-3 items-center py-2">
+                    {uncategorizedTags.map((tag) => (
+                      <motion.button
+                        key={tag.name}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => router.push(`/?tags=${encodeURIComponent(tag.name)}`)}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors hover:opacity-80 ${getTagStyle(
+                          tagColors[tag.name],
+                          false
+                        )}`}
+                        style={{ fontSize: `${getFontSize(tag.count)}px` }}
+                      >
+                        {tag.name}
+                        <span className="text-[10px] opacity-60 ml-0.5">{tag.count}</span>
+                      </motion.button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {uncategorizedTags.map((tag) => (
+                      <TagCard
+                        key={tag.name}
+                        tag={tag}
+                        tagColors={tagColors}
+                        onColorChange={handleColorChange}
+                        onRemoveColor={handleRemoveColor}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <button
+              onClick={() => setTagCategories(null)}
+              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            >
+              清除分类，恢复默认视图
+            </button>
+          </div>
         ) : viewMode === 'cloud' ? (
+          /* Flat cloud view */
           <div className="flex flex-wrap gap-3 items-center justify-center py-8">
             {tags.map((tag) => (
               <motion.button
@@ -299,75 +447,16 @@ export default function TagsPage() {
             ))}
           </div>
         ) : (
+          /* Flat cards view */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {tags.map((tag) => (
-              <motion.div
+              <TagCard
                 key={tag.name}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 p-4"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <button
-                    onClick={() => router.push(`/?tags=${encodeURIComponent(tag.name)}`)}
-                    className={`inline-flex items-center px-2.5 py-1 text-sm rounded-full ${getTagStyle(
-                      tagColors[tag.name],
-                      false
-                    )}`}
-                  >
-                    {tag.name}
-                  </button>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {tag.count} 条记忆
-                  </span>
-                </div>
-
-                <div className="text-xs text-gray-400 dark:text-gray-500 mb-3">
-                  最近更新: {formatDate(tag.last_updated_at)}
-                </div>
-
-                {tag.related_tags && tag.related_tags.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap mb-3">
-                    <span className="text-xs text-gray-400 dark:text-gray-500">相关:</span>
-                    {tag.related_tags.slice(0, 3).map((r) => (
-                      <button
-                        key={r}
-                        onClick={() => router.push(`/?tags=${encodeURIComponent(r)}`)}
-                        className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                      >
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Color picker */}
-                <div className="flex items-center gap-1.5 pt-3 border-t border-gray-100 dark:border-gray-700">
-                  <span className="text-xs text-gray-400 dark:text-gray-500 mr-1">颜色:</span>
-                  {TAG_PRESET_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => handleColorChange(tag.name, color)}
-                      className={`w-5 h-5 rounded-full border transition-transform hover:scale-110 ${
-                        tagColors[tag.name] === color
-                          ? 'border-gray-400 dark:border-gray-300 scale-110'
-                          : 'border-gray-200 dark:border-gray-600'
-                      }`}
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                  {tagColors[tag.name] && (
-                    <button
-                      onClick={() => handleRemoveColor(tag.name)}
-                      className="p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                      title="移除颜色"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </motion.div>
+                tag={tag}
+                tagColors={tagColors}
+                onColorChange={handleColorChange}
+                onRemoveColor={handleRemoveColor}
+              />
             ))}
           </div>
         )}
@@ -419,5 +508,87 @@ export default function TagsPage() {
         </div>
       )}
     </main>
+  )
+}
+
+// TagCard sub-component for reuse in categorized and flat views
+function TagCard({
+  tag,
+  tagColors,
+  onColorChange,
+  onRemoveColor,
+}: {
+  tag: TagInfo
+  tagColors: Record<string, string>
+  onColorChange: (name: string, color: string) => void
+  onRemoveColor: (name: string) => void
+}) {
+  const router = useRouter()
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 p-4"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <button
+          onClick={() => router.push(`/?tags=${encodeURIComponent(tag.name)}`)}
+          className={`inline-flex items-center px-2.5 py-1 text-sm rounded-full ${getTagStyle(
+            tagColors[tag.name],
+            false
+          )}`}
+        >
+          {tag.name}
+        </button>
+        <span className="text-xs text-gray-400 dark:text-gray-500">{tag.count} 条记忆</span>
+      </div>
+
+      <div className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+        最近更新: {formatDate(tag.last_updated_at)}
+      </div>
+
+      {tag.related_tags && tag.related_tags.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          <span className="text-xs text-gray-400 dark:text-gray-500">相关:</span>
+          {tag.related_tags.slice(0, 3).map((r) => (
+            <button
+              key={r}
+              onClick={() => router.push(`/?tags=${encodeURIComponent(r)}`)}
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Color picker */}
+      <div className="flex items-center gap-1.5 pt-3 border-t border-gray-100 dark:border-gray-700">
+        <span className="text-xs text-gray-400 dark:text-gray-500 mr-1">颜色:</span>
+        {TAG_PRESET_COLORS.map((color) => (
+          <button
+            key={color}
+            onClick={() => onColorChange(tag.name, color)}
+            className={`w-5 h-5 rounded-full border transition-transform hover:scale-110 ${
+              tagColors[tag.name] === color
+                ? 'border-gray-400 dark:border-gray-300 scale-110'
+                : 'border-gray-200 dark:border-gray-600'
+            }`}
+            style={{ backgroundColor: color }}
+            title={color}
+          />
+        ))}
+        {tagColors[tag.name] && (
+          <button
+            onClick={() => onRemoveColor(tag.name)}
+            className="p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            title="移除颜色"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </motion.div>
   )
 }

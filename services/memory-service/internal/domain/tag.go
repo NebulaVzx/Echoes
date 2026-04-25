@@ -29,3 +29,14 @@ type MergeTagsRequest struct {
 	SourceTag string `json:"source_tag" binding:"required"`
 	TargetTag string `json:"target_tag" binding:"required"`
 }
+
+// TagCategory represents a single category with its tags.
+type TagCategory struct {
+	Name string   `json:"name"`
+	Tags []string `json:"tags"`
+}
+
+// CategorizeTagsResponse represents the response for tag categorization.
+type CategorizeTagsResponse struct {
+	Categories []TagCategory `json:"categories"`
+}

@@ -147,6 +147,15 @@ export interface SimilarTagsResponse {
   pairs: { canonical: string; duplicate: string }[]
 }
 
+export interface TagCategory {
+  name: string
+  tags: string[]
+}
+
+export interface CategorizeTagsResponse {
+  categories: TagCategory[]
+}
+
 export interface AISuggestion {
   id: string
   memory_id: string
@@ -424,6 +433,10 @@ class ApiClient {
 
   async getSimilarTags(): Promise<ApiResponse<SimilarTagsResponse>> {
     return this.request<SimilarTagsResponse>('GET', '/api/v1/tags/similar')
+  }
+
+  async categorizeTags(): Promise<ApiResponse<CategorizeTagsResponse>> {
+    return this.request<CategorizeTagsResponse>('POST', '/api/v1/tags/categorize')
   }
 
   // Chat endpoints
