@@ -82,7 +82,7 @@ description: 拾忆产品开发路线图
 | 5. Observability + Polish | v1.0 | 7/7 | Complete | 2026-04-22 |
 | 6. Echo Assistant | v1.1 | 5/5 | Complete | 2026-04-22 |
 | 7. Bug Fixes & Quality | v1.1 | 4/4 | Complete | 2026-04-25 |
-| 8. AI 陪伴建议 | v1.2 | 0/5 | Planning | — |
+| 8. AI 陪伴建议 | v1.2 | 3/5 | Executing | 2026-04-25 |
 | 9. 标签重生 | v1.2 | — | Planning | — |
 | 10. 记忆的温度 | v1.2 | — | Planning | — |
 

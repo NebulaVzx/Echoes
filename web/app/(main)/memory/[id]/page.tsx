@@ -10,6 +10,7 @@ import { useTheme } from '@/app/providers/theme-provider'
 import Logo from '@/components/logo'
 import RelatedMemories from '@/components/search/related-memories'
 import SearchInput from '@/components/search/search-input'
+import SuggestionDetailSection from '@/components/memory/suggestion-detail-section'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 
@@ -328,6 +329,9 @@ export default function MemoryDetailPage() {
               {isDeleting ? '删除中...' : '删除'}
             </button>
           </div>
+
+          {/* AI Suggestion */}
+          <SuggestionDetailSection memoryId={memoryId} />
 
           {/* Related memories */}
           <RelatedMemories memoryId={memoryId} />
