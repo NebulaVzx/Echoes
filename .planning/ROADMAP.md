@@ -8,7 +8,8 @@ description: 拾忆产品开发路线图
 ## 里程碑
 
 - ✅ **v1.0 MVP** — Phases 0-5 (shipped 2026-04-22)
-- 🚧 **v1.1 Echo Assistant** — Phases 6-7 (in progress)
+- ✅ **v1.1 Echo Assistant** — Phases 6-7 (shipped 2026-04-25)
+- 🚧 **v1.2** — 待定
 
 ## 已发布
 
@@ -28,68 +29,37 @@ description: 拾忆产品开发路线图
 
 </details>
 
+<details>
+<summary>✅ v1.1 Echo Assistant (Phases 6-7) — SHIPPED 2026-04-25</summary>
+
+| Phase | 名称 | 计划数 | 完成日期 |
+|-------|------|--------|----------|
+| 6 | Echo Assistant | 5 | 2026-04-22 |
+| 7 | Bug Fixes & Quality | 4 | 2026-04-25 |
+
+完整归档见 `.planning/milestones/v1.1-ROADMAP.md`
+
+</details>
+
 ## 进行中
 
-### 🚧 v1.1 Echo Assistant
+### 🚧 v1.2 (规划中)
 
-**目标：** 对话式 AI 助手，基于 RAG 回答用户记忆相关问题 + 修复 v1.0 已知问题
-
-#### Phase 6: Echo Assistant
-
-**目标：** 实现对话式 AI 助手，支持 RAG 检索 + LLM 生成回答 + 对话历史
-
-**需求映射：** CHAT-01 ~ CHAT-15
-
-**成功标准：**
-1. 用户可在首页打开 Chat 侧边栏与 AI 对话
-2. AI 能基于用户记忆回答"我上周存的关于 Go 的文章有哪些？"
-3. 回答中显示引用的记忆来源
-4. 对话历史可持久化、查看、删除
-5. Playwright E2E 测试覆盖核心 Chat 流程
-
-**计划：** 5 plans
-
-Plans:
-- [x] 06-01-PLAN.md — 数据库模型 + Go domain models（conversations/messages 表）
-- [x] 06-02-PLAN.md — LLM Provider chat() 扩展（多轮对话支持）
-- [x] 06-03-PLAN.md — Go Chat 服务（RAG 检索 + Prompt 组装 + API 路由）
-- [x] 06-04-PLAN.md — 前端 Chat UI 组件（侧边栏、消息、Markdown、引用）
-- [x] 06-05-PLAN.md — 集成层（API 客户端、ChatProvider、首页接入）
-
-#### Phase 7: Bug Fixes & Quality
-
-**目标：** 修复 v1.0 已知问题，补充 Go 单元测试
-
-**需求映射：** BUG-01 ~ BUG-11
-
-**成功标准：**
-1. OAuth state 条目 10 分钟后自动清理
-2. Gateway /health 返回下游服务健康状态
-3. 时间轴支持分页（页码组件）
-4. User/Memory/Gateway 核心逻辑有单元测试覆盖
-5. 所有修复通过 Playwright E2E 回归测试
-
-**计划：** 4 plans
-
-Plans:
-- [ ] 07-01-PLAN.md — OAuth State TTL + 定期清理（BUG-01, BUG-02）
-- [ ] 07-02-PLAN.md — Gateway 健康检查 + 反向代理超时 + 路径遍历修复（BUG-03, BUG-04, BUG-05, CR-02）
-- [ ] 07-03-PLAN.md — 前端分页 UI + 设置切换（BUG-06, BUG-07, BUG-08）
-- [ ] 07-04-PLAN.md — Go 单元测试 + Chat Service 修复（BUG-09, BUG-10, BUG-11, WR-01, WR-02, IN-01）
+待开始下一个里程碑规划。
 
 ## 进度
 
 | Phase | 里程碑 | 计划完成 | 状态 | 完成日期 |
 |-------|--------|----------|------|----------|
-| 1. Foundation | v1.0 | — | Complete | 2026-04-19 |
-| 2. Authentication | v1.0 | — | Complete | 2026-04-19 |
-| 3. Memory Capture | v1.0 | — | Complete | 2026-04-19 |
-| 4. AI Processing | v1.0 | 4/4 | Complete | 2026-04-19 |
-| 5. Search | v1.0 | 4/4 | Complete | 2026-04-21 |
-| 6. Observability + Polish | v1.0 | 7/7 | Complete | 2026-04-22 |
+| 0. Foundation | v1.0 | — | Complete | 2026-04-19 |
+| 1. Authentication | v1.0 | — | Complete | 2026-04-19 |
+| 2. Memory Capture | v1.0 | — | Complete | 2026-04-19 |
+| 3. AI Processing | v1.0 | 4/4 | Complete | 2026-04-19 |
+| 4. Search | v1.0 | 4/4 | Complete | 2026-04-21 |
+| 5. Observability + Polish | v1.0 | 7/7 | Complete | 2026-04-22 |
 | 6. Echo Assistant | v1.1 | 5/5 | Complete | 2026-04-22 |
-| 7. Bug Fixes | v1.1 | 0/4 | Not started | — |
+| 7. Bug Fixes & Quality | v1.1 | 4/4 | Complete | 2026-04-25 |
 
 ---
 
-*Roadmap updated: 2026-04-23 for Phase 7 planning*
+*Roadmap updated: 2026-04-25 for v1.1 milestone completion*

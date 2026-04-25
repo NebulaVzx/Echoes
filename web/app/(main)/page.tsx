@@ -245,11 +245,11 @@ function HomePage() {
           )}
 
           {/* Pagination component for page_numbers mode */}
-          {paginationMode === 'page_numbers' && total > limit && (
+          {paginationMode === 'page_numbers' && total > 0 && (
             <div className="mt-6">
               <Pagination
                 currentPage={page}
-                totalPages={Math.ceil(total / limit)}
+                totalPages={Math.max(1, Math.ceil(total / limit))}
                 onPageChange={handlePageChange}
               />
             </div>

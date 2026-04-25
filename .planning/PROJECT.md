@@ -43,8 +43,8 @@ type: product
 ## 架构模式
 
 微服务架构，API Gateway 模式：
-- Gateway：统一入口，JWT 认证，反向代理
-- User Service：注册/登录/OAuth，JWT 管理
+- Gateway：统一入口，JWT 认证，反向代理，聚合健康检查
+- User Service：注册/登录/OAuth，JWT 管理，用户设置（LLM/搜索/分页偏好）
 - Memory Service：记忆 CRUD，搜索，异步任务发布
 - Processor Service：链接抓取，自动标签（Python）
 - Vectorizer Service：BGE-M3 向量化（Python）
@@ -57,28 +57,42 @@ type: product
 - 所有 LLM 调用必须异步，失败时降级为本地关键词提取
 - Windows 兼容（WSL2 / Docker Desktop）
 
-## 当前里程碑：v1.1 Echo Assistant
+## 当前状态
 
-**目标：** 对话式 AI 助手，基于 RAG 回答用户记忆相关问题 + 修复 v1.0 已知问题
+**已发布版本：** v1.1 Echo Assistant（2026-04-25）
 
-**目标功能：**
+**v1.1 已交付功能：**
 - Chat UI 侧边栏（Notion-like 风格）
 - RAG 检索逻辑（语义搜索 + LLM 生成回答）
 - 引用来源展示（显示答案来自哪些记忆）
-- 对话历史管理（多轮对话上下文）
-- 修复 OAuth state 内存泄漏
-- Gateway 后端健康检查
-- 前端分页 UI
-- Go 单元测试补充
+- 对话历史管理（多轮对话上下文，持久化到数据库）
+- OAuth state 内存泄漏修复（TTL + 定期清理 goroutine）
+- Gateway 聚合健康检查（/health 探测下游服务）
+- 前端双模式分页（加载更多 / 页码组件，支持移动端）
+- Go 单元测试补充（User/Memory/Gateway 共 55+ 测试）
+- Phase 6 代码审查修复（路径遍历、系统提示重复、JSON 错误处理）
 
-## 已验证需求（v1.0）
+## 已验证需求
 
+### v1.0 (2026-04-22)
 - 认证：邮箱注册/登录 + GitHub OAuth + JWT 双 Token
 - 记忆捕获：文字/链接保存，时间轴浏览，详情编辑删除
 - 搜索：语义搜索 + 相似推荐（BGE-M3 + pgvector）
 - AI：LLM 自动标签，Redis Stream 异步队列
 - 可观测性：Prometheus / Jaeger / Grafana / Zap
 - 前端：暗黑模式，Framer Motion 动效，骨架屏，Playwright E2E
+
+### v1.1 (2026-04-25)
+- Echo Assistant：Chat 侧边栏 + RAG 检索 + 多轮对话 + 引用标注
+- 质量：OAuth 清理 + 健康检查 + 双模式分页 + Go 单元测试
+
+## 下一个里程碑目标 (v1.2)
+
+待规划。候选方向：
+- Chat 消息流式输出（SSE）
+- 对话导出（Markdown / PDF）
+- AI 主动建议（基于新保存的记忆提示）
+- 多人协作共享记忆
 
 ## 相关文档
 
@@ -90,4 +104,4 @@ type: product
 
 ---
 
-*Project context updated: 2026-04-22 after v1.0 milestone*
+*Project context updated: 2026-04-25 after v1.1 milestone*

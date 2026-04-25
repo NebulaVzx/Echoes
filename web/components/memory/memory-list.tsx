@@ -50,15 +50,19 @@ export default function MemoryList({ memories, hasMore, onLoadMore, isLoadingMor
         ))}
       </motion.div>
 
-      {hasMore && onLoadMore && (
+      {onLoadMore && (
         <div className="flex justify-center py-6">
-          <button
-            onClick={onLoadMore}
-            disabled={isLoadingMore}
-            className="px-5 py-2.5 text-sm text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoadingMore ? '加载中...' : '加载更多'}
-          </button>
+          {hasMore ? (
+            <button
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="px-5 py-2.5 text-sm text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoadingMore ? '加载中...' : '加载更多'}
+            </button>
+          ) : (
+            <span className="text-sm text-gray-400 dark:text-gray-500">已加载全部</span>
+          )}
         </div>
       )}
     </>
