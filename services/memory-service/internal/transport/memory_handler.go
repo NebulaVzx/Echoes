@@ -83,11 +83,16 @@ func (h *MemoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/search", h.Search)
 	router.GET("/memories/:id/related", h.GetRelated)
 
+	// Suggestion routes (public, authenticated)
+	router.GET("/memories/:id/suggestion", h.GetSuggestion)
+	router.PATCH("/memories/:id/suggestion/feedback", h.UpdateSuggestionFeedback)
+
 	// Internal API for service-to-service communication
 	internal := router.Group("/internal")
 	internal.Use(internalAuthMiddleware())
 	internal.PATCH("/memories/:id/tasks", h.UpdateTaskStatus)
 	internal.POST("/memories/:id/tasks/:task_type/retry", h.RetryTask)
+	internal.POST("/memories/:id/suggestion", h.CreateSuggestion)
 }
 
 // getUserID extracts user ID from X-User-ID header (set by Gateway JWT middleware).
@@ -121,7 +126,7 @@ func (h *MemoryHandler) Create(c *gin.Context) {
 		return
 	}
 
-	memory, err := h.memoryService.Create(ctx, userID, req)
+	memory, suggestionStatus, err := h.memoryService.Create(ctx, userID, req)
 	if err != nil {
 		span.SetAttributes(attribute.String("error", err.Error()))
 		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
@@ -129,7 +134,13 @@ func (h *MemoryHandler) Create(c *gin.Context) {
 	}
 
 	span.SetAttributes(attribute.String("memory_id", memory.ID.String()))
-	c.JSON(http.StatusCreated, gin.H{"success": true, "data": memory.SafeResponse()})
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"data": gin.H{
+			"memory":            memory.SafeResponse(),
+			"suggestion_status": suggestionStatus,
+		},
+	})
 }
 
 // List handles retrieving a paginated list of memories.
@@ -447,4 +458,106 @@ func (h *MemoryHandler) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Memory deleted"})
+}
+
+// GetSuggestion handles retrieving the AI suggestion for a memory.
+func (h *MemoryHandler) GetSuggestion(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	memoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
+		return
+	}
+
+	suggestion, err := h.memoryService.GetSuggestion(c.Request.Context(), memoryID, userID)
+	if err != nil {
+		switch err {
+		case service.ErrMemoryNotFound:
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Memory not found")
+		case service.ErrUnauthorized:
+			respondWithError(c, http.StatusForbidden, "FORBIDDEN", "Access denied")
+		case service.ErrSuggestionNotFound:
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Suggestion not found")
+		default:
+			zap.L().Error("failed to get suggestion", zap.Error(err), zap.String("memory_id", memoryID.String()))
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": suggestion})
+}
+
+// UpdateSuggestionFeedback handles updating user feedback for a suggestion.
+func (h *MemoryHandler) UpdateSuggestionFeedback(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	memoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
+		return
+	}
+
+	var req domain.UpdateSuggestionFeedbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithValidationError(c, err)
+		return
+	}
+
+	if err := h.memoryService.UpdateSuggestionFeedback(c.Request.Context(), memoryID, userID, req.UserFeedback); err != nil {
+		switch err {
+		case service.ErrMemoryNotFound:
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Memory not found")
+		case service.ErrUnauthorized:
+			respondWithError(c, http.StatusForbidden, "FORBIDDEN", "Access denied")
+		case service.ErrSuggestionNotFound:
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Suggestion not found")
+		default:
+			zap.L().Error("failed to update suggestion feedback", zap.Error(err), zap.String("memory_id", memoryID.String()))
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// CreateSuggestion handles POST /api/v1/internal/memories/:id/suggestion
+// Called by Processor Service after generating a suggestion.
+func (h *MemoryHandler) CreateSuggestion(c *gin.Context) {
+	memoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
+		return
+	}
+
+	var req domain.CreateSuggestionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithValidationError(c, err)
+		return
+	}
+
+	// Ensure memory_id in body matches URL param
+	if req.MemoryID != memoryID {
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Memory ID mismatch")
+		return
+	}
+
+	suggestion, err := h.memoryService.CreateSuggestion(c.Request.Context(), memoryID, req)
+	if err != nil {
+		zap.L().Error("failed to create suggestion", zap.Error(err), zap.String("memory_id", memoryID.String()))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": suggestion})
 }

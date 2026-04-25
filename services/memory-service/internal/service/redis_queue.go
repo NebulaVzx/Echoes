@@ -80,6 +80,22 @@ func (q *RedisTaskQueue) PublishTagGenerate(ctx context.Context, memoryID uuid.U
 	return q.PublishTask(ctx, "tag:generate", fields)
 }
 
+// PublishSuggestionGenerate publishes an AI suggestion generation task to Redis Stream.
+// Accepts context for trace propagation per D-02.
+func (q *RedisTaskQueue) PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, llmConfig map[string]interface{}) error {
+	fields := map[string]interface{}{
+		"memory_id":    memoryID.String(),
+		"content_type": contentType,
+		"content":      content,
+		"style":        style,
+	}
+	if note != "" {
+		fields["note"] = note
+	}
+	mergeLLMConfig(fields, llmConfig)
+	return q.PublishTask(ctx, "suggestion:generate", fields)
+}
+
 // mergeLLMConfig merges LLM settings into the message fields if present.
 func mergeLLMConfig(fields map[string]interface{}, llmConfig map[string]interface{}) {
 	if llmConfig == nil {

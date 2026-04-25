@@ -57,11 +57,12 @@ func (m Memory) SafeResponse() map[string]interface{} {
 
 // CreateMemoryRequest represents a request to create a new memory.
 type CreateMemoryRequest struct {
-	ContentType string   `json:"content_type" binding:"required,oneof=text link"`
-	TextContent string   `json:"text_content" binding:"omitempty,max=10000"`
-	LinkURL     string   `json:"link_url" binding:"omitempty,url,max=2048"`
-	Tags        []string `json:"tags" binding:"omitempty,dive,max=50"`
-	Note        string   `json:"note" binding:"omitempty,max=1000"`
+	ContentType        string   `json:"content_type" binding:"required,oneof=text link"`
+	TextContent        string   `json:"text_content" binding:"omitempty,max=10000"`
+	LinkURL            string   `json:"link_url" binding:"omitempty,url,max=2048"`
+	Tags               []string `json:"tags" binding:"omitempty,dive,max=50"`
+	Note               string   `json:"note" binding:"omitempty,max=1000"`
+	EnableAISuggestion bool     `json:"enable_ai_suggestion" binding:"omitempty"`
 }
 
 // UpdateMemoryRequest represents a request to update a memory.

@@ -17,12 +17,14 @@ import (
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"go.uber.org/zap"
 )
 
 var (
-	ErrMemoryNotFound = errors.New("memory not found")
-	ErrUnauthorized   = errors.New("unauthorized access to memory")
-	ErrInvalidURL     = errors.New("invalid URL: must be http or https")
+	ErrMemoryNotFound     = errors.New("memory not found")
+	ErrUnauthorized       = errors.New("unauthorized access to memory")
+	ErrInvalidURL         = errors.New("invalid URL: must be http or https")
+	ErrSuggestionNotFound = errors.New("suggestion not found")
 )
 
 // dangerousHTMLTags matches potentially harmful HTML tags.
@@ -71,10 +73,11 @@ func validateLinkURL(rawURL string) error {
 
 // MemoryService handles memory CRUD business logic.
 type MemoryService struct {
-	repo       repository.MemoryRepository
-	userRepo   repository.UserRepository
-	queue      TaskQueue
-	vectorizer *VectorizerClient
+	repo           repository.MemoryRepository
+	userRepo       repository.UserRepository
+	queue          TaskQueue
+	vectorizer     *VectorizerClient
+	suggestionRepo repository.SuggestionRepository
 }
 
 // TaskQueue defines the interface for publishing async tasks.
@@ -82,32 +85,35 @@ type TaskQueue interface {
 	PublishLinkFetch(ctx context.Context, memoryID uuid.UUID, linkURL string, note string, llmConfig map[string]interface{}) error
 	PublishTextVectorize(ctx context.Context, memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
 	PublishTagGenerate(ctx context.Context, memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error
+	PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
 // NewMemoryService creates a new memory service.
-func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue, vectorizer *VectorizerClient) *MemoryService {
+func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue, vectorizer *VectorizerClient, suggestionRepo repository.SuggestionRepository) *MemoryService {
 	return &MemoryService{
-		repo:       repo,
-		userRepo:   userRepo,
-		queue:      queue,
-		vectorizer: vectorizer,
+		repo:           repo,
+		userRepo:       userRepo,
+		queue:          queue,
+		vectorizer:     vectorizer,
+		suggestionRepo: suggestionRepo,
 	}
 }
 
 // Create creates a new memory and publishes async tasks.
-func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain.CreateMemoryRequest) (*domain.Memory, error) {
+// Returns the created memory, suggestion status ("pending", "skipped", "failed"), and any error.
+func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain.CreateMemoryRequest) (*domain.Memory, string, error) {
 	// Validate request based on content type
 	if req.ContentType == "text" && strings.TrimSpace(req.TextContent) == "" {
-		return nil, errors.New("text content is required for text memories")
+		return nil, "", errors.New("text content is required for text memories")
 	}
 	if req.ContentType == "link" && strings.TrimSpace(req.LinkURL) == "" {
-		return nil, errors.New("link URL is required for link memories")
+		return nil, "", errors.New("link URL is required for link memories")
 	}
 	// Validate and sanitize link URL
 	if req.ContentType == "link" {
 		if err := validateLinkURL(req.LinkURL); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	}
 
@@ -130,14 +136,30 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 	}
 
 	if err := s.repo.Create(ctx, memory); err != nil {
-		return nil, fmt.Errorf("failed to create memory: %w", err)
+		return nil, "", fmt.Errorf("failed to create memory: %w", err)
 	}
 
 	// Fetch user LLM settings and publish async tasks
 	llmConfig, _ := s.getUserLLMConfig(ctx, userID)
 	s.publishTasks(ctx, memory, llmConfig)
 
-	return memory, nil
+	// Publish suggestion generation task if user enabled it
+	suggestionStatus := "skipped"
+	if req.EnableAISuggestion {
+		style := s.getUserSuggestionStyle(ctx, userID)
+		content := s.extractContent(memory)
+		if content != "" {
+			err := s.queue.PublishSuggestionGenerate(ctx, memory.ID, memory.ContentType, content, memory.Note, style, llmConfig)
+			if err != nil {
+				zap.L().Error("failed to publish suggestion task", zap.Error(err), zap.String("memory_id", memory.ID.String()))
+				suggestionStatus = "failed"
+			} else {
+				suggestionStatus = "pending"
+			}
+		}
+	}
+
+	return memory, suggestionStatus, nil
 }
 
 // getUserLLMConfig fetches user settings and extracts LLM config as a flat map.
@@ -601,4 +623,81 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 	memory.ProcessingStatus = domain.AggregateStatus(tasks)
 
 	return s.repo.Update(ctx, memory)
+}
+
+// getUserSuggestionStyle fetches the user's AI suggestion style, defaulting to "inspiring".
+func (s *MemoryService) getUserSuggestionStyle(ctx context.Context, userID uuid.UUID) string {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return "inspiring"
+	}
+	settingsStr := user.Settings.String()
+	if len(user.Settings) == 0 || settingsStr == "{}" || settingsStr == "null" {
+		return "inspiring"
+	}
+	var settings struct {
+		AISuggestionStyle string `json:"ai_suggestion_style"`
+	}
+	if err := json.Unmarshal([]byte(settingsStr), &settings); err != nil {
+		return "inspiring"
+	}
+	if settings.AISuggestionStyle == "" {
+		return "inspiring"
+	}
+	return settings.AISuggestionStyle
+}
+
+// GetSuggestion retrieves the AI suggestion for a memory, verifying ownership.
+func (s *MemoryService) GetSuggestion(ctx context.Context, memoryID, userID uuid.UUID) (*domain.AISuggestion, error) {
+	// Verify memory ownership first
+	memory, err := s.Get(ctx, memoryID, userID)
+	if err != nil {
+		return nil, err
+	}
+	suggestion, err := s.suggestionRepo.GetByMemoryID(ctx, memory.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrSuggestionNotFound) {
+			return nil, ErrSuggestionNotFound
+		}
+		return nil, err
+	}
+	return suggestion, nil
+}
+
+// CreateSuggestion creates an AI suggestion for a memory (called by internal API from Processor).
+func (s *MemoryService) CreateSuggestion(ctx context.Context, memoryID uuid.UUID, req domain.CreateSuggestionRequest) (*domain.AISuggestion, error) {
+	suggestion := &domain.AISuggestion{
+		ID:             uuid.New(),
+		MemoryID:       memoryID,
+		Content:        req.Content,
+		SuggestionType: req.SuggestionType,
+		Metadata:       "{}",
+	}
+	if req.Metadata != nil {
+		metaJSON, err := json.Marshal(req.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+		suggestion.Metadata = string(metaJSON)
+	}
+	if err := s.suggestionRepo.Create(ctx, suggestion); err != nil {
+		return nil, fmt.Errorf("failed to create suggestion: %w", err)
+	}
+	return suggestion, nil
+}
+
+// UpdateSuggestionFeedback updates user feedback for a suggestion.
+func (s *MemoryService) UpdateSuggestionFeedback(ctx context.Context, memoryID, userID uuid.UUID, feedback string) error {
+	// Verify memory ownership
+	_, err := s.Get(ctx, memoryID, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.suggestionRepo.UpdateFeedback(ctx, memoryID, feedback); err != nil {
+		if errors.Is(err, repository.ErrSuggestionNotFound) {
+			return ErrSuggestionNotFound
+		}
+		return err
+	}
+	return nil
 }
