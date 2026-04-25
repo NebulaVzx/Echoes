@@ -134,6 +134,21 @@ function HomePage() {
     loadMemories(1, false)
   }, [loadMemories])
 
+  // Poll for processing status updates — when any memory is pending/processing,
+  // refresh the list every 3 seconds until all are completed/failed.
+  useEffect(() => {
+    const hasProcessing = memories.some(
+      (m) => m.processing_status === 'pending' || m.processing_status === 'processing'
+    )
+    if (!hasProcessing) return
+
+    const interval = setInterval(() => {
+      loadMemories(page, false)
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [memories, page, loadMemories])
+
   if (authLoading) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">

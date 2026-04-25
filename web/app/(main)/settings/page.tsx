@@ -20,6 +20,7 @@ const settingsSchema = z.object({
   similarity_threshold: z.number().min(0).max(1),
   rag_memory_limit: z.number().min(1).max(20),
   pagination_mode: z.enum(['load_more', 'page_numbers']).optional(),
+  ai_suggestion_enabled: z.boolean().optional(),
   ai_suggestion_style: z.enum(['gentle', 'practical', 'inspiring']).optional(),
   ai_suggestion_timeout: z.number().min(10).max(60).optional(),
   ai_suggestion_max_retries: z.number().min(1).max(5).optional(),
@@ -112,6 +113,7 @@ export default function SettingsPage() {
       similarity_threshold: 0.4,
       rag_memory_limit: 5,
       pagination_mode: 'load_more',
+      ai_suggestion_enabled: false,
       ai_suggestion_style: 'inspiring',
       ai_suggestion_timeout: 30,
       ai_suggestion_max_retries: 3,
@@ -141,6 +143,7 @@ export default function SettingsPage() {
             similarity_threshold: data.search_similarity_threshold ?? 0.4,
             rag_memory_limit: data.rag_memory_limit ?? 5,
             pagination_mode: (data.pagination_mode as 'load_more' | 'page_numbers') || 'load_more',
+            ai_suggestion_enabled: data.ai_suggestion_enabled ?? false,
             ai_suggestion_style: (data.ai_suggestion_style as 'gentle' | 'practical' | 'inspiring') || 'inspiring',
             ai_suggestion_timeout: data.ai_suggestion_timeout ?? 30,
             ai_suggestion_max_retries: data.ai_suggestion_max_retries ?? 3,
@@ -352,6 +355,7 @@ export default function SettingsPage() {
     const data = getValues()
     const payload = {
       ai: {
+        ai_suggestion_enabled: data.ai_suggestion_enabled ?? false,
         ai_suggestion_style: data.ai_suggestion_style || 'inspiring',
         ai_suggestion_timeout: typeof data.ai_suggestion_timeout === 'string'
           ? parseInt(data.ai_suggestion_timeout, 10)
@@ -779,6 +783,26 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-5">
+            {/* Enable AI Suggestion Toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  开启 AI 建议
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  开启后，创建记忆时默认启用 AI 建议生成
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  {...register('ai_suggestion_enabled')}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-400 dark:peer-focus:ring-amber-500 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-500 peer-checked:bg-amber-500 dark:peer-checked:bg-amber-600" />
+              </label>
+            </div>
+
             {/* Style Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

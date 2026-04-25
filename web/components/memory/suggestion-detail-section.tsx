@@ -14,23 +14,43 @@ export default function SuggestionDetailSection({ memoryId }: SuggestionDetailSe
   const [isLoading, setIsLoading] = useState(true)
   const [feedback, setFeedback] = useState<string | undefined>()
 
+  // Poll for suggestion — handles the case where suggestion is generated after page load
   useEffect(() => {
     let cancelled = false
+    let timeoutId: NodeJS.Timeout | null = null
+    let attempts = 0
+    const maxAttempts = 20 // ~60s with backoff
+
     const loadSuggestion = async () => {
       try {
         const response = await api.getSuggestion(memoryId)
         if (!cancelled && response.success && response.data) {
           setSuggestion(response.data)
           setFeedback(response.data.user_feedback)
+          setIsLoading(false)
+          return // stop polling
         }
       } catch {
-        // No suggestion or error
-      } finally {
-        if (!cancelled) setIsLoading(false)
+        // No suggestion or error — keep polling
       }
+
+      attempts++
+      if (attempts >= maxAttempts) {
+        if (!cancelled) setIsLoading(false)
+        return // stop polling
+      }
+
+      // Exponential backoff
+      const delay = Math.min(2000 + Math.floor(attempts / 3) * 1000, 5000)
+      timeoutId = setTimeout(loadSuggestion, delay)
     }
+
     loadSuggestion()
-    return () => { cancelled = true }
+
+    return () => {
+      cancelled = true
+      if (timeoutId) clearTimeout(timeoutId)
+    }
   }, [memoryId])
 
   const handleFeedback = async (type: 'liked' | 'disliked') => {
@@ -58,7 +78,27 @@ export default function SuggestionDetailSection({ memoryId }: SuggestionDetailSe
     )
   }
 
-  if (!suggestion) return null
+  if (!suggestion) {
+    return (
+      <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-400 animate-pulse" />
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            AI 建议
+          </h3>
+        </div>
+        <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-100 dark:border-amber-900/30 p-5">
+          <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            AI 正在生成建议，请稍候...
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <motion.div

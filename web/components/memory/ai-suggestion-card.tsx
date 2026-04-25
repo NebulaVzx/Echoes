@@ -24,40 +24,49 @@ export default function AISuggestionCard({
   const [isDismissed, setIsDismissed] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Poll for suggestion if pending
+  // Reset state when memoryId changes (e.g. user saves a second memory)
+  useEffect(() => {
+    setSuggestion(initialSuggestion)
+    setFeedback(initialSuggestion?.user_feedback)
+    setIsLoading(suggestionStatus === 'pending')
+    setIsDismissed(false)
+  }, [memoryId, initialSuggestion, suggestionStatus])
+
+  // Poll for suggestion if pending — extended to 60s with exponential backoff
   useEffect(() => {
     if (suggestionStatus !== 'pending') return
 
     let attempts = 0
-    const maxAttempts = 8 // 8 * 2s = 16s max polling
+    const maxAttempts = 20 // ~60s total with backoff
 
-    intervalRef.current = setInterval(async () => {
+    const poll = async () => {
       attempts++
       try {
         const response = await api.getSuggestion(memoryId)
         if (response.success && response.data) {
           setSuggestion(response.data)
           setIsLoading(false)
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current)
-            intervalRef.current = null
-          }
+          return // stop polling
         }
       } catch {
         // Silently fail on polling errors
       }
+
       if (attempts >= maxAttempts) {
         setIsLoading(false)
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current)
-          intervalRef.current = null
-        }
+        return // stop polling
       }
-    }, 2000)
+
+      // Exponential backoff: 2s, 2s, 2s, 3s, 3s, 4s, 4s, 5s...
+      const delay = Math.min(2000 + Math.floor(attempts / 3) * 1000, 5000)
+      intervalRef.current = setTimeout(poll, delay)
+    }
+
+    intervalRef.current = setTimeout(poll, 2000)
 
     return () => {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+        clearTimeout(intervalRef.current)
         intervalRef.current = null
       }
     }

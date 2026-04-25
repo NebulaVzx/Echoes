@@ -1,10 +1,10 @@
 # Echoes Docker Operations Script
 # Usage: .\docker-ops.ps1 [command] [args]
-# Commands: status, check, fix-web, fix-all, logs, restart
+# Commands: status, check, fix-web, fix-all, logs, restart, reload
 
 param(
     [Parameter(Position=0)]
-    [ValidateSet('status','check','fix-web','fix-all','logs','restart','help')]
+    [ValidateSet('status','check','fix-web','fix-all','logs','restart','reload','help')]
     [string]$Command = 'status',
 
     [Parameter(Position=1)]
@@ -183,6 +183,45 @@ function Restart-Container {
     Write-Ok "$containerName restarted"
 }
 
+function Reload-Service {
+    param([string]$serviceName)
+
+    if (-not $serviceName) {
+        Write-Err "Usage: .\docker-ops.ps1 reload <service-name>"
+        Write-Host "Available: gateway, user-service, memory-service, processor, vectorizer, web, all"
+        return
+    }
+
+    $map = @{
+        'gateway'        = 'echoes-gateway'
+        'user-service'   = 'echoes-user-service'
+        'memory-service' = 'echoes-memory-service'
+        'processor'      = 'echoes-processor'
+        'vectorizer'     = 'echoes-vectorizer'
+        'web'            = 'echoes-web'
+    }
+
+    if ($serviceName -eq 'all') {
+        Write-Header "Reloading all services"
+        foreach ($svc in $map.Values) {
+            Write-Warn "Reloading $svc..."
+            docker restart $svc | Out-Null
+            Write-Ok "$svc reloaded"
+        }
+        return
+    }
+
+    $container = $map[$serviceName]
+    if (-not $container) {
+        Write-Err "Unknown service: $serviceName"
+        return
+    }
+
+    Write-Header "Reloading $serviceName"
+    docker restart $container
+    Write-Ok "$container reloaded (code changes applied without rebuild)"
+}
+
 function Repair-Web {
     Write-Header "Fixing Web Container"
 
@@ -290,6 +329,7 @@ Commands:
   fix-all               One-click fix: web + restart unhealthy containers + check
   logs <container>      Show last 50 lines of container logs
   restart <container>   Restart a specific container
+  reload <service>      Reload service after code changes (no rebuild)
   help                  Show this help message
 
 Examples:
@@ -299,6 +339,8 @@ Examples:
   .\docker-ops.ps1 fix-all
   .\docker-ops.ps1 logs echoes-web
   .\docker-ops.ps1 restart echoes-memory-service
+  .\docker-ops.ps1 reload gateway
+  .\docker-ops.ps1 reload all
 "@
 }
 
@@ -310,6 +352,7 @@ switch ($Command) {
     'fix-all'  { Repair-All }
     'logs'     { Show-Logs $Arg }
     'restart'  { Restart-Container $Arg }
+    'reload'   { Reload-Service $Arg }
     'help'     { Show-Help }
     default    { Show-Status }
 }

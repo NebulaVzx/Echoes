@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Echoes Docker Operations Script
 # Usage: ./docker-ops.sh [command] [args]
-# Commands: status, check, fix-web, fix-all, logs, restart
+# Commands: status, check, fix-web, fix-all, logs, restart, reload
 
 set -euo pipefail
 
@@ -173,6 +173,41 @@ cmd_restart() {
   ok "$container_name restarted"
 }
 
+cmd_reload() {
+  local service=${1:-}
+  if [[ -z "$service" ]]; then
+    err "Usage: ./docker-ops.sh reload <service>"
+    echo "Available services: gateway, user-service, memory-service, processor, vectorizer, web, all"
+    return 1
+  fi
+
+  header "Reloading $service"
+  local container_name=""
+  case "$service" in
+    gateway)        container_name="echoes-gateway" ;;
+    user-service)   container_name="echoes-user-service" ;;
+    memory-service) container_name="echoes-memory-service" ;;
+    processor)      container_name="echoes-processor" ;;
+    vectorizer)     container_name="echoes-vectorizer" ;;
+    web)            container_name="echoes-web" ;;
+    all)
+      for c in echoes-gateway echoes-user-service echoes-memory-service echoes-processor echoes-vectorizer echoes-web; do
+        ok "Reloading $c..."
+        docker restart "$c" >/dev/null 2>&1 || warn "$c restart failed"
+      done
+      ok "All services reloaded"
+      return 0
+      ;;
+    *)
+      err "Unknown service: $service"
+      return 1
+      ;;
+  esac
+
+  docker restart "$container_name"
+  ok "$container_name reloaded (code changes applied without rebuild)"
+}
+
 cmd_fix_web() {
   header "Fixing Web Container"
 
@@ -283,6 +318,7 @@ Commands:
   fix-all               One-click fix: web + restart unhealthy + check
   logs <container>      Show last 50 lines of container logs
   restart <container>   Restart a specific container
+  reload <service>      Reload service after code changes (no rebuild)
   help                  Show this help message
 
 Examples:
@@ -303,6 +339,7 @@ case "${1:-status}" in
   fix-all)  cmd_fix_all ;;
   logs)     cmd_logs "${2:-}" ;;
   restart)  cmd_restart "${2:-}" ;;
+  reload)   cmd_reload "${2:-}" ;;
   help|--help|-h) show_help ;;
   *)
     err "Unknown command: $1"

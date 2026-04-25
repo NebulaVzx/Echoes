@@ -117,14 +117,14 @@ export default function MemoryDetailPage() {
 
   // Poll for processing status updates
   useEffect(() => {
-    if (!memory || memory.processing_status !== 'pending') return
+    if (!memory || (memory.processing_status !== 'pending' && memory.processing_status !== 'processing')) return
 
     const interval = setInterval(async () => {
       try {
         const response = await api.getMemory(memoryId)
         if (response.success && response.data) {
           setMemory(response.data)
-          if (response.data.processing_status !== 'pending') {
+          if (response.data.processing_status !== 'pending' && response.data.processing_status !== 'processing') {
             clearInterval(interval)
           }
         }

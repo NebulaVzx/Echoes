@@ -208,6 +208,7 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 
 	// Update AI suggestion settings if provided
 	if req.AI != nil {
+		existing.AISuggestionEnabled = req.AI.Enabled
 		if req.AI.Style != "" {
 			existing.AISuggestionStyle = req.AI.Style
 		}

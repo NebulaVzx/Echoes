@@ -81,7 +81,7 @@ type UserSettings struct {
 	RAGMemoryLimit            int     `json:"rag_memory_limit,omitempty" binding:"omitempty,gte=1,lte=20"`
 	PaginationMode            string  `json:"pagination_mode,omitempty" binding:"omitempty,oneof=load_more page_numbers"`
 	// AI Suggestion settings (Phase 8)
-	AISuggestionEnabled    bool   `json:"ai_suggestion_enabled,omitempty" binding:"omitempty"`
+	AISuggestionEnabled    bool   `json:"ai_suggestion_enabled" binding:"omitempty"`
 	AISuggestionStyle      string `json:"ai_suggestion_style,omitempty" binding:"omitempty,oneof=gentle practical inspiring"`
 	AISuggestionTimeout    int    `json:"ai_suggestion_timeout,omitempty" binding:"omitempty,gte=10,lte=60"`
 	AISuggestionMaxRetries int    `json:"ai_suggestion_max_retries,omitempty" binding:"omitempty,gte=1,lte=5"`
@@ -103,7 +103,7 @@ type TestLLMRequest struct {
 
 // AISettings represents per-user AI suggestion configuration.
 type AISettings struct {
-	Enabled    bool   `json:"ai_suggestion_enabled,omitempty" binding:"omitempty"`
+	Enabled    bool   `json:"ai_suggestion_enabled" binding:"omitempty"`
 	Style      string `json:"ai_suggestion_style,omitempty" binding:"omitempty,oneof=gentle practical inspiring"`
 	Timeout    int    `json:"ai_suggestion_timeout,omitempty" binding:"omitempty,gte=10,lte=60"`
 	MaxRetries int    `json:"ai_suggestion_max_retries,omitempty" binding:"omitempty,gte=1,lte=5"`

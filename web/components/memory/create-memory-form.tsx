@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { api, CreateMemoryResponse } from '@/lib/api'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 import { Sparkles } from 'lucide-react'
@@ -24,6 +24,17 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
   const [lastCreatedMemory, setLastCreatedMemory] = useState<CreateMemoryResponse | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const tagInputRef = useRef<HTMLInputElement>(null)
+
+  // Load global AI suggestion preference on mount
+  useEffect(() => {
+    api.getSettings().then((response) => {
+      if (response.success && response.data?.ai_suggestion_enabled) {
+        setEnableAISuggestion(true)
+      }
+    }).catch(() => {
+      // Silently fail — default to false
+    })
+  }, [])
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type })
@@ -251,6 +262,7 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
       {/* AI Suggestion Card */}
       {lastCreatedMemory && lastCreatedMemory.suggestion_status !== 'skipped' && (
         <AISuggestionCard
+          key={lastCreatedMemory.memory.id}
           memoryId={lastCreatedMemory.memory.id}
           suggestionStatus={lastCreatedMemory.suggestion_status}
           onDismiss={() => setLastCreatedMemory(null)}
