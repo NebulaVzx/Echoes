@@ -159,8 +159,37 @@ func (m *mockTaskQueue) PublishTagGenerate(ctx context.Context, memoryID uuid.UU
 	return nil
 }
 
+func (m *mockTaskQueue) PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, timeout int, maxRetries int, llmConfig map[string]interface{}) error {
+	m.published = append(m.published, map[string]interface{}{
+		"type":         "suggestion:generate",
+		"memory":       memoryID,
+		"content_type": contentType,
+		"style":        style,
+	})
+	return nil
+}
+
 func (m *mockTaskQueue) PublishTask(ctx context.Context, stream string, data map[string]interface{}) error {
 	m.published = append(m.published, data)
+	return nil
+}
+
+// mockSuggestionRepository implements SuggestionRepository for testing.
+type mockSuggestionRepository struct{}
+
+func (m *mockSuggestionRepository) Create(ctx context.Context, suggestion *domain.AISuggestion) error {
+	return nil
+}
+
+func (m *mockSuggestionRepository) GetByMemoryID(ctx context.Context, memoryID uuid.UUID) (*domain.AISuggestion, error) {
+	return nil, repository.ErrSuggestionNotFound
+}
+
+func (m *mockSuggestionRepository) UpdateFeedback(ctx context.Context, memoryID uuid.UUID, feedback string) error {
+	return nil
+}
+
+func (m *mockSuggestionRepository) DeleteByMemoryID(ctx context.Context, memoryID uuid.UUID) error {
 	return nil
 }
 
@@ -172,7 +201,8 @@ func newTestMemoryService() (*MemoryService, *mockMemoryRepository, *mockTaskQue
 		},
 	}
 	queue := newMockTaskQueue()
-	svc := NewMemoryService(repo, userRepo, queue, nil)
+	suggestionRepo := &mockSuggestionRepository{}
+	svc := NewMemoryService(repo, userRepo, queue, nil, suggestionRepo)
 	return svc, repo, queue
 }
 
@@ -188,7 +218,7 @@ func TestMemoryService_Create_TextMemory(t *testing.T) {
 		Note:        "test note",
 	}
 
-	memory, err := svc.Create(ctx, userID, req)
+	memory, _, err := svc.Create(ctx, userID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -241,7 +271,7 @@ func TestMemoryService_Create_LinkMemory_InvalidURL(t *testing.T) {
 		LinkURL:     "ftp://example.com",
 	}
 
-	_, err := svc.Create(ctx, userID, req)
+	_, _, err := svc.Create(ctx, userID, req)
 	if err == nil {
 		t.Fatal("Create() expected error for ftp:// URL, got nil")
 	}
@@ -261,7 +291,7 @@ func TestMemoryService_Create_LinkMemory_ValidURL(t *testing.T) {
 		Note:        "interesting article",
 	}
 
-	memory, err := svc.Create(ctx, userID, req)
+	memory, _, err := svc.Create(ctx, userID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -304,7 +334,7 @@ func TestMemoryService_Get_Success(t *testing.T) {
 		TextContent: "test content for get",
 	}
 
-	created, err := svc.Create(ctx, userID, req)
+	created, _, err := svc.Create(ctx, userID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -335,7 +365,7 @@ func TestMemoryService_Get_Unauthorized(t *testing.T) {
 		TextContent: "private content",
 	}
 
-	created, err := svc.Create(ctx, ownerID, req)
+	created, _, err := svc.Create(ctx, ownerID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -374,7 +404,7 @@ func TestMemoryService_List_Pagination(t *testing.T) {
 			ContentType: "text",
 			TextContent: "memory content number",
 		}
-		_, err := svc.Create(ctx, userID, req)
+		_, _, err := svc.Create(ctx, userID, req)
 		if err != nil {
 			t.Fatalf("Create() #%d error: %v", i, err)
 		}
@@ -432,7 +462,7 @@ func TestMemoryService_Update_Success(t *testing.T) {
 		Tags:        []string{"old"},
 	}
 
-	created, err := svc.Create(ctx, userID, req)
+	created, _, err := svc.Create(ctx, userID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -466,7 +496,7 @@ func TestMemoryService_Delete_Success(t *testing.T) {
 		TextContent: "content to delete",
 	}
 
-	created, err := svc.Create(ctx, userID, req)
+	created, _, err := svc.Create(ctx, userID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
