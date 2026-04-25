@@ -82,6 +82,7 @@ type TaskQueue interface {
 	PublishLinkFetch(ctx context.Context, memoryID uuid.UUID, linkURL string, note string, llmConfig map[string]interface{}) error
 	PublishTextVectorize(ctx context.Context, memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
 	PublishTagGenerate(ctx context.Context, memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error
+	PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
