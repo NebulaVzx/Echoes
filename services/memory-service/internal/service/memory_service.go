@@ -235,11 +235,14 @@ func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit 
 		items[i] = m.SafeResponse()
 	}
 
+	hasMore := int64(page*limit) < total
+
 	return &domain.ListMemoriesResponse{
 		Memories: items,
 		Total:    total,
 		Page:     page,
 		Limit:    limit,
+		HasMore:  hasMore,
 	}, nil
 }
 

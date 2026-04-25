@@ -76,6 +76,7 @@ type ListMemoriesResponse struct {
 	Total    int64                    `json:"total"`
 	Page     int                      `json:"page"`
 	Limit    int                      `json:"limit"`
+	HasMore  bool                     `json:"has_more"`
 }
 
 // SubTaskState represents a single sub-task's status in metadata JSONB.
