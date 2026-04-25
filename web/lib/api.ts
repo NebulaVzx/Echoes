@@ -135,6 +135,10 @@ export interface CreateMemoryResponse {
   suggestion_status: 'pending' | 'completed' | 'skipped' | 'failed'
 }
 
+export interface MemoryWithSuggestion extends Memory {
+  suggestion?: AISuggestion
+}
+
 class ApiClient {
   private baseURL: string
   private token: string | null = null
@@ -322,8 +326,9 @@ class ApiClient {
     link_url?: string
     tags?: string[]
     note?: string
-  }): Promise<ApiResponse<Memory>> {
-    return this.request<Memory>('POST', '/api/v1/memories', data)
+    enable_ai_suggestion?: boolean
+  }): Promise<ApiResponse<CreateMemoryResponse>> {
+    return this.request<CreateMemoryResponse>('POST', '/api/v1/memories', data)
   }
 
   async listMemories(params?: { page?: number; limit?: number; tag?: string }): Promise<ApiResponse<ListMemoriesResponse>> {
@@ -359,6 +364,17 @@ class ApiClient {
     if (params?.limit) searchParams.set('limit', String(params.limit))
     const query = searchParams.toString()
     return this.request<RelatedResponse>('GET', `/api/v1/memories/${id}/related${query ? '?' + query : ''}`)
+  }
+
+  // AI Suggestion endpoints
+  async getSuggestion(memoryId: string): Promise<ApiResponse<AISuggestion>> {
+    return this.request<AISuggestion>('GET', `/api/v1/memories/${memoryId}/suggestion`)
+  }
+
+  async updateSuggestionFeedback(memoryId: string, feedback: 'liked' | 'disliked' | 'ignored'): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('PATCH', `/api/v1/memories/${memoryId}/suggestion/feedback`, {
+      user_feedback: feedback,
+    })
   }
 
   // Chat endpoints
