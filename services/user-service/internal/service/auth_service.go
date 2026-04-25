@@ -206,6 +206,19 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 		existing.PaginationMode = req.Pagination.Mode
 	}
 
+	// Update AI suggestion settings if provided
+	if req.AI != nil {
+		if req.AI.Style != "" {
+			existing.AISuggestionStyle = req.AI.Style
+		}
+		if req.AI.Timeout > 0 {
+			existing.AISuggestionTimeout = req.AI.Timeout
+		}
+		if req.AI.MaxRetries > 0 {
+			existing.AISuggestionMaxRetries = req.AI.MaxRetries
+		}
+	}
+
 	settingsJSON, err := json.Marshal(existing)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal settings: %w", err)
