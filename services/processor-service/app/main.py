@@ -7,7 +7,9 @@ Consumes tasks from Redis Streams.
 import logging
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import List
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 import redis.asyncio as redis
@@ -103,3 +105,55 @@ async def root():
         "version": settings.service_version,
         "description": "Link scraping and auto-tagging service",
     }
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    temperature: float = 0.7
+    max_tokens: int = 1000
+    provider: str = None
+    protocol: str = None
+    model: str = None
+    api_key: str = None
+    base_url: str = None
+
+
+class ChatResponse(BaseModel):
+    content: str
+
+
+@app.post("/api/v1/generate/chat")
+async def chat_generate(req: ChatRequest):
+    """Generate a chat response from a conversation history."""
+    from app.services.llm.factory import LLMFactory
+
+    try:
+        llm = LLMFactory.create(
+            protocol=req.protocol,
+            provider=req.provider,
+            model=req.model,
+            temperature=req.temperature,
+            api_key=req.api_key,
+            base_url=req.base_url,
+        )
+    except Exception as e:
+        logging.error(f"Failed to create LLM provider: {e}")
+        raise HTTPException(status_code=500, detail=f"LLM provider error: {e}")
+
+    messages = [{"role": m.role, "content": m.content} for m in req.messages]
+    try:
+        content = await llm.chat(
+            messages=messages,
+            temperature=req.temperature,
+            max_tokens=req.max_tokens,
+        )
+    except Exception as e:
+        logging.error(f"LLM chat failed: {e}")
+        raise HTTPException(status_code=500, detail=f"LLM generation error: {e}")
+
+    return ChatResponse(content=content)

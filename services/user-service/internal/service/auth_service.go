@@ -194,6 +194,18 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 		existing.SearchSimilarityThreshold = req.Search.SimilarityThreshold
 	}
 
+	// Update RAG settings if provided
+	if req.RAG != nil {
+		if req.RAG.MemoryLimit > 0 {
+			existing.RAGMemoryLimit = req.RAG.MemoryLimit
+		}
+	}
+
+	// Update pagination settings if provided
+	if req.Pagination != nil && req.Pagination.Mode != "" {
+		existing.PaginationMode = req.Pagination.Mode
+	}
+
 	settingsJSON, err := json.Marshal(existing)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal settings: %w", err)

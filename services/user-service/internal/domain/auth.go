@@ -36,7 +36,7 @@ type RefreshRequest struct {
 
 // LLMSettings represents per-user LLM configuration.
 type LLMSettings struct {
-	Provider              string      `json:"llm_provider" binding:"omitempty,oneof=openai anthropic"`
+	Provider              string      `json:"llm_provider" binding:"omitempty,max=50"`
 	Protocol              string      `json:"llm_protocol" binding:"omitempty,oneof=openai anthropic"`
 	Model                 string      `json:"llm_model" binding:"omitempty,max=100"`
 	Temperature           interface{} `json:"llm_temperature" binding:"omitempty"`
@@ -64,16 +64,30 @@ type SearchSettings struct {
 	SimilarityThreshold float64 `json:"similarity_threshold,omitempty" binding:"omitempty,gte=0,lte=1"`
 }
 
+// RAGSettings represents per-user RAG configuration.
+type RAGSettings struct {
+	MemoryLimit int `json:"rag_memory_limit,omitempty" binding:"omitempty,gte=1,lte=20"`
+}
+
+// PaginationSettings represents per-user pagination preferences.
+type PaginationSettings struct {
+	Mode string `json:"mode,omitempty" binding:"omitempty,oneof=load_more page_numbers"`
+}
+
 // UserSettings represents the complete user settings.
 type UserSettings struct {
 	LLMSettings
 	SearchSimilarityThreshold float64 `json:"search_similarity_threshold,omitempty" binding:"omitempty,gte=0,lte=1"`
+	RAGMemoryLimit            int     `json:"rag_memory_limit,omitempty" binding:"omitempty,gte=1,lte=20"`
+	PaginationMode            string  `json:"pagination_mode,omitempty" binding:"omitempty,oneof=load_more page_numbers"`
 }
 
 // UpdateSettingsRequest represents a request to update user settings.
 type UpdateSettingsRequest struct {
-	LLM    *LLMSettings    `json:"llm,omitempty"`
-	Search *SearchSettings `json:"search,omitempty"`
+	LLM        *LLMSettings        `json:"llm,omitempty"`
+	Search     *SearchSettings     `json:"search,omitempty"`
+	RAG        *RAGSettings        `json:"rag,omitempty"`
+	Pagination *PaginationSettings `json:"pagination,omitempty"`
 }
 
 // TestLLMRequest represents a request to test LLM connectivity.

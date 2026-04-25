@@ -2,22 +2,28 @@
 package router
 
 import (
+	"context"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"time"
 
+	chatRepository "github.com/NebulaVzx/Echoes/services/gateway/internal/chat/repository"
+	chatService "github.com/NebulaVzx/Echoes/services/gateway/internal/chat/service"
+	chatTransport "github.com/NebulaVzx/Echoes/services/gateway/internal/chat/transport"
 	"github.com/NebulaVzx/Echoes/services/gateway/internal/middleware"
 	"github.com/NebulaVzx/Echoes/services/gateway/internal/observability"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 // Setup configures all routes and returns the Gin engine.
 // Middleware chain per D-02/D-04/D-06: Recovery -> otelgin -> PrometheusMetrics -> ZapLogger -> CORS -> RateLimit -> JWTAuth
-func Setup(logger *zap.Logger) *gin.Engine {
+func Setup(logger *zap.Logger, db *gorm.DB) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(middleware.OTelGin("gateway"))
@@ -35,14 +41,8 @@ func Setup(logger *zap.Logger) *gin.Engine {
 	authLimiter := middleware.NewRateLimiter(time.Second, 30)
 	defaultLimiter := middleware.NewRateLimiter(time.Second, 60)
 
-	// Health check (no rate limit)
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":  "ok",
-			"service": "gateway",
-			"version": "0.2.0",
-		})
-	})
+	// Health check (no rate limit) — aggregated: gateway + downstream services
+	router.GET("/health", healthCheckHandler)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -77,7 +77,75 @@ func Setup(logger *zap.Logger) *gin.Engine {
 		memoryProxy.ServeHTTP(c.Writer, c.Request)
 	})
 
+	// Chat routes — handled by Gateway directly (not proxied)
+	chatRepo := chatRepository.NewGormConversationRepository(db)
+	chatSvc := chatService.NewChatService(
+		chatRepo,
+		os.Getenv("MEMORY_SERVICE_URL"),
+		os.Getenv("PROCESSOR_SERVICE_URL"),
+		os.Getenv("USER_SERVICE_URL"),
+		logger,
+	)
+	chatHandler := chatTransport.NewChatHandler(chatSvc, logger)
+
+	protected.POST("/chat/messages", chatHandler.SendMessage)
+	protected.GET("/chat/conversations", chatHandler.ListConversations)
+	protected.DELETE("/chat/conversations/:id", chatHandler.DeleteConversation)
+	protected.GET("/chat/conversations/:id/messages", chatHandler.GetMessages)
+
 	return router
+}
+
+// healthCheckHandler performs aggregated health checks against downstream services.
+// Returns 200 if all services healthy, 503 if any service is unreachable.
+func healthCheckHandler(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+
+	services := map[string]string{
+		"user":   checkServiceHealth(ctx, os.Getenv("USER_SERVICE_URL"), "http://user-service:8001", "/api/v1/auth/me"),
+		"memory": checkServiceHealth(ctx, os.Getenv("MEMORY_SERVICE_URL"), "http://memory-service:8002", "/api/v1/memories"),
+	}
+
+	overallStatus := "healthy"
+	httpStatus := http.StatusOK
+	for _, status := range services {
+		if status != "ok" {
+			overallStatus = "degraded"
+			httpStatus = http.StatusServiceUnavailable
+			break
+		}
+	}
+
+	c.JSON(httpStatus, gin.H{
+		"status":   overallStatus,
+		"gateway":  "ok",
+		"services": services,
+		"version":  "0.2.0",
+	})
+}
+
+// checkServiceHealth probes a downstream service with an HTTP HEAD request.
+// Returns "ok" if the service responds with 2xx/3xx/4xx, or "unreachable" on error/5xx.
+func checkServiceHealth(ctx context.Context, envURL, defaultURL, path string) string {
+	targetURL := envURL
+	if targetURL == "" {
+		targetURL = defaultURL
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, targetURL+path, nil)
+	if err != nil {
+		return "unreachable"
+	}
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "unreachable"
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+		return "ok"
+	}
+	return "unreachable"
 }
 
 // newReverseProxy creates a reverse proxy to a backend service.
@@ -94,11 +162,19 @@ func newReverseProxy(envKey, defaultURL string) *httputil.ReverseProxy {
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
-	// Custom transport with timeout and OTel trace propagation to downstream services
+	// Custom transport with explicit timeouts and OTel trace propagation to downstream services
 	proxy.Transport = otelhttp.NewTransport(&http.Transport{
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 10,
 		IdleConnTimeout:     90 * time.Second,
+		// Explicit connection timeouts to prevent indefinite blocking
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	})
 
 	// Modify request to set correct host and path

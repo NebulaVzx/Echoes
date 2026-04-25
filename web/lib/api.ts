@@ -1,5 +1,12 @@
 // Echoes API client - centralized HTTP client for backend communication
 
+import {
+  SendMessageRequest,
+  SendMessageResponse,
+  ListConversationsResponse,
+  ListMessagesResponse,
+} from '@/types/chat'
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8088'
 
 export interface ApiResponse<T> {
@@ -42,13 +49,21 @@ export interface SearchSettings {
   similarity_threshold: number
 }
 
+export interface RAGSettings {
+  rag_memory_limit: number
+}
+
 export interface UserSettings extends LLMSettings {
   search_similarity_threshold?: number
+  rag_memory_limit?: number
+  pagination_mode?: 'load_more' | 'page_numbers'
 }
 
 export interface UpdateSettingsRequest {
   llm?: LLMSettings
   search?: SearchSettings
+  rag?: RAGSettings
+  pagination?: { mode?: 'load_more' | 'page_numbers' }
 }
 
 export interface AuthResponse {
@@ -77,6 +92,7 @@ export interface ListMemoriesResponse {
   total: number
   page: number
   limit: number
+  has_more: boolean
 }
 
 export interface SearchResult extends Memory {
@@ -317,6 +333,23 @@ class ApiClient {
     if (params?.limit) searchParams.set('limit', String(params.limit))
     const query = searchParams.toString()
     return this.request<RelatedResponse>('GET', `/api/v1/memories/${id}/related${query ? '?' + query : ''}`)
+  }
+
+  // Chat endpoints
+  async sendMessage(data: SendMessageRequest): Promise<ApiResponse<SendMessageResponse>> {
+    return this.request<SendMessageResponse>('POST', '/api/v1/chat/messages', data)
+  }
+
+  async listConversations(): Promise<ApiResponse<ListConversationsResponse>> {
+    return this.request<ListConversationsResponse>('GET', '/api/v1/chat/conversations')
+  }
+
+  async deleteConversation(id: string): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('DELETE', `/api/v1/chat/conversations/${id}`)
+  }
+
+  async getMessages(conversationId: string): Promise<ApiResponse<ListMessagesResponse>> {
+    return this.request<ListMessagesResponse>('GET', `/api/v1/chat/conversations/${conversationId}/messages`)
   }
 }
 

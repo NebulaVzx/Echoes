@@ -2,7 +2,7 @@ import os
 from typing import List
 import asyncio
 from openai import AsyncOpenAI, RateLimitError
-from .base import LLMProvider
+from .base import LLMProvider, LLMMessage
 
 
 class OpenAIProvider(LLMProvider):
@@ -46,3 +46,26 @@ Content: {content[:2000]}"""
         result = await self.generate(prompt, temperature=0.3, max_tokens=100)
         tags = [t.strip() for t in result.split(",") if t.strip()]
         return tags[:5]
+
+    async def chat(self, messages: List[LLMMessage], temperature: float = None, max_tokens: int = 500) -> str:
+        temp = temperature if temperature is not None else self.temperature
+        for attempt in range(3):
+            try:
+                resp = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=temp,
+                        max_tokens=max_tokens,
+                    ),
+                    timeout=30.0,
+                )
+                return resp.choices[0].message.content
+            except RateLimitError:
+                wait = 2 ** attempt
+                await asyncio.sleep(wait)
+            except asyncio.TimeoutError:
+                if attempt == 2:
+                    raise
+                await asyncio.sleep(1)
+        raise RuntimeError("OpenAI chat failed after 3 attempts")

@@ -2,12 +2,15 @@
 # Multi-stage build for Go + Gin API Gateway
 
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:alpine AS builder
 
 WORKDIR /app
 
 # Install dependencies
 RUN apk add --no-cache git
+
+# Allow automatic Go toolchain download
+ENV GOTOOLCHAIN=auto
 
 # Copy go mod files
 COPY go.mod ./
@@ -38,7 +41,7 @@ EXPOSE 8080
 CMD ["./gateway"]
 
 # Development stage
-FROM golang:1.25-alpine AS development
+FROM golang:alpine AS development
 
 WORKDIR /app
 

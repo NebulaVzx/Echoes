@@ -67,31 +67,58 @@ func respondWithValidationError(c *gin.Context, err error) {
 
 // In-memory state store for GitHub OAuth CSRF protection.
 // Production should use Redis with TTL.
+const oauthStateTTL = 10 * time.Minute
+
 var (
-	oauthStates   = make(map[string]time.Time)
-	oauthStateMux sync.Mutex
+	oauthStates      = make(map[string]time.Time)
+	oauthStateMux    sync.Mutex
+	startCleanupOnce sync.Once
 )
+
+// cleanupOAuthStates periodically removes expired OAuth states from the map.
+// It runs indefinitely, scanning the map every 5 minutes.
+func cleanupOAuthStates() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		oauthStateMux.Lock()
+		now := time.Now()
+		for state, expiry := range oauthStates {
+			if now.After(expiry) {
+				delete(oauthStates, state)
+			}
+		}
+		oauthStateMux.Unlock()
+	}
+}
 
 // generateState creates a random state string and stores it with expiration.
 func generateState() string {
+	startCleanupOnce.Do(func() {
+		go cleanupOAuthStates()
+	})
+
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 	state := hex.EncodeToString(b)
 	oauthStateMux.Lock()
-	oauthStates[state] = time.Now().Add(10 * time.Minute)
+	oauthStates[state] = time.Now().Add(oauthStateTTL)
 	oauthStateMux.Unlock()
 	return state
 }
 
 // validateState checks if a state exists and hasn't expired, then removes it.
+// Returns false for expired or non-existent states, and always deletes the
+// consumed/expired entry from the map.
 func validateState(state string) bool {
 	oauthStateMux.Lock()
 	expiry, ok := oauthStates[state]
+	valid := ok && time.Now().Before(expiry)
 	delete(oauthStates, state)
 	oauthStateMux.Unlock()
-	return ok && time.Now().Before(expiry)
+	return valid
 }
 
 // AuthHandler handles HTTP requests for authentication.
@@ -308,6 +335,7 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 }
 
 // GetSettings returns the current user's LLM settings.
+// When called internally (X-Internal-Request header), returns the raw decrypted API key.
 func (h *AuthHandler) GetSettings(c *gin.Context) {
 	userIDStr, ok := getUserID(c)
 	if !ok {
@@ -330,6 +358,14 @@ func (h *AuthHandler) GetSettings(c *gin.Context) {
 			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to retrieve settings")
 		}
 		return
+	}
+
+	// Internal service calls (e.g. Gateway) need the raw decrypted API key
+	if c.GetHeader("X-Internal-Request") == "true" {
+		decrypted, err := h.authService.GetUserAPIKeyForTesting(c.Request.Context(), userIDUUID)
+		if err == nil && decrypted != "" {
+			settings.APIKey = decrypted
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": settings})

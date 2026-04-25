@@ -18,6 +18,8 @@ const settingsSchema = z.object({
   base_url: z.union([z.string().url('请输入有效的 URL'), z.literal('')]).optional(),
   include_note_in_analysis: z.boolean().optional(),
   similarity_threshold: z.number().min(0).max(1),
+  rag_memory_limit: z.number().min(1).max(20),
+  pagination_mode: z.enum(['load_more', 'page_numbers']).optional(),
 })
 
 type SettingsFormData = z.infer<typeof settingsSchema>
@@ -73,6 +75,7 @@ export default function SettingsPage() {
   const [isSavingConnection, setIsSavingConnection] = useState(false)
   const [isSavingProcessing, setIsSavingProcessing] = useState(false)
   const [isSavingSearch, setIsSavingSearch] = useState(false)
+  const [isSavingUI, setIsSavingUI] = useState(false)
 
   // Test connection state
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
@@ -103,6 +106,8 @@ export default function SettingsPage() {
       base_url: '',
       include_note_in_analysis: false,
       similarity_threshold: 0.4,
+      rag_memory_limit: 5,
+      pagination_mode: 'load_more',
     },
   })
 
@@ -127,6 +132,8 @@ export default function SettingsPage() {
             base_url: data.base_url || '',
             include_note_in_analysis: data.include_note_in_analysis ?? false,
             similarity_threshold: data.search_similarity_threshold ?? 0.4,
+            rag_memory_limit: data.rag_memory_limit ?? 5,
+            pagination_mode: (data.pagination_mode as 'load_more' | 'page_numbers') || 'load_more',
           })
         }
       } catch (err) {
@@ -285,6 +292,11 @@ export default function SettingsPage() {
           ? parseFloat(data.similarity_threshold)
           : data.similarity_threshold,
       },
+      rag: {
+        rag_memory_limit: typeof data.rag_memory_limit === 'string'
+          ? parseInt(data.rag_memory_limit, 10)
+          : data.rag_memory_limit,
+      },
     }
 
     try {
@@ -298,6 +310,29 @@ export default function SettingsPage() {
       showToast(err instanceof Error ? err.message : '保存失败', 'error')
     } finally {
       setIsSavingSearch(false)
+    }
+  }
+
+  const onSaveUIPreferences = async () => {
+    setIsSavingUI(true)
+    dismissToast()
+    const data = getValues()
+    const payload = {
+      pagination: {
+        mode: data.pagination_mode || 'load_more',
+      },
+    }
+    try {
+      const response = await api.updateSettings(payload)
+      if (response.success) {
+        showToast('界面偏好已保存', 'success')
+      } else {
+        showToast(response.error?.message || '保存失败', 'error')
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '保存失败', 'error')
+    } finally {
+      setIsSavingUI(false)
     }
   }
 
@@ -603,6 +638,32 @@ export default function SettingsPage() {
               )}
             </div>
 
+            {/* RAG Memory Limit */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                RAG 记忆片段数量
+              </label>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  {...register('rag_memory_limit', { valueAsNumber: true })}
+                  min="1"
+                  max="20"
+                  step="1"
+                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-400 w-12 text-right">
+                  {watch('rag_memory_limit') || 5}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                AI 回答问题时最多参考的记忆片段数量。数量越多参考范围越广，但可能降低回答精度 (1 - 20)
+              </p>
+              {errors.rag_memory_limit && (
+                <p className="mt-1 text-xs text-red-500">{errors.rag_memory_limit.message}</p>
+              )}
+            </div>
+
             <div className="pt-2">
               <button
                 type="button"
@@ -611,6 +672,59 @@ export default function SettingsPage() {
                 className="px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-md text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingSearch ? '保存中...' : '保存搜索偏好'}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 4: UI Preferences */}
+        <section className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-1">
+            界面偏好
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            自定义时间轴的交互方式
+          </p>
+
+          <div className="space-y-5">
+            {/* Pagination Mode */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                分页模式
+              </label>
+              <div className="flex gap-3">
+                <label className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <input
+                    type="radio"
+                    {...register('pagination_mode')}
+                    value="load_more"
+                    className="text-gray-900 dark:text-gray-100"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">加载更多</span>
+                </label>
+                <label className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <input
+                    type="radio"
+                    {...register('pagination_mode')}
+                    value="page_numbers"
+                    className="text-gray-900 dark:text-gray-100"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">页码组件</span>
+                </label>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                "加载更多"适合浏览，"页码组件"适合快速跳转
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={onSaveUIPreferences}
+                disabled={isSavingUI}
+                className="px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-md text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingUI ? '保存中...' : '保存界面偏好'}
               </button>
             </div>
           </div>

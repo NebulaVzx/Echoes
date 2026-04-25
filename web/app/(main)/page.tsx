@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/app/providers/auth-provider'
+import { ChatProvider, useChat } from '@/app/providers/chat-provider'
 import { api, Memory } from '@/lib/api'
 import Logo from '@/components/logo'
 import Link from 'next/link'
@@ -10,8 +11,11 @@ import CreateMemoryForm from '@/components/memory/create-memory-form'
 import MemoryList from '@/components/memory/memory-list'
 import SearchInput from '@/components/search/search-input'
 import EmptyState from '@/components/empty-state'
+import ChatSidebar from '@/components/chat/chat-sidebar'
+import Pagination from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
+import { Sparkles } from 'lucide-react'
 
 function TimelineSkeleton() {
   return (
@@ -37,32 +41,97 @@ function TimelineSkeleton() {
   )
 }
 
-export default function HomePage() {
+export default function HomePageWrapper() {
+  return (
+    <ChatProvider>
+      <HomePage />
+    </ChatProvider>
+  )
+}
+
+function HomePage() {
   const { user, isLoading: authLoading, logout } = useAuth()
+  const {
+    isOpen,
+    closeChat,
+    toggleChat,
+    messages,
+    isLoading: chatLoading,
+    sendMessage,
+    conversations,
+    activeConversationId,
+    selectConversation,
+    newConversation,
+    deleteConversation,
+  } = useChat()
   const [memories, setMemories] = useState<Memory[]>([])
   const [isLoading, setIsLoading] = useState(true)
+
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [limit] = useState(20)
+  const [hasMore, setHasMore] = useState(false)
+  const [total, setTotal] = useState(0)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [paginationMode, setPaginationMode] = useState<'load_more' | 'page_numbers'>('load_more')
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const showToast = (message: string, type: 'success' | 'error') => setToast({ message, type })
   const dismissToast = () => setToast(null)
 
-  const loadMemories = useCallback(async () => {
+  const loadMemories = useCallback(async (targetPage: number = 1, append: boolean = false) => {
     try {
-      setIsLoading(true)
-      const response = await api.listMemories({ page: 1, limit: 20 })
+      if (targetPage === 1) setIsLoading(true)
+      else setIsLoadingMore(true)
+
+      const response = await api.listMemories({ page: targetPage, limit })
       if (response.success && response.data) {
-        setMemories(response.data.memories)
+        const data = response.data
+        if (append) {
+          setMemories(prev => [...prev, ...data.memories])
+        } else {
+          setMemories(data.memories)
+        }
+        setHasMore(data.has_more)
+        setTotal(data.total)
+        setPage(targetPage)
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : '加载失败', 'error')
     } finally {
       setIsLoading(false)
+      setIsLoadingMore(false)
     }
+  }, [limit])
+
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || isLoadingMore) return
+    loadMemories(page + 1, true)
+  }, [hasMore, isLoadingMore, page, loadMemories])
+
+  const handlePageChange = useCallback((newPage: number) => {
+    loadMemories(newPage, false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [loadMemories])
+
+  // Load pagination mode from user settings on mount
+  useEffect(() => {
+    const loadPaginationPreference = async () => {
+      try {
+        const response = await api.getSettings()
+        if (response.success && response.data?.pagination_mode) {
+          setPaginationMode(response.data.pagination_mode)
+        }
+      } catch {
+        // Ignore settings load failure; default to load_more
+      }
+    }
+    loadPaginationPreference()
   }, [])
 
   useEffect(() => {
-    loadMemories()
+    loadMemories(1, false)
   }, [loadMemories])
 
   if (authLoading) {
@@ -88,6 +157,17 @@ export default function HomePage() {
           </div>
           <SearchInput />
           <div className="flex items-center gap-1 flex-shrink-0">
+            {user && (
+              <button
+                onClick={toggleChat}
+                className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
+                title="Echo Assistant"
+                aria-label="AI 助手"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="hidden sm:inline">AI</span>
+              </button>
+            )}
             <ThemeToggle />
             {user && (
               <div className="flex items-center gap-1 ml-1">
@@ -130,7 +210,7 @@ export default function HomePage() {
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Create form */}
         <div className="mb-10">
-          <CreateMemoryForm onSuccess={loadMemories} />
+          <CreateMemoryForm onSuccess={() => loadMemories(1, false)} />
         </div>
 
         {/* Timeline */}
@@ -140,7 +220,7 @@ export default function HomePage() {
               时间轴
             </h2>
             <span className="text-xs text-gray-400 dark:text-gray-500">
-              {memories.length} 条记忆
+              {total > 0 ? `${total} 条记忆` : `${memories.length} 条记忆`}
             </span>
           </div>
 
@@ -156,10 +236,41 @@ export default function HomePage() {
               title="还没有记忆，上方创建第一条吧"
             />
           ) : (
-            <MemoryList memories={memories} />
+            <MemoryList
+              memories={memories}
+              hasMore={paginationMode === 'load_more' ? hasMore : undefined}
+              onLoadMore={paginationMode === 'load_more' ? handleLoadMore : undefined}
+              isLoadingMore={isLoadingMore}
+            />
+          )}
+
+          {/* Pagination component for page_numbers mode */}
+          {paginationMode === 'page_numbers' && total > 0 && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={page}
+                totalPages={Math.max(1, Math.ceil(total / limit))}
+                onPageChange={handlePageChange}
+              />
+            </div>
           )}
         </div>
       </div>
+
+      {user && (
+        <ChatSidebar
+          isOpen={isOpen}
+          onClose={closeChat}
+          messages={messages}
+          isLoading={chatLoading}
+          onSendMessage={sendMessage}
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelectConversation={selectConversation}
+          onNewConversation={newConversation}
+          onDeleteConversation={deleteConversation}
+        />
+      )}
     </main>
   )
 }
