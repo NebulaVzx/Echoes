@@ -99,10 +99,8 @@ func NewChatService(repo repository.ConversationRepository, memoryURL, processor
 func (s *ChatService) SendMessage(ctx context.Context, userID uuid.UUID, req *domain.SendMessageRequest, authHeader string) (*domain.ChatResponse, error) {
 	// 1. Determine or create conversation
 	var conversationID uuid.UUID
-	var isNewConversation bool
 
 	if req.ConversationID == "" {
-		isNewConversation = true
 		conversationID = uuid.New()
 		title := req.Content
 		if len([]rune(title)) > 30 {
@@ -186,7 +184,11 @@ func (s *ChatService) SendMessage(ctx context.Context, userID uuid.UUID, req *do
 	}
 
 	// 8. Save assistant message
-	citationsJSON, _ := json.Marshal(citations)
+	citationsJSON, err := json.Marshal(citations)
+	if err != nil {
+		s.logger.Error("failed to marshal citations", zap.Error(err), zap.String("conversation_id", conversationID.String()))
+		citationsJSON = []byte("[]")
+	}
 	assistantMsg := &domain.Message{
 		ConversationID: conversationID,
 		Role:           "assistant",
@@ -209,13 +211,6 @@ func (s *ChatService) SendMessage(ctx context.Context, userID uuid.UUID, req *do
 			CreatedAt:      assistantMsg.CreatedAt,
 		},
 		Citations: citations,
-	}
-
-	// If new conversation, include the conversation ID in the response for frontend
-	if isNewConversation {
-		// We can't modify the Message struct, but the frontend will get conversation_id from the message
-		// The conversation was already created with the ID
-		_ = conversationID
 	}
 
 	return resp, nil
@@ -364,7 +359,7 @@ func (s *ChatService) assembleSystemPrompt(memories []domain.SearchResultMemory)
 func (s *ChatService) buildMessages(query string, memories []domain.SearchResultMemory, history []domain.Message) []map[string]string {
 	messages := make([]map[string]string, 0, MaxHistoryMessages+2)
 
-	// 1. System message with RAG context
+	// 1. System message with RAG context (insert once)
 	systemContent := s.assembleSystemPrompt(memories)
 	messages = append(messages, map[string]string{
 		"role":    "system",
@@ -372,22 +367,23 @@ func (s *ChatService) buildMessages(query string, memories []domain.SearchResult
 	})
 
 	// 2. Recent history (up to MaxHistoryMessages, filter out system if any)
-	historyCount := 0
-	for i := len(history) - 1; i >= 0 && historyCount < MaxHistoryMessages; i-- {
+	// Collect history messages in reverse order, then reverse to maintain chronological order
+	historyMessages := make([]map[string]string, 0, MaxHistoryMessages)
+	count := 0
+	for i := len(history) - 1; i >= 0 && count < MaxHistoryMessages; i-- {
 		msg := history[i]
 		if msg.Role == "system" {
 			continue
 		}
-		// Prepend to maintain order
-		messages = append([]map[string]string{{
+		historyMessages = append(historyMessages, map[string]string{
 			"role":    msg.Role,
 			"content": msg.Content,
-		}}, messages[1:]...)
-		messages = append([]map[string]string{{
-			"role":    "system",
-			"content": systemContent,
-		}}, messages...)
-		historyCount++
+		})
+		count++
+	}
+	// Reverse to maintain chronological order (oldest first)
+	for i := len(historyMessages) - 1; i >= 0; i-- {
+		messages = append(messages, historyMessages[i])
 	}
 
 	// 3. Current user query
