@@ -12,6 +12,7 @@ import MemoryList from '@/components/memory/memory-list'
 import SearchInput from '@/components/search/search-input'
 import EmptyState from '@/components/empty-state'
 import ChatSidebar from '@/components/chat/chat-sidebar'
+import Pagination from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 import { Sparkles } from 'lucide-react'
@@ -66,27 +67,71 @@ function HomePage() {
   const [memories, setMemories] = useState<Memory[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [limit] = useState(20)
+  const [hasMore, setHasMore] = useState(false)
+  const [total, setTotal] = useState(0)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [paginationMode, setPaginationMode] = useState<'load_more' | 'page_numbers'>('load_more')
+
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const showToast = (message: string, type: 'success' | 'error') => setToast({ message, type })
   const dismissToast = () => setToast(null)
 
-  const loadMemories = useCallback(async () => {
+  const loadMemories = useCallback(async (targetPage: number = 1, append: boolean = false) => {
     try {
-      setIsLoading(true)
-      const response = await api.listMemories({ page: 1, limit: 20 })
+      if (targetPage === 1) setIsLoading(true)
+      else setIsLoadingMore(true)
+
+      const response = await api.listMemories({ page: targetPage, limit })
       if (response.success && response.data) {
-        setMemories(response.data.memories)
+        const data = response.data
+        if (append) {
+          setMemories(prev => [...prev, ...data.memories])
+        } else {
+          setMemories(data.memories)
+        }
+        setHasMore(data.has_more)
+        setTotal(data.total)
+        setPage(targetPage)
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : '加载失败', 'error')
     } finally {
       setIsLoading(false)
+      setIsLoadingMore(false)
     }
+  }, [limit])
+
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || isLoadingMore) return
+    loadMemories(page + 1, true)
+  }, [hasMore, isLoadingMore, page, loadMemories])
+
+  const handlePageChange = useCallback((newPage: number) => {
+    loadMemories(newPage, false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [loadMemories])
+
+  // Load pagination mode from user settings on mount
+  useEffect(() => {
+    const loadPaginationPreference = async () => {
+      try {
+        const response = await api.getSettings()
+        if (response.success && response.data?.pagination_mode) {
+          setPaginationMode(response.data.pagination_mode)
+        }
+      } catch {
+        // Ignore settings load failure; default to load_more
+      }
+    }
+    loadPaginationPreference()
   }, [])
 
   useEffect(() => {
-    loadMemories()
+    loadMemories(1, false)
   }, [loadMemories])
 
   if (authLoading) {
@@ -165,7 +210,7 @@ function HomePage() {
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Create form */}
         <div className="mb-10">
-          <CreateMemoryForm onSuccess={loadMemories} />
+          <CreateMemoryForm onSuccess={() => loadMemories(1, false)} />
         </div>
 
         {/* Timeline */}
@@ -175,7 +220,7 @@ function HomePage() {
               时间轴
             </h2>
             <span className="text-xs text-gray-400 dark:text-gray-500">
-              {memories.length} 条记忆
+              {total > 0 ? `${total} 条记忆` : `${memories.length} 条记忆`}
             </span>
           </div>
 
@@ -191,7 +236,23 @@ function HomePage() {
               title="还没有记忆，上方创建第一条吧"
             />
           ) : (
-            <MemoryList memories={memories} />
+            <MemoryList
+              memories={memories}
+              hasMore={paginationMode === 'load_more' ? hasMore : undefined}
+              onLoadMore={paginationMode === 'load_more' ? handleLoadMore : undefined}
+              isLoadingMore={isLoadingMore}
+            />
+          )}
+
+          {/* Pagination component for page_numbers mode */}
+          {paginationMode === 'page_numbers' && total > limit && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={page}
+                totalPages={Math.ceil(total / limit)}
+                onPageChange={handlePageChange}
+              />
+            </div>
           )}
         </div>
       </div>
