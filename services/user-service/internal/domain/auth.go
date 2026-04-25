@@ -69,18 +69,25 @@ type RAGSettings struct {
 	MemoryLimit int `json:"rag_memory_limit,omitempty" binding:"omitempty,gte=1,lte=20"`
 }
 
+// PaginationSettings represents per-user pagination preferences.
+type PaginationSettings struct {
+	Mode string `json:"mode,omitempty" binding:"omitempty,oneof=load_more page_numbers"`
+}
+
 // UserSettings represents the complete user settings.
 type UserSettings struct {
 	LLMSettings
 	SearchSimilarityThreshold float64 `json:"search_similarity_threshold,omitempty" binding:"omitempty,gte=0,lte=1"`
 	RAGMemoryLimit            int     `json:"rag_memory_limit,omitempty" binding:"omitempty,gte=1,lte=20"`
+	PaginationMode            string  `json:"pagination_mode,omitempty" binding:"omitempty,oneof=load_more page_numbers"`
 }
 
 // UpdateSettingsRequest represents a request to update user settings.
 type UpdateSettingsRequest struct {
-	LLM    *LLMSettings    `json:"llm,omitempty"`
-	Search *SearchSettings `json:"search,omitempty"`
-	RAG    *RAGSettings    `json:"rag,omitempty"`
+	LLM        *LLMSettings        `json:"llm,omitempty"`
+	Search     *SearchSettings     `json:"search,omitempty"`
+	RAG        *RAGSettings        `json:"rag,omitempty"`
+	Pagination *PaginationSettings `json:"pagination,omitempty"`
 }
 
 // TestLLMRequest represents a request to test LLM connectivity.
