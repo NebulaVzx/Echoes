@@ -105,9 +105,48 @@ type RelatedResponse struct {
 	MemoryID uuid.UUID      `json:"memory_id"`
 }
 
+// AISuggestion represents an AI-generated companion suggestion for a memory.
+type AISuggestion struct {
+	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	MemoryID       uuid.UUID `gorm:"type:uuid;not null;index" json:"memory_id"`
+	Content        string    `gorm:"type:text;not null" json:"content"`
+	SuggestionType string    `gorm:"type:varchar(20)" json:"suggestion_type,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UserFeedback   string    `gorm:"type:varchar(20)" json:"user_feedback,omitempty"`
+	Metadata       string    `gorm:"type:jsonb" json:"metadata,omitempty"`
+}
+
+// TableName specifies the table name for AISuggestion.
+func (AISuggestion) TableName() string {
+	return "ai_suggestions"
+}
+
+// CreateSuggestionRequest represents a request to create an AI suggestion (internal API).
+type CreateSuggestionRequest struct {
+	MemoryID       uuid.UUID              `json:"memory_id" binding:"required"`
+	Content        string                 `json:"content" binding:"required,max=500"`
+	SuggestionType string                 `json:"suggestion_type" binding:"omitempty,oneof=emotion_support knowledge_expand action_suggest connection general"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// UpdateSuggestionFeedbackRequest represents a request to update user feedback on a suggestion.
+type UpdateSuggestionFeedbackRequest struct {
+	UserFeedback string `json:"user_feedback" binding:"required,oneof=liked disliked ignored"`
+}
+
+// SuggestionResponse represents a single AI suggestion in API responses.
+type SuggestionResponse struct {
+	ID             uuid.UUID `json:"id"`
+	MemoryID       uuid.UUID `json:"memory_id"`
+	Content        string    `json:"content"`
+	SuggestionType string    `json:"suggestion_type,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UserFeedback   string    `json:"user_feedback,omitempty"`
+}
+
 // TaskStatusUpdate is the request body for the internal task status API.
 type TaskStatusUpdate struct {
-	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate"`
+	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate suggestion:generate"`
 	Status   string                 `json:"status" binding:"required,oneof=pending processing completed failed"`
 	Error    string                 `json:"error,omitempty"`
 	Result   map[string]interface{} `json:"result,omitempty"` // e.g., {"tags": [...]}, {"vector": [...]}, {"title": "...", "summary": "..."}
