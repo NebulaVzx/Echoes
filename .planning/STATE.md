@@ -6,19 +6,19 @@ type: state
 
 # 项目状态
 
-**最后更新：** 2026-04-23
+**最后更新：** 2026-04-25
 **当前分支：** develop
-**当前里程碑：** v1.1 Echo Assistant
+**当前里程碑：** v1.2 "记忆的温度"（规划中）
 
 ---
 
 ## 当前位置
 
-阶段：Phase 7 - Bug Fixes & Quality（已发货）
-上一阶段：Phase 6 - Echo Assistant（已完成并通过验证）
-计划：4 plans (4/4 完成)
-状态：Phase 7 已发货 — PR #3 (develop → main)
-最近活动：2026-04-25 — Phase 7 发货完成，PR #3 已创建
+阶段：v1.2 "记忆的温度" — 里程碑规划中
+上一阶段：Phase 7 - Bug Fixes & Quality（已发货）
+计划：3 phases (Phase 8-10) 规划中
+状态：需求已定义，待进入 discuss-phase
+最近活动：2026-04-25 — v1.2 需求规划完成，PR #3 已发货
 
 ---
 
@@ -34,6 +34,12 @@ type: state
 - Phase 7 — Bug Fixes & Quality（已完成）
 - 修复：OAuth state 内存泄漏、Gateway 健康检查、路径遍历、Chat 服务问题
 - 新增：双模式分页、Go 单元测试（55 个测试全部通过）
+
+### v1.2 "记忆的温度"（规划中）
+- Phase 8 — AI 陪伴建议（待开始）
+- Phase 9 — 标签重生（待开始）
+- Phase 10 — 记忆的温度（待开始）
+- 方向：AI 持久化建议、标签交互网络、记忆情感化功能
 
 ### Phase 6 进度
 - [x] 06-01 — 数据库模型 + Go domain models
@@ -79,4 +85,4 @@ Phase 6 初始验证后，在 E2E 测试和实际使用中发现的以下问题�
 
 ---
 
-*State tracking for Echoes project. Updated: 2026-04-23*
+*State tracking for Echoes project. Updated: 2026-04-25 for v1.2 milestone planning*
