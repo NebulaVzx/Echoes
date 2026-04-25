@@ -82,12 +82,14 @@ func (q *RedisTaskQueue) PublishTagGenerate(ctx context.Context, memoryID uuid.U
 
 // PublishSuggestionGenerate publishes an AI suggestion generation task to Redis Stream.
 // Accepts context for trace propagation per D-02.
-func (q *RedisTaskQueue) PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, llmConfig map[string]interface{}) error {
+func (q *RedisTaskQueue) PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, timeout int, maxRetries int, llmConfig map[string]interface{}) error {
 	fields := map[string]interface{}{
 		"memory_id":    memoryID.String(),
 		"content_type": contentType,
 		"content":      content,
 		"style":        style,
+		"timeout":      timeout,
+		"max_retries":  maxRetries,
 	}
 	if note != "" {
 		fields["note"] = note

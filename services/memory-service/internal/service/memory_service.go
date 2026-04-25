@@ -85,7 +85,7 @@ type TaskQueue interface {
 	PublishLinkFetch(ctx context.Context, memoryID uuid.UUID, linkURL string, note string, llmConfig map[string]interface{}) error
 	PublishTextVectorize(ctx context.Context, memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
 	PublishTagGenerate(ctx context.Context, memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error
-	PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, llmConfig map[string]interface{}) error
+	PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, timeout int, maxRetries int, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
@@ -146,10 +146,10 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 	// Publish suggestion generation task if user enabled it
 	suggestionStatus := "skipped"
 	if req.EnableAISuggestion {
-		style := s.getUserSuggestionStyle(ctx, userID)
+		style, timeout, maxRetries := s.getUserSuggestionConfig(ctx, userID)
 		content := s.extractContent(memory)
 		if content != "" {
-			err := s.queue.PublishSuggestionGenerate(ctx, memory.ID, memory.ContentType, content, memory.Note, style, llmConfig)
+			err := s.queue.PublishSuggestionGenerate(ctx, memory.ID, memory.ContentType, content, memory.Note, style, timeout, maxRetries, llmConfig)
 			if err != nil {
 				zap.L().Error("failed to publish suggestion task", zap.Error(err), zap.String("memory_id", memory.ID.String()))
 				suggestionStatus = "failed"
@@ -518,7 +518,7 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 	}
 
 	// Validate task type
-	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true}
+	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true}
 	if !validTypes[taskType] {
 		return fmt.Errorf("invalid task_type: %s", taskType)
 	}
@@ -563,6 +563,28 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 		data["content"] = content
 		if memory.Note != "" {
 			data["note"] = memory.Note
+		}
+	case "suggestion:generate":
+		style, timeout, maxRetries := s.getUserSuggestionConfig(ctx, memory.UserID)
+		content := s.extractContent(memory)
+		if content == "" {
+			return fmt.Errorf("memory has no content for suggestion:generate task")
+		}
+		data["content_type"] = memory.ContentType
+		data["content"] = content
+		data["style"] = style
+		data["timeout"] = timeout
+		data["max_retries"] = maxRetries
+		if memory.Note != "" {
+			data["note"] = memory.Note
+		}
+		if memory.ContentType == "link" {
+			if memory.LinkTitle != "" {
+				data["link_title"] = memory.LinkTitle
+			}
+			if memory.LinkSummary != "" {
+				data["link_summary"] = memory.LinkSummary
+			}
 		}
 	}
 
@@ -625,26 +647,38 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 	return s.repo.Update(ctx, memory)
 }
 
-// getUserSuggestionStyle fetches the user's AI suggestion style, defaulting to "inspiring".
-func (s *MemoryService) getUserSuggestionStyle(ctx context.Context, userID uuid.UUID) string {
+// getUserSuggestionConfig fetches the user's AI suggestion configuration.
+// Returns style (default "inspiring"), timeout seconds (default 30), maxRetries (default 3).
+func (s *MemoryService) getUserSuggestionConfig(ctx context.Context, userID uuid.UUID) (string, int, int) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
-		return "inspiring"
+		return "inspiring", 30, 3
 	}
 	settingsStr := user.Settings.String()
 	if len(user.Settings) == 0 || settingsStr == "{}" || settingsStr == "null" {
-		return "inspiring"
+		return "inspiring", 30, 3
 	}
 	var settings struct {
-		AISuggestionStyle string `json:"ai_suggestion_style"`
+		AISuggestionStyle      string `json:"ai_suggestion_style"`
+		AISuggestionTimeout    int    `json:"ai_suggestion_timeout"`
+		AISuggestionMaxRetries int    `json:"ai_suggestion_max_retries"`
 	}
 	if err := json.Unmarshal([]byte(settingsStr), &settings); err != nil {
-		return "inspiring"
+		return "inspiring", 30, 3
 	}
-	if settings.AISuggestionStyle == "" {
-		return "inspiring"
+	style := settings.AISuggestionStyle
+	if style == "" {
+		style = "inspiring"
 	}
-	return settings.AISuggestionStyle
+	timeout := settings.AISuggestionTimeout
+	if timeout <= 0 {
+		timeout = 30
+	}
+	maxRetries := settings.AISuggestionMaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+	return style, timeout, maxRetries
 }
 
 // GetSuggestion retrieves the AI suggestion for a memory, verifying ownership.

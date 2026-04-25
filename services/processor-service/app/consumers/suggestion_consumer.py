@@ -62,10 +62,14 @@ class SuggestionConsumer(RedisStreamConsumer):
         else:
             raise ValueError(f"unknown content_type: {content_type}")
 
+        # Read per-user timeout and max_retries from message fields
+        timeout_raw = fields.get("timeout")
+        timeout = float(timeout_raw) if timeout_raw is not None else 30.0
+
         # Generate suggestion with timing
         llm = _create_llm(fields)
         start_time = time.time()
-        suggestion_text = await llm.generate_suggestion(prompt, temperature=0.8, max_tokens=200)
+        suggestion_text = await llm.generate_suggestion(prompt, temperature=0.8, max_tokens=200, timeout=timeout)
         latency_ms = int((time.time() - start_time) * 1000)
 
         if not suggestion_text or not suggestion_text.strip():

@@ -13,8 +13,9 @@ class OpenAIProvider(LLMProvider):
             client_kwargs["base_url"] = base_url.rstrip("/")
         self.client = AsyncOpenAI(**client_kwargs)
 
-    async def generate(self, prompt: str, temperature: float = None, max_tokens: int = 500) -> str:
+    async def generate(self, prompt: str, temperature: float = None, max_tokens: int = 500, timeout: float = None) -> str:
         temp = temperature if temperature is not None else self.temperature
+        api_timeout = timeout if timeout is not None else 30.0
         for attempt in range(3):
             try:
                 resp = await asyncio.wait_for(
@@ -24,7 +25,7 @@ class OpenAIProvider(LLMProvider):
                         temperature=temp,
                         max_tokens=max_tokens,
                     ),
-                    timeout=30.0,
+                    timeout=api_timeout,
                 )
                 return resp.choices[0].message.content
             except RateLimitError:
@@ -47,8 +48,9 @@ Content: {content[:2000]}"""
         tags = [t.strip() for t in result.split(",") if t.strip()]
         return tags[:5]
 
-    async def chat(self, messages: List[LLMMessage], temperature: float = None, max_tokens: int = 500) -> str:
+    async def chat(self, messages: List[LLMMessage], temperature: float = None, max_tokens: int = 500, timeout: float = None) -> str:
         temp = temperature if temperature is not None else self.temperature
+        api_timeout = timeout if timeout is not None else 30.0
         for attempt in range(3):
             try:
                 resp = await asyncio.wait_for(
@@ -58,7 +60,7 @@ Content: {content[:2000]}"""
                         temperature=temp,
                         max_tokens=max_tokens,
                     ),
-                    timeout=30.0,
+                    timeout=api_timeout,
                 )
                 return resp.choices[0].message.content
             except RateLimitError:
@@ -70,8 +72,8 @@ Content: {content[:2000]}"""
                 await asyncio.sleep(1)
         raise RuntimeError("OpenAI chat failed after 3 attempts")
 
-    async def generate_suggestion(self, prompt: str, temperature: float = None, max_tokens: int = 200) -> str:
+    async def generate_suggestion(self, prompt: str, temperature: float = None, max_tokens: int = 200, timeout: float = None) -> str:
         """Generate a suggestion using the standard generate with suggestion-optimized defaults."""
         # Suggestions should be warm and slightly creative; use temperature 0.8 default
         temp = temperature if temperature is not None else 0.8
-        return await self.generate(prompt, temperature=temp, max_tokens=max_tokens)
+        return await self.generate(prompt, temperature=temp, max_tokens=max_tokens, timeout=timeout)

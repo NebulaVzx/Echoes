@@ -302,7 +302,7 @@ func (h *MemoryHandler) RetryTask(c *gin.Context) {
 	}
 
 	taskType := c.Param("task_type")
-	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true}
+	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true}
 	if !validTypes[taskType] {
 		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid task_type")
 		return

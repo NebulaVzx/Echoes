@@ -112,7 +112,9 @@ class RedisStreamConsumer(ABC):
                 tid = _get_trace_id()
                 logger.warning(f"[{tid}] Failed to report processing status for {memory_id}: {e}")
 
-            for attempt in range(retry_count, self.max_retries):
+            # Allow per-message max_retries override (e.g., from user settings)
+            msg_max_retries = int(fields.get("max_retries", self.max_retries))
+            for attempt in range(retry_count, msg_max_retries):
                 try:
                     await self.process_message(msg_id, fields)
                     await self.redis.xack(self.stream, self.group, msg_id)
@@ -124,8 +126,8 @@ class RedisStreamConsumer(ABC):
                     span.set_attribute("error", True)
                     span.set_attribute("error.message", str(e))
                     tid = _get_trace_id()
-                    logger.error(f"[{tid}] Error processing {self.stream} for memory {memory_id} (attempt {attempt + 1}/{self.max_retries}): {e}")
-                    if attempt == self.max_retries - 1:
+                    logger.error(f"[{tid}] Error processing {self.stream} for memory {memory_id} (attempt {attempt + 1}/{msg_max_retries}): {e}")
+                    if attempt == msg_max_retries - 1:
                         # Report failure -- do NOT ack, keep in pending for manual retry
                         try:
                             await self.memory_client.update_task_status(
