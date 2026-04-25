@@ -78,6 +78,14 @@ func Setup(logger *zap.Logger, db *gorm.DB) *gin.Engine {
 		memoryProxy.ServeHTTP(c.Writer, c.Request)
 	})
 
+	// Tag routes → Memory Service
+	protected.Any("/tags", func(c *gin.Context) {
+		memoryProxy.ServeHTTP(c.Writer, c.Request)
+	})
+	protected.Any("/tags/*path", func(c *gin.Context) {
+		memoryProxy.ServeHTTP(c.Writer, c.Request)
+	})
+
 	// Chat routes — handled by Gateway directly (not proxied)
 	chatRepo := chatRepository.NewGormConversationRepository(db)
 	chatSvc := chatService.NewChatService(

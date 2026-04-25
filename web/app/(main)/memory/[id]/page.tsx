@@ -13,6 +13,7 @@ import SearchInput from '@/components/search/search-input'
 import SuggestionDetailSection from '@/components/memory/suggestion-detail-section'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
+import { getTagStyle } from '@/components/memory/tag-filter-bar'
 
 function ThemeToggle() {
   const { resolvedTheme, toggleTheme } = useTheme()
@@ -85,6 +86,7 @@ export default function MemoryDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
+  const [relatedTags, setRelatedTags] = useState<Record<string, string[]>>({})
 
   // Toast for delete errors
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
@@ -102,6 +104,23 @@ export default function MemoryDetailPage() {
         const response = await api.getMemory(memoryId)
         if (response.success && response.data) {
           setMemory(response.data)
+          // Load related tags for each tag
+          if (response.data.tags && response.data.tags.length > 0) {
+            const related: Record<string, string[]> = {}
+            await Promise.all(
+              response.data.tags.map(async (tag) => {
+                try {
+                  const resp = await api.getRelatedTags(tag)
+                  if (resp.success && resp.data) {
+                    related[tag] = resp.data.related_tags
+                  }
+                } catch {
+                  // Silently fail
+                }
+              })
+            )
+            setRelatedTags(related)
+          }
         } else {
           setError('记忆不存在')
         }
@@ -329,6 +348,31 @@ export default function MemoryDetailPage() {
               {isDeleting ? '删除中...' : '删除'}
             </button>
           </div>
+
+          {/* Related Tags */}
+          {Object.keys(relatedTags).length > 0 && (
+            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">相关标签</p>
+              <div className="space-y-2">
+                {Object.entries(relatedTags).map(([tag, related]) =>
+                  related.length > 0 ? (
+                    <div key={tag} className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{tag}:</span>
+                      {related.map((r) => (
+                        <Link
+                          key={r}
+                          href={`/?tags=${encodeURIComponent(r)}`}
+                          className={`inline-flex px-2 py-0.5 text-xs rounded-full transition-colors hover:opacity-80 ${getTagStyle(undefined, false)}`}
+                        >
+                          {r}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null
+                )}
+              </div>
+            </div>
+          )}
 
           {/* AI Suggestion */}
           <SuggestionDetailSection memoryId={memoryId} />

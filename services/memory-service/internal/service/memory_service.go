@@ -239,7 +239,7 @@ func (s *MemoryService) extractContent(memory *domain.Memory) string {
 }
 
 // List returns paginated memories for a user.
-func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit int, tag string) (*domain.ListMemoriesResponse, error) {
+func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit int, tags []string) (*domain.ListMemoriesResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -247,7 +247,7 @@ func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit 
 		limit = 20
 	}
 
-	memories, total, err := s.repo.ListByUser(ctx, userID, page, limit, tag)
+	memories, total, err := s.repo.ListByUser(ctx, userID, page, limit, tags)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list memories: %w", err)
 	}

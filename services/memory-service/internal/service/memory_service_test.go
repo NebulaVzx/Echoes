@@ -37,17 +37,24 @@ func (m *mockMemoryRepository) GetVectorByID(ctx context.Context, id uuid.UUID) 
 	return "", nil
 }
 
-func (m *mockMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tag string) ([]domain.Memory, int64, error) {
+func (m *mockMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string) ([]domain.Memory, int64, error) {
 	var results []domain.Memory
 	for _, mem := range m.memories {
 		if mem.UserID != userID {
 			continue
 		}
-		if tag != "" {
-			found := false
-			for _, t := range mem.Tags {
-				if t == tag {
-					found = true
+		if len(tags) > 0 {
+			found := true
+			for _, tag := range tags {
+				tagFound := false
+				for _, t := range mem.Tags {
+					if t == tag {
+						tagFound = true
+						break
+					}
+				}
+				if !tagFound {
+					found = false
 					break
 				}
 			}
@@ -411,7 +418,7 @@ func TestMemoryService_List_Pagination(t *testing.T) {
 	}
 
 	// List page 1 with limit 10
-	resp, err := svc.List(ctx, userID, 1, 10, "")
+	resp, err := svc.List(ctx, userID, 1, 10, nil)
 	if err != nil {
 		t.Fatalf("List() unexpected error: %v", err)
 	}
@@ -437,7 +444,7 @@ func TestMemoryService_List_Pagination(t *testing.T) {
 	}
 
 	// List page 3 with limit 10 (should return last 5 items)
-	resp2, err := svc.List(ctx, userID, 3, 10, "")
+	resp2, err := svc.List(ctx, userID, 3, 10, nil)
 	if err != nil {
 		t.Fatalf("List() page 3 unexpected error: %v", err)
 	}

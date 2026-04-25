@@ -5,9 +5,12 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
 import { api, Memory } from '@/lib/api'
+import { getTagStyle } from './tag-filter-bar'
 
 interface MemoryCardProps {
   memory: Memory
+  tagColors?: Record<string, string>
+  onTagClick?: (tag: string) => void
 }
 
 function formatDate(dateStr: string): string {
@@ -40,7 +43,7 @@ function StatusDot({ status }: { status: string }) {
   )
 }
 
-export default function MemoryCard({ memory }: MemoryCardProps) {
+export default function MemoryCard({ memory, tagColors, onTagClick }: MemoryCardProps) {
   const preview = getPreviewContent(memory)
   const isLink = memory.content_type === 'link'
   const isProcessing = memory.processing_status === 'pending' || memory.processing_status === 'processing'
@@ -129,7 +132,16 @@ export default function MemoryCard({ memory }: MemoryCardProps) {
               {memory.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 text-xs bg-gray-50 dark:bg-gray-700/60 text-gray-500 dark:text-gray-400 rounded-full border border-gray-100 dark:border-gray-600"
+                  onClick={(e) => {
+                    if (onTagClick) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onTagClick(tag)
+                    }
+                  }}
+                  className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full transition-colors ${
+                    onTagClick ? 'cursor-pointer hover:opacity-80' : ''
+                  } ${getTagStyle(tagColors?.[tag], false)}`}
                 >
                   #{tag}
                 </span>

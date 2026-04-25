@@ -164,9 +164,16 @@ func (h *MemoryHandler) List(c *gin.Context) {
 		}
 	}
 
-	tag := c.Query("tag")
+	// Multi-tag filtering: ?tags=react&tags=golang
+	// Backward compatible: ?tag=react maps to single-element array
+	tags := c.QueryArray("tags")
+	if len(tags) == 0 {
+		if singleTag := c.Query("tag"); singleTag != "" {
+			tags = []string{singleTag}
+		}
+	}
 
-	resp, err := h.memoryService.List(c.Request.Context(), userID, page, limit, tag)
+	resp, err := h.memoryService.List(c.Request.Context(), userID, page, limit, tags)
 	if err != nil {
 		zap.L().Error("failed to list memories", zap.Error(err), zap.String("user_id", userID.String()))
 		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")

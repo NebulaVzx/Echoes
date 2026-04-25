@@ -60,6 +60,10 @@ export interface AISettings {
   ai_suggestion_max_retries?: number
 }
 
+export interface TagMeta {
+  color?: string
+}
+
 export interface UserSettings extends LLMSettings {
   search_similarity_threshold?: number
   rag_memory_limit?: number
@@ -68,6 +72,7 @@ export interface UserSettings extends LLMSettings {
   ai_suggestion_style?: 'gentle' | 'practical' | 'inspiring'
   ai_suggestion_timeout?: number
   ai_suggestion_max_retries?: number
+  tag_metadata?: Record<string, TagMeta>
 }
 
 export interface UpdateSettingsRequest {
@@ -76,6 +81,7 @@ export interface UpdateSettingsRequest {
   rag?: RAGSettings
   pagination?: { mode?: 'load_more' | 'page_numbers' }
   ai?: AISettings
+  tags?: Record<string, TagMeta>
 }
 
 export interface AuthResponse {
@@ -119,6 +125,26 @@ export interface SearchResponse {
 export interface RelatedResponse {
   results: SearchResult[]
   memory_id: string
+}
+
+export interface TagInfo {
+  name: string
+  count: number
+  last_updated_at: string
+  related_tags?: string[]
+}
+
+export interface TagListResponse {
+  tags: TagInfo[]
+}
+
+export interface RelatedTagsResponse {
+  tag: string
+  related_tags: string[]
+}
+
+export interface SimilarTagsResponse {
+  pairs: { canonical: string; duplicate: string }[]
 }
 
 export interface AISuggestion {
@@ -331,11 +357,14 @@ class ApiClient {
     return this.request<CreateMemoryResponse>('POST', '/api/v1/memories', data)
   }
 
-  async listMemories(params?: { page?: number; limit?: number; tag?: string }): Promise<ApiResponse<ListMemoriesResponse>> {
+  async listMemories(params?: { page?: number; limit?: number; tag?: string; tags?: string[] }): Promise<ApiResponse<ListMemoriesResponse>> {
     const searchParams = new URLSearchParams()
     if (params?.page) searchParams.set('page', String(params.page))
     if (params?.limit) searchParams.set('limit', String(params.limit))
     if (params?.tag) searchParams.set('tag', params.tag)
+    if (params?.tags) {
+      params.tags.forEach(tag => searchParams.append('tags', tag))
+    }
     const query = searchParams.toString()
     return this.request<ListMemoriesResponse>('GET', `/api/v1/memories${query ? '?' + query : ''}`)
   }
@@ -375,6 +404,26 @@ class ApiClient {
     return this.request<unknown>('PATCH', `/api/v1/memories/${memoryId}/suggestion/feedback`, {
       user_feedback: feedback,
     })
+  }
+
+  // Tag endpoints
+  async getTags(): Promise<ApiResponse<TagListResponse>> {
+    return this.request<TagListResponse>('GET', '/api/v1/tags')
+  }
+
+  async getRelatedTags(tag: string): Promise<ApiResponse<RelatedTagsResponse>> {
+    return this.request<RelatedTagsResponse>('GET', `/api/v1/tags/${encodeURIComponent(tag)}/related`)
+  }
+
+  async mergeTags(sourceTag: string, targetTag: string): Promise<ApiResponse<{ affected: number }>> {
+    return this.request<{ affected: number }>('POST', '/api/v1/tags/merge', {
+      source_tag: sourceTag,
+      target_tag: targetTag,
+    })
+  }
+
+  async getSimilarTags(): Promise<ApiResponse<SimilarTagsResponse>> {
+    return this.request<SimilarTagsResponse>('GET', '/api/v1/tags/similar')
   }
 
   // Chat endpoints

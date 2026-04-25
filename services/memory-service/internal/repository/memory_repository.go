@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -19,7 +20,7 @@ type MemoryRepository interface {
 	Create(ctx context.Context, memory *domain.Memory) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Memory, error)
 	GetVectorByID(ctx context.Context, id uuid.UUID) (string, error)
-	ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tag string) ([]domain.Memory, int64, error)
+	ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string) ([]domain.Memory, int64, error)
 	Update(ctx context.Context, memory *domain.Memory) error
 	UpdateVector(ctx context.Context, id uuid.UUID, vector string) error
 	Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
@@ -56,13 +57,14 @@ func (r *GormMemoryRepository) GetByID(ctx context.Context, id uuid.UUID) (*doma
 }
 
 // ListByUser retrieves memories for a user with pagination and optional tag filter.
-func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tag string) ([]domain.Memory, int64, error) {
+// Supports multi-tag AND filtering using tags @> ARRAY[...].
+func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string) ([]domain.Memory, int64, error) {
 	var memories []domain.Memory
 	var total int64
 
 	query := r.db.WithContext(ctx).Model(&domain.Memory{}).Where("user_id = ?", userID)
-	if tag != "" {
-		query = query.Where("? = ANY(tags)", tag)
+	if len(tags) > 0 {
+		query = query.Where("tags @> ?", pq.Array(tags))
 	}
 
 	if err := query.Count(&total).Error; err != nil {

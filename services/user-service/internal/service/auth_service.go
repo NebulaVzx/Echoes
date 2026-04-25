@@ -220,6 +220,20 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 		}
 	}
 
+	// Update tag metadata if provided (Phase 9)
+	if req.Tags != nil {
+		if existing.TagMetadata == nil {
+			existing.TagMetadata = make(map[string]domain.TagMeta)
+		}
+		for tag, meta := range req.Tags {
+			if meta.Color == "" {
+				delete(existing.TagMetadata, tag)
+			} else {
+				existing.TagMetadata[tag] = meta
+			}
+		}
+	}
+
 	settingsJSON, err := json.Marshal(existing)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal settings: %w", err)

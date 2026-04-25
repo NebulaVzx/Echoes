@@ -74,6 +74,11 @@ type PaginationSettings struct {
 	Mode string `json:"mode,omitempty" binding:"omitempty,oneof=load_more page_numbers"`
 }
 
+// TagMeta represents metadata for a single tag.
+type TagMeta struct {
+	Color string `json:"color,omitempty"`
+}
+
 // UserSettings represents the complete user settings.
 type UserSettings struct {
 	LLMSettings
@@ -85,6 +90,8 @@ type UserSettings struct {
 	AISuggestionStyle      string `json:"ai_suggestion_style,omitempty" binding:"omitempty,oneof=gentle practical inspiring"`
 	AISuggestionTimeout    int    `json:"ai_suggestion_timeout,omitempty" binding:"omitempty,gte=10,lte=60"`
 	AISuggestionMaxRetries int    `json:"ai_suggestion_max_retries,omitempty" binding:"omitempty,gte=1,lte=5"`
+	// Tag metadata (Phase 9)
+	TagMetadata map[string]TagMeta `json:"tag_metadata,omitempty"`
 }
 
 // UpdateSettingsRequest represents a request to update user settings.
@@ -94,6 +101,7 @@ type UpdateSettingsRequest struct {
 	RAG        *RAGSettings        `json:"rag,omitempty"`
 	Pagination *PaginationSettings `json:"pagination,omitempty"`
 	AI         *AISettings         `json:"ai,omitempty"`
+	Tags       map[string]TagMeta  `json:"tags,omitempty"`
 }
 
 // TestLLMRequest represents a request to test LLM connectivity.

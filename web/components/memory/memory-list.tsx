@@ -32,9 +32,11 @@ interface MemoryListProps {
   hasMore?: boolean
   onLoadMore?: () => void
   isLoadingMore?: boolean
+  tagColors?: Record<string, string>
+  onTagClick?: (tag: string) => void
 }
 
-export default function MemoryList({ memories, hasMore, onLoadMore, isLoadingMore }: MemoryListProps) {
+export default function MemoryList({ memories, hasMore, onLoadMore, isLoadingMore, tagColors, onTagClick }: MemoryListProps) {
   return (
     <>
       <motion.div
@@ -45,7 +47,7 @@ export default function MemoryList({ memories, hasMore, onLoadMore, isLoadingMor
       >
         {memories.map((memory) => (
           <motion.div key={memory.id} variants={itemVariants}>
-            <MemoryCard memory={memory} />
+            <MemoryCard memory={memory} tagColors={tagColors} onTagClick={onTagClick} />
           </motion.div>
         ))}
       </motion.div>
