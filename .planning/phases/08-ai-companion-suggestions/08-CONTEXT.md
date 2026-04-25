@@ -127,14 +127,20 @@ CREATE INDEX idx_ai_suggestions_memory_id ON ai_suggestions(memory_id);
 
 ### 5. 失败与降级 — 静默处理 + 内部监控
 
-**D-11: 静默降级原则**
-- LLM 生成失败 → 不展示建议区域，前端无任何变化
-- 内容过短（< 15 字）→ 跳过生成，`suggestion_status: "skipped"`
-- 生成超时（> 15 秒）→ 自动放弃
-- 用户侧无感知，保持"不打扰"原则
+**D-11: 生成保证原则 — 只要开关开启，每条记忆必须有建议**
+- **不跳过任何内容**：无论内容长短（哪怕只有 1 个字），都生成建议
+- **超时后自动重试**：首次超时（默认 30 秒）→ 自动重试，最多 3 次，指数退避（1s / 2s / 4s）
+- **重试全部失败后**：标记为 `suggestion_status: "failed"`，但用户侧仍显示「AI 暂时没想好，稍后再来看看吧~」而非空白
+- **永不静默忽略**：前端始终有展示区域，只是内容可能是占位文案或实际建议
 
-**D-12: 内部监控**
-- 失败时记录结构化日志（Zap）：memory_id, error, model, latency
+**D-12: 用户可配置阈值（Settings 页面）**
+- `ai_suggestion_timeout`: 单次生成超时时间（10-60 秒，默认 30 秒）
+- `ai_suggestion_max_retries`: 最大重试次数（1-5 次，默认 3 次）
+- 存储在 `users.settings` JSONB 中
+- 高级选项默认折叠，普通用户不感知
+
+**D-13: 内部监控**
+- 失败时记录结构化日志（Zap）：memory_id, error, model, latency, retry_count
 - 定期查看失败率，用于优化 Prompt 或模型配置
 
 ### 6. 用户反馈机制
