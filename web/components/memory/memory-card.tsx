@@ -1,8 +1,10 @@
 'use client'
 
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Memory } from '@/lib/api'
+import { Sparkles } from 'lucide-react'
+import { api, Memory } from '@/lib/api'
 
 interface MemoryCardProps {
   memory: Memory
@@ -43,6 +45,26 @@ export default function MemoryCard({ memory }: MemoryCardProps) {
   const isLink = memory.content_type === 'link'
   const isProcessing = memory.processing_status === 'pending' || memory.processing_status === 'processing'
 
+  const [hasSuggestion, setHasSuggestion] = useState(false)
+  const [suggestionPreview, setSuggestionPreview] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    const checkSuggestion = async () => {
+      try {
+        const response = await api.getSuggestion(memory.id)
+        if (!cancelled && response.success && response.data) {
+          setHasSuggestion(true)
+          setSuggestionPreview(response.data.content)
+        }
+      } catch {
+        // No suggestion or error — keep hidden
+      }
+    }
+    checkSuggestion()
+    return () => { cancelled = true }
+  }, [memory.id])
+
   return (
     <motion.div
       whileHover={{ scale: 1.01 }}
@@ -71,6 +93,15 @@ export default function MemoryCard({ memory }: MemoryCardProps) {
             </div>
             <div className="flex items-center gap-2">
               {isProcessing && <StatusDot status={memory.processing_status} />}
+              {hasSuggestion && (
+                <div className="group/suggestion relative">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500" />
+                  <div className="absolute right-0 bottom-full mb-2 w-48 p-2.5 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg shadow-lg z-20 opacity-0 group-hover/suggestion:opacity-100 transition-opacity pointer-events-none">
+                    <p className="line-clamp-2">{suggestionPreview.substring(0, 60)}{suggestionPreview.length > 60 ? '...' : ''}</p>
+                    <div className="absolute right-2 top-full w-2 h-2 bg-gray-900 dark:bg-gray-700 rotate-45 -mt-1" />
+                  </div>
+                </div>
+              )}
               <span className="text-xs text-gray-400 dark:text-gray-500">
                 {formatDate(memory.created_at)}
               </span>
