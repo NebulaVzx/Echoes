@@ -94,3 +94,9 @@ Content: {content[:2000]}"""
                     raise
                 await asyncio.sleep(1)
         raise RuntimeError("Anthropic chat failed after 3 attempts")
+
+    async def generate_suggestion(self, prompt: str, temperature: float = None, max_tokens: int = 200) -> str:
+        """Generate a suggestion using the standard generate with suggestion-optimized defaults."""
+        # Suggestions should be warm and slightly creative; use temperature 0.8 default
+        temp = temperature if temperature is not None else 0.8
+        return await self.generate(prompt, temperature=temp, max_tokens=max_tokens)
