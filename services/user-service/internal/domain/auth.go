@@ -80,6 +80,11 @@ type UserSettings struct {
 	SearchSimilarityThreshold float64 `json:"search_similarity_threshold,omitempty" binding:"omitempty,gte=0,lte=1"`
 	RAGMemoryLimit            int     `json:"rag_memory_limit,omitempty" binding:"omitempty,gte=1,lte=20"`
 	PaginationMode            string  `json:"pagination_mode,omitempty" binding:"omitempty,oneof=load_more page_numbers"`
+	// AI Suggestion settings (Phase 8)
+	AISuggestionEnabled    bool   `json:"ai_suggestion_enabled,omitempty" binding:"omitempty"`
+	AISuggestionStyle      string `json:"ai_suggestion_style,omitempty" binding:"omitempty,oneof=gentle practical inspiring"`
+	AISuggestionTimeout    int    `json:"ai_suggestion_timeout,omitempty" binding:"omitempty,gte=10,lte=60"`
+	AISuggestionMaxRetries int    `json:"ai_suggestion_max_retries,omitempty" binding:"omitempty,gte=1,lte=5"`
 }
 
 // UpdateSettingsRequest represents a request to update user settings.
@@ -88,11 +93,20 @@ type UpdateSettingsRequest struct {
 	Search     *SearchSettings     `json:"search,omitempty"`
 	RAG        *RAGSettings        `json:"rag,omitempty"`
 	Pagination *PaginationSettings `json:"pagination,omitempty"`
+	AI         *AISettings         `json:"ai,omitempty"`
 }
 
 // TestLLMRequest represents a request to test LLM connectivity.
 type TestLLMRequest struct {
 	LLM LLMSettings `json:"llm" binding:"required"`
+}
+
+// AISettings represents per-user AI suggestion configuration.
+type AISettings struct {
+	Enabled    bool   `json:"ai_suggestion_enabled,omitempty" binding:"omitempty"`
+	Style      string `json:"ai_suggestion_style,omitempty" binding:"omitempty,oneof=gentle practical inspiring"`
+	Timeout    int    `json:"ai_suggestion_timeout,omitempty" binding:"omitempty,gte=10,lte=60"`
+	MaxRetries int    `json:"ai_suggestion_max_retries,omitempty" binding:"omitempty,gte=1,lte=5"`
 }
 
 // GitHubOAuthState stores state for OAuth CSRF protection.

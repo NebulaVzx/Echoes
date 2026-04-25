@@ -53,10 +53,21 @@ export interface RAGSettings {
   rag_memory_limit: number
 }
 
+export interface AISettings {
+  ai_suggestion_enabled?: boolean
+  ai_suggestion_style?: 'gentle' | 'practical' | 'inspiring'
+  ai_suggestion_timeout?: number
+  ai_suggestion_max_retries?: number
+}
+
 export interface UserSettings extends LLMSettings {
   search_similarity_threshold?: number
   rag_memory_limit?: number
   pagination_mode?: 'load_more' | 'page_numbers'
+  ai_suggestion_enabled?: boolean
+  ai_suggestion_style?: 'gentle' | 'practical' | 'inspiring'
+  ai_suggestion_timeout?: number
+  ai_suggestion_max_retries?: number
 }
 
 export interface UpdateSettingsRequest {
@@ -64,6 +75,7 @@ export interface UpdateSettingsRequest {
   search?: SearchSettings
   rag?: RAGSettings
   pagination?: { mode?: 'load_more' | 'page_numbers' }
+  ai?: AISettings
 }
 
 export interface AuthResponse {
@@ -107,6 +119,20 @@ export interface SearchResponse {
 export interface RelatedResponse {
   results: SearchResult[]
   memory_id: string
+}
+
+export interface AISuggestion {
+  id: string
+  memory_id: string
+  content: string
+  suggestion_type?: 'emotion_support' | 'knowledge_expand' | 'action_suggest' | 'connection' | 'general'
+  created_at: string
+  user_feedback?: 'liked' | 'disliked' | 'ignored'
+}
+
+export interface CreateMemoryResponse {
+  memory: Memory
+  suggestion_status: 'pending' | 'completed' | 'skipped' | 'failed'
 }
 
 class ApiClient {
