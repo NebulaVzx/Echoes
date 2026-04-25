@@ -148,3 +148,21 @@ skipped: 3
   - NewMemoryService 调用增加 suggestionRepo 参数（mockSuggestionRepository）
   - PublishSuggestionGenerate mock 方法更新为新签名（增加 timeout, maxRetries）
   - 所有 svc.Create 调用更新为接收 3 个返回值
+
+**Frontend Issues Found and Fixed:**
+1. **Next.js dev server 500 错误** (`Cannot find module './154.js'`)
+   - 根因：`.next` 目录中的 webpack 缓存与 dev server 编译产物不一致（host build 和 dev server 共用同一目录导致冲突）
+   - 修复：删除 `.next` 目录并重启 dev server
+   - 验证：JS chunks 正常加载（200），不再返回 500
+
+2. **Playwright baseURL 配置错误**
+   - 根因：`playwright.config.ts` 中 `baseURL` 指向 `localhost:3000`（Docker backend），但 dev server 运行在 `3002`
+   - 修复：将 `baseURL` 从 `http://localhost:3000` 改为 `http://localhost:3002`
+   - 验证：settings.spec.ts 等测试可以正确访问前端
+
+3. **前端代码验证**
+   - `npm run build`：成功，8 条路由
+   - `npx tsc --noEmit`：无类型错误
+   - Settings 页面 AI 设置区域：代码完整（开启开关、风格选择、高级选项折叠）
+   - Create Memory Form：包含 `enableAISuggestion` toggle 和 `AISuggestionCard` 渲染
+   - AI Suggestion Card：轮询、反馈、动画、可关闭功能完整
