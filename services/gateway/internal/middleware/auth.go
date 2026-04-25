@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
+	stdpath "path"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -84,9 +84,9 @@ func JWTAuth() gin.HandlerFunc {
 }
 
 // isPublicRoute checks if the request path does not require authentication.
-// Uses filepath.Clean to normalize the path, preventing traversal bypass (CR-02).
+// Uses path.Clean to normalize the path, preventing traversal bypass (CR-02).
 func isPublicRoute(path string) bool {
-	cleanPath := filepath.Clean(path)
+	cleanPath := stdpath.Clean(path)
 	publicPaths := []string{
 		"/api/v1/auth/register",
 		"/api/v1/auth/login",
