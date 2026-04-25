@@ -29,21 +29,38 @@ const itemVariants = {
 
 interface MemoryListProps {
   memories: Memory[]
+  hasMore?: boolean
+  onLoadMore?: () => void
+  isLoadingMore?: boolean
 }
 
-export default function MemoryList({ memories }: MemoryListProps) {
+export default function MemoryList({ memories, hasMore, onLoadMore, isLoadingMore }: MemoryListProps) {
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="flex flex-col gap-5"
-    >
-      {memories.map((memory) => (
-        <motion.div key={memory.id} variants={itemVariants}>
-          <MemoryCard memory={memory} />
-        </motion.div>
-      ))}
-    </motion.div>
+    <>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="flex flex-col gap-5"
+      >
+        {memories.map((memory) => (
+          <motion.div key={memory.id} variants={itemVariants}>
+            <MemoryCard memory={memory} />
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {hasMore && onLoadMore && (
+        <div className="flex justify-center py-6">
+          <button
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            className="px-5 py-2.5 text-sm text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoadingMore ? '加载中...' : '加载更多'}
+          </button>
+        </div>
+      )}
+    </>
   )
 }

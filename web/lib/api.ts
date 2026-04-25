@@ -56,12 +56,14 @@ export interface RAGSettings {
 export interface UserSettings extends LLMSettings {
   search_similarity_threshold?: number
   rag_memory_limit?: number
+  pagination_mode?: 'load_more' | 'page_numbers'
 }
 
 export interface UpdateSettingsRequest {
   llm?: LLMSettings
   search?: SearchSettings
   rag?: RAGSettings
+  pagination?: { mode?: 'load_more' | 'page_numbers' }
 }
 
 export interface AuthResponse {
@@ -90,6 +92,7 @@ export interface ListMemoriesResponse {
   total: number
   page: number
   limit: number
+  has_more: boolean
 }
 
 export interface SearchResult extends Memory {
