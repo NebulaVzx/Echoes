@@ -376,7 +376,6 @@ func (s *MemoryService) GetSerendipity(ctx context.Context, userID uuid.UUID) (*
 	yearsAgo := 1
 
 	// Filter to memories from approximately 1 year ago (within a 30-day window)
-	oneYearAgo := now.AddDate(-1, 0, 0)
 	for i := range memories {
 		age := now.Sub(memories[i].CreatedAt).Hours() / 24
 		if age >= 335 && age <= 395 { // ~1 year with tolerance

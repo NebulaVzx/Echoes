@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
@@ -37,7 +38,7 @@ func (m *mockMemoryRepository) GetVectorByID(ctx context.Context, id uuid.UUID) 
 	return "", nil
 }
 
-func (m *mockMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string) ([]domain.Memory, int64, error) {
+func (m *mockMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool) ([]domain.Memory, int64, error) {
 	var results []domain.Memory
 	for _, mem := range m.memories {
 		if mem.UserID != userID {
@@ -113,6 +114,64 @@ func (m *mockMemoryRepository) SearchByVector(ctx context.Context, userID uuid.U
 
 func (m *mockMemoryRepository) FindRelated(ctx context.Context, userID uuid.UUID, memoryID uuid.UUID, vector string, limit int, threshold float64) ([]domain.SearchResult, error) {
 	return nil, nil
+}
+
+func (m *mockMemoryRepository) GetMemoriesByDateRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]domain.Memory, error) {
+	var results []domain.Memory
+	for _, mem := range m.memories {
+		if mem.UserID != userID {
+			continue
+		}
+		if mem.CreatedAt.After(start) && mem.CreatedAt.Before(end) {
+			results = append(results, *mem)
+		}
+	}
+	return results, nil
+}
+
+func (m *mockMemoryRepository) GetRandomMemory(ctx context.Context, userID uuid.UUID, before time.Time) (domain.Memory, error) {
+	for _, mem := range m.memories {
+		if mem.UserID == userID && mem.CreatedAt.Before(before) {
+			return *mem, nil
+		}
+	}
+	return domain.Memory{}, repository.ErrMemoryNotFound
+}
+
+func (m *mockMemoryRepository) GetMemoriesByDay(ctx context.Context, userID uuid.UUID, day time.Time) ([]domain.Memory, error) {
+	var results []domain.Memory
+	for _, mem := range m.memories {
+		if mem.UserID != userID {
+			continue
+		}
+		if mem.CreatedAt.Year() == day.Year() && mem.CreatedAt.YearDay() == day.YearDay() {
+			results = append(results, *mem)
+		}
+	}
+	return results, nil
+}
+
+func (m *mockMemoryRepository) GetMemoriesOnDate(ctx context.Context, userID uuid.UUID, month, day int) ([]domain.Memory, error) {
+	var results []domain.Memory
+	for _, mem := range m.memories {
+		if mem.UserID != userID {
+			continue
+		}
+		if int(mem.CreatedAt.Month()) == month && mem.CreatedAt.Day() == day {
+			results = append(results, *mem)
+		}
+	}
+	return results, nil
+}
+
+func (m *mockMemoryRepository) CountMemoriesSince(ctx context.Context, userID uuid.UUID, since time.Time) (int64, error) {
+	var count int64
+	for _, mem := range m.memories {
+		if mem.UserID == userID && mem.CreatedAt.After(since) {
+			count++
+		}
+	}
+	return count, nil
 }
 
 // mockUserRepository implements the memory-service's UserRepository for tests.
