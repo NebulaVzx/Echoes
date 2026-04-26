@@ -88,6 +88,12 @@ func (h *MemoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/memories/serendipity", h.GetSerendipity)
 	router.GET("/memories/daily-review", h.GetDailyReview)
 
+	// Time capsule routes
+	router.POST("/memories/:id/seal", h.SealMemory)
+	router.DELETE("/memories/:id/seal", h.UnsealMemory)
+	router.GET("/memories/sealed", h.ListSealedMemories)
+	router.GET("/memories/unsealed", h.GetRecentlyUnsealed)
+
 	// Suggestion routes (public, authenticated)
 	router.GET("/memories/:id/suggestion", h.GetSuggestion)
 	router.PATCH("/memories/:id/suggestion/feedback", h.UpdateSuggestionFeedback)
@@ -652,4 +658,114 @@ func (h *MemoryHandler) CreateSuggestion(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": suggestion})
+}
+
+// SealMemory handles POST /api/v1/memories/:id/seal
+func (h *MemoryHandler) SealMemory(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	memoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
+		return
+	}
+
+	var req domain.SealMemoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithValidationError(c, err)
+		return
+	}
+
+	if err := h.memoryService.SealMemory(c.Request.Context(), userID, memoryID, req.SealedUntil); err != nil {
+		if errors.Is(err, service.ErrInvalidRequest) {
+			respondWithError(c, http.StatusBadRequest, "INVALID_REQUEST", "Cannot seal to a past date")
+			return
+		}
+		zap.L().Error("failed to seal memory", zap.Error(err), zap.String("memory_id", memoryID.String()))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// UnsealMemory handles DELETE /api/v1/memories/:id/seal
+func (h *MemoryHandler) UnsealMemory(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	memoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
+		return
+	}
+
+	if err := h.memoryService.UnsealMemory(c.Request.Context(), userID, memoryID); err != nil {
+		zap.L().Error("failed to unseal memory", zap.Error(err), zap.String("memory_id", memoryID.String()))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// ListSealedMemories handles GET /api/v1/memories/sealed
+func (h *MemoryHandler) ListSealedMemories(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	page := 1
+	limit := 20
+	if p := c.Query("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 100 {
+			limit = v
+		}
+	}
+
+	resp, err := h.memoryService.ListSealedMemories(c.Request.Context(), userID, page, limit)
+	if err != nil {
+		zap.L().Error("failed to list sealed memories", zap.Error(err), zap.String("user_id", userID.String()))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": resp})
+}
+
+// GetRecentlyUnsealed handles GET /api/v1/memories/unsealed
+func (h *MemoryHandler) GetRecentlyUnsealed(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	memories, err := h.memoryService.GetRecentlyUnsealed(c.Request.Context(), userID)
+	if err != nil {
+		zap.L().Error("failed to get recently unsealed", zap.Error(err), zap.String("user_id", userID.String()))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		return
+	}
+
+	results := make([]map[string]interface{}, len(memories))
+	for i, m := range memories {
+		results[i] = m.SafeResponse()
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"memories": results}})
 }

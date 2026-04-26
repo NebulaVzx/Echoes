@@ -174,6 +174,61 @@ func (m *mockMemoryRepository) CountMemoriesSince(ctx context.Context, userID uu
 	return count, nil
 }
 
+func (m *mockMemoryRepository) SealMemory(ctx context.Context, userID, memoryID uuid.UUID, sealedUntil time.Time) error {
+	mem, ok := m.memories[memoryID]
+	if !ok {
+		return repository.ErrMemoryNotFound
+	}
+	if mem.UserID != userID {
+		return repository.ErrMemoryNotFound
+	}
+	mem.SealedUntil = &sealedUntil
+	return nil
+}
+
+func (m *mockMemoryRepository) UnsealMemory(ctx context.Context, userID, memoryID uuid.UUID) error {
+	mem, ok := m.memories[memoryID]
+	if !ok {
+		return repository.ErrMemoryNotFound
+	}
+	if mem.UserID != userID {
+		return repository.ErrMemoryNotFound
+	}
+	mem.SealedUntil = nil
+	return nil
+}
+
+func (m *mockMemoryRepository) ListSealedMemories(ctx context.Context, userID uuid.UUID, page, limit int) ([]domain.Memory, int64, error) {
+	var results []domain.Memory
+	now := time.Now()
+	for _, mem := range m.memories {
+		if mem.UserID == userID && mem.SealedUntil != nil && mem.SealedUntil.After(now) {
+			results = append(results, *mem)
+		}
+	}
+	total := int64(len(results))
+	offset := (page - 1) * limit
+	if offset >= len(results) {
+		return []domain.Memory{}, total, nil
+	}
+	end := offset + limit
+	if end > len(results) {
+		end = len(results)
+	}
+	return results[offset:end], total, nil
+}
+
+func (m *mockMemoryRepository) GetRecentlyUnsealed(ctx context.Context, userID uuid.UUID, since time.Time) ([]domain.Memory, error) {
+	var results []domain.Memory
+	now := time.Now()
+	for _, mem := range m.memories {
+		if mem.UserID == userID && mem.SealedUntil != nil && mem.SealedUntil.Before(now) && mem.SealedUntil.After(since) {
+			results = append(results, *mem)
+		}
+	}
+	return results, nil
+}
+
 // mockUserRepository implements the memory-service's UserRepository for tests.
 type mockUserRepo struct {
 	user *domain.User
