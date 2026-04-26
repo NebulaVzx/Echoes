@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { api, CreateMemoryResponse } from '@/lib/api'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 import { Sparkles } from 'lucide-react'
+import StreakIndicator from '@/components/warmth/streak-indicator'
 import AISuggestionCard from './ai-suggestion-card'
 
 interface CreateMemoryFormProps {
@@ -150,6 +151,8 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
       </ToastContainer>
 
       <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 p-5 min-h-[360px] flex flex-col">
+        <StreakIndicator />
+
         {/* Content type toggle */}
         <div className="flex gap-2 mb-4">
           {(['text', 'link'] as ContentType[]).map((type) => (
