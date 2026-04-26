@@ -247,7 +247,7 @@ func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit 
 		limit = 20
 	}
 
-	memories, total, err := s.repo.ListByUser(ctx, userID, page, limit, tags)
+	memories, total, err := s.repo.ListByUser(ctx, userID, page, limit, tags, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list memories: %w", err)
 	}
@@ -265,6 +265,209 @@ func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit 
 		Page:     page,
 		Limit:    limit,
 		HasMore:  hasMore,
+	}, nil
+}
+
+// GetStreak calculates the user's current and longest recording streaks.
+// Uses grace-based logic: allows a 1-day gap before breaking the streak.
+func (s *MemoryService) GetStreak(ctx context.Context, userID uuid.UUID) (int, int, bool, error) {
+	// Fetch all non-sealed memories for the user, ordered by creation date desc
+	memories, err := s.repo.GetMemoriesByDateRange(ctx, userID, time.Time{}, time.Now())
+	if err != nil {
+		return 0, 0, false, fmt.Errorf("failed to fetch memories for streak: %w", err)
+	}
+	if len(memories) == 0 {
+		return 0, 0, false, nil
+	}
+
+	// Extract unique dates (normalized to UTC midnight)
+	dateSet := make(map[string]bool)
+	var dates []time.Time
+	for _, m := range memories {
+		dateKey := m.CreatedAt.UTC().Format("2006-01-02")
+		if !dateSet[dateKey] {
+			dateSet[dateKey] = true
+			// Normalize to midnight UTC for consistent gap calculation
+			normalized := time.Date(m.CreatedAt.UTC().Year(), m.CreatedAt.UTC().Month(), m.CreatedAt.UTC().Day(), 0, 0, 0, 0, time.UTC)
+			dates = append(dates, normalized)
+		}
+	}
+
+	// Sort dates descending (most recent first)
+	for i := 0; i < len(dates)-1; i++ {
+		for j := i + 1; j < len(dates); j++ {
+			if dates[i].Before(dates[j]) {
+				dates[i], dates[j] = dates[j], dates[i]
+			}
+		}
+	}
+
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	yesterday := today.Add(-24 * time.Hour)
+
+	hasRecordedToday := false
+	if len(dates) > 0 && dates[0].Equal(today) {
+		hasRecordedToday = true
+	}
+
+	// Calculate current streak with 1-day grace period
+	currentStreak := 0
+	if hasRecordedToday {
+		currentStreak = 1
+	} else if len(dates) > 0 && dates[0].Equal(yesterday) {
+		// Grace: recorded yesterday, today is still within grace
+		currentStreak = 1
+	}
+
+	for i := 1; i < len(dates); i++ {
+		gap := dates[i-1].Sub(dates[i]).Hours() / 24
+		if gap <= 2 { // Within 2 days = consecutive with grace (1-day gap allowed)
+			if currentStreak == 0 {
+				// Starting from a grace period
+				if dates[i-1].Equal(yesterday) && dates[i].Before(yesterday.Add(-24*time.Hour)) {
+					break
+				}
+			}
+			currentStreak++
+		} else {
+			break
+		}
+	}
+
+	// Calculate longest streak
+	longestStreak := 0
+	if len(dates) > 0 {
+		longestStreak = 1
+	}
+	currentRun := 1
+	for i := 1; i < len(dates); i++ {
+		gap := dates[i-1].Sub(dates[i]).Hours() / 24
+		if gap <= 2 {
+			currentRun++
+			if currentRun > longestStreak {
+				longestStreak = currentRun
+			}
+		} else {
+			currentRun = 1
+		}
+	}
+
+	return currentStreak, longestStreak, hasRecordedToday, nil
+}
+
+// GetSerendipity returns a "that day in history" memory for the user.
+// Prioritizes a memory from exactly 1 year ago; falls back to a random old memory.
+func (s *MemoryService) GetSerendipity(ctx context.Context, userID uuid.UUID) (*domain.SerendipityResponse, error) {
+	now := time.Now()
+
+	// Try to find memory from exactly 1 year ago (same month/day)
+	memories, err := s.repo.GetMemoriesOnDate(ctx, userID, int(now.Month()), now.Day())
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch memories on date: %w", err)
+	}
+
+	var selected *domain.Memory
+	yearsAgo := 1
+
+	// Filter to memories from approximately 1 year ago (within a 30-day window)
+	oneYearAgo := now.AddDate(-1, 0, 0)
+	for i := range memories {
+		age := now.Sub(memories[i].CreatedAt).Hours() / 24
+		if age >= 335 && age <= 395 { // ~1 year with tolerance
+			selected = &memories[i]
+			break
+		}
+	}
+
+	// Fallback: random memory older than 30 days
+	if selected == nil {
+		cutoff := now.AddDate(0, 0, -30)
+		randomMem, err := s.repo.GetRandomMemory(ctx, userID, cutoff)
+		if err != nil {
+			if errors.Is(err, repository.ErrMemoryNotFound) {
+				return nil, ErrMemoryNotFound
+			}
+			return nil, fmt.Errorf("failed to fetch random memory: %w", err)
+		}
+		selected = &randomMem
+		yearsAgo = 0
+	}
+
+	// Count memories created since the selected memory
+	countSince, err := s.repo.CountMemoriesSince(ctx, userID, selected.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count memories since: %w", err)
+	}
+
+	return &domain.SerendipityResponse{
+		Memory:        selected,
+		MemoriesSince: int(countSince),
+		YearsAgo:      yearsAgo,
+	}, nil
+}
+
+// GetDailyReview returns daily stats: today's count, top tags, and a memory worth reviewing.
+func (s *MemoryService) GetDailyReview(ctx context.Context, userID uuid.UUID) (*domain.DailyReview, error) {
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	// Get today's memories
+	todayMemories, err := s.repo.GetMemoriesByDateRange(ctx, userID, startOfDay, endOfDay)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch today's memories: %w", err)
+	}
+
+	// Count and extract top tags
+	tagCounts := make(map[string]int)
+	for _, m := range todayMemories {
+		for _, tag := range m.Tags {
+			tagCounts[tag]++
+		}
+	}
+
+	// Get top 3 tags by frequency
+	type tagCount struct {
+		Tag   string
+		Count int
+	}
+	var tagList []tagCount
+	for tag, count := range tagCounts {
+		tagList = append(tagList, tagCount{Tag: tag, Count: count})
+	}
+	for i := 0; i < len(tagList)-1; i++ {
+		for j := i + 1; j < len(tagList); j++ {
+			if tagList[i].Count < tagList[j].Count {
+				tagList[i], tagList[j] = tagList[j], tagList[i]
+			}
+		}
+	}
+
+	topTags := make([]string, 0, 3)
+	for i := 0; i < len(tagList) && i < 3; i++ {
+		topTags = append(topTags, tagList[i].Tag)
+	}
+
+	// Find a memory worth reviewing: old, has tags/content, not from today
+	var worthReviewing *domain.Memory
+	cutoff := now.AddDate(0, 0, -30)
+	oldMemories, err := s.repo.GetMemoriesByDateRange(ctx, userID, time.Time{}, cutoff)
+	if err == nil && len(oldMemories) > 0 {
+		// Pick the one with the most tags (proxy for "rich content")
+		best := oldMemories[0]
+		for _, m := range oldMemories {
+			if len(m.Tags) > len(best.Tags) {
+				best = m
+			}
+		}
+		worthReviewing = &best
+	}
+
+	return &domain.DailyReview{
+		TodayCount:     len(todayMemories),
+		TopTags:        topTags,
+		WorthReviewing: worthReviewing,
 	}, nil
 }
 
