@@ -5,6 +5,7 @@ import { api, CreateMemoryResponse } from '@/lib/api'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 import { Sparkles } from 'lucide-react'
 import StreakIndicator from '@/components/warmth/streak-indicator'
+import TimeCapsuleToggle from '@/components/warmth/time-capsule-toggle'
 import AISuggestionCard from './ai-suggestion-card'
 
 interface CreateMemoryFormProps {
@@ -22,6 +23,7 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
   const [note, setNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [enableAISuggestion, setEnableAISuggestion] = useState(false)
+  const [sealedUntil, setSealedUntil] = useState<string | null>(null)
   const [lastCreatedMemory, setLastCreatedMemory] = useState<CreateMemoryResponse | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const tagInputRef = useRef<HTMLInputElement>(null)
@@ -90,6 +92,7 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
       tags?: string[]
       note?: string
       enable_ai_suggestion?: boolean
+      sealed_until?: string
     } = {
       content_type: contentType,
       enable_ai_suggestion: enableAISuggestion,
@@ -115,6 +118,9 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
     if (note.trim()) {
       data.note = note.trim()
     }
+    if (sealedUntil) {
+      data.sealed_until = sealedUntil
+    }
 
     setIsSubmitting(true)
     try {
@@ -125,6 +131,7 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
         setTagList([])
         setTagInput('')
         setNote('')
+        setSealedUntil(null)
         setLastCreatedMemory(response.data)
         showToast('记忆已保存', 'success')
         onSuccess?.()
@@ -252,6 +259,9 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
             <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-400 dark:peer-focus:ring-amber-500 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:border-gray-500 peer-checked:bg-amber-500 dark:peer-checked:bg-amber-600" />
           </label>
         </div>
+
+        {/* Time Capsule Toggle */}
+        <TimeCapsuleToggle sealedUntil={sealedUntil} onChange={setSealedUntil} />
 
         <button
           type="submit"
