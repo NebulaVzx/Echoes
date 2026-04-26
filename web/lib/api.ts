@@ -103,6 +103,7 @@ export interface Memory {
   note?: string
   processing_status: 'pending' | 'processing' | 'completed' | 'failed'
   visibility: 'private' | 'public'
+  sealed_until?: string
   created_at: string
   updated_at: string
 }

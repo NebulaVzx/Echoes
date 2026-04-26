@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { Lock, Unlock } from 'lucide-react'
 import { api, Memory } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
 import { useTheme } from '@/app/providers/theme-provider'
@@ -170,6 +171,23 @@ export default function MemoryDetailPage() {
       showToast(err instanceof Error ? err.message : '删除失败', 'error')
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleSeal = async () => {
+    // Default seal for 30 days from detail page
+    const d = new Date()
+    d.setDate(d.getDate() + 30)
+    const res = await api.sealMemory(memoryId, d.toISOString())
+    if (res.success) {
+      setMemory(prev => prev ? { ...prev, sealed_until: d.toISOString() } : prev)
+    }
+  }
+
+  const handleUnseal = async () => {
+    const res = await api.unsealMemory(memoryId)
+    if (res.success) {
+      setMemory(prev => prev ? { ...prev, sealed_until: undefined } : prev)
     }
   }
 
@@ -340,6 +358,23 @@ export default function MemoryDetailPage() {
             >
               返回
             </Link>
+            {memory.sealed_until ? (
+              <button
+                onClick={handleUnseal}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+              >
+                <Unlock className="w-4 h-4" />
+                解除封印（{new Date(memory.sealed_until).toLocaleDateString('zh-CN')} 解锁）
+              </button>
+            ) : (
+              <button
+                onClick={handleSeal}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              >
+                <Lock className="w-4 h-4" />
+                封印这段记忆
+              </button>
+            )}
             <button
               onClick={handleDelete}
               disabled={isDeleting}
