@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers/auth-provider'
 import { ChatProvider, useChat } from '@/app/providers/chat-provider'
 import { api, Memory } from '@/lib/api'
@@ -53,6 +53,7 @@ export default function HomePageWrapper() {
 
 function HomePage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const { user, isLoading: authLoading, logout } = useAuth()
   const {
     isOpen,
@@ -140,22 +141,35 @@ function HomePage() {
     }
   }, [])
 
+  // Update URL to reflect current tag selection
+  const updateTagURL = useCallback((tags: string[]) => {
+    const params = new URLSearchParams()
+    tags.forEach(t => params.append('tags', t))
+    const query = params.toString()
+    router.replace(query ? `/?${query}` : '/', { scroll: false })
+  }, [router])
+
   const handleTagToggle = useCallback((tag: string) => {
-    setSelectedTags(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-    )
-  }, [])
+    setSelectedTags(prev => {
+      const next = prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+      updateTagURL(next)
+      return next
+    })
+  }, [updateTagURL])
 
   const handleClearAllTags = useCallback(() => {
     setSelectedTags([])
-  }, [])
+    router.replace('/', { scroll: false })
+  }, [router])
 
   const handleTagClickFromCard = useCallback((tag: string) => {
     setSelectedTags(prev => {
       if (prev.includes(tag)) return prev
-      return [...prev, tag]
+      const next = [...prev, tag]
+      updateTagURL(next)
+      return next
     })
-  }, [])
+  }, [updateTagURL])
 
   // Sync selectedTags from URL query params on mount / external navigation
   useEffect(() => {
