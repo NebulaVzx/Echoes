@@ -83,6 +83,11 @@ func (h *MemoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/search", h.Search)
 	router.GET("/memories/:id/related", h.GetRelated)
 
+	// Warmth routes (streaks, serendipity, daily review)
+	router.GET("/memories/streaks", h.GetStreak)
+	router.GET("/memories/serendipity", h.GetSerendipity)
+	router.GET("/memories/daily-review", h.GetDailyReview)
+
 	// Suggestion routes (public, authenticated)
 	router.GET("/memories/:id/suggestion", h.GetSuggestion)
 	router.PATCH("/memories/:id/suggestion/feedback", h.UpdateSuggestionFeedback)
@@ -536,6 +541,86 @@ func (h *MemoryHandler) UpdateSuggestionFeedback(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// GetStreak handles GET /api/v1/memories/streaks
+func (h *MemoryHandler) GetStreak(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	current, longest, hasToday, err := h.memoryService.GetStreak(c.Request.Context(), userID)
+	if err != nil {
+		zap.L().Error("failed to get streak", zap.Error(err), zap.String("user_id", userID.String()))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"current_streak":     current,
+			"longest_streak":     longest,
+			"has_recorded_today": hasToday,
+		},
+	})
+}
+
+// GetSerendipity handles GET /api/v1/memories/serendipity
+func (h *MemoryHandler) GetSerendipity(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	resp, err := h.memoryService.GetSerendipity(c.Request.Context(), userID)
+	if err != nil {
+		if errors.Is(err, service.ErrMemoryNotFound) {
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "No memories found for serendipity")
+			return
+		}
+		zap.L().Error("failed to get serendipity", zap.Error(err), zap.String("user_id", userID.String()))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"memory":         resp.Memory.SafeResponse(),
+			"memories_since": resp.MemoriesSince,
+			"years_ago":      resp.YearsAgo,
+		},
+	})
+}
+
+// GetDailyReview handles GET /api/v1/memories/daily-review
+func (h *MemoryHandler) GetDailyReview(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	review, err := h.memoryService.GetDailyReview(c.Request.Context(), userID)
+	if err != nil {
+		zap.L().Error("failed to get daily review", zap.Error(err), zap.String("user_id", userID.String()))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		return
+	}
+
+	data := gin.H{
+		"today_count": review.TodayCount,
+		"top_tags":    review.TopTags,
+	}
+	if review.WorthReviewing != nil {
+		data["worth_reviewing"] = review.WorthReviewing.SafeResponse()
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": data})
 }
 
 // CreateSuggestion handles POST /api/v1/internal/memories/:id/suggestion
