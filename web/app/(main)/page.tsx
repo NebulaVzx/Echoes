@@ -18,6 +18,7 @@ import Pagination from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 import { Sparkles } from 'lucide-react'
+import UnlockCeremony from '@/components/warmth/unlock-ceremony'
 import SerendipityCard from '@/components/warmth/serendipity-card'
 import DailyReviewCard from '@/components/warmth/daily-review-card'
 
@@ -306,6 +307,7 @@ function HomePage() {
       {/* Main content */}
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Warmth cards */}
+        <UnlockCeremony />
         <SerendipityCard />
         <DailyReviewCard />
 
