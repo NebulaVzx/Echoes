@@ -32,6 +32,12 @@ type MemoryRepository interface {
 	Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
 	SearchByVector(ctx context.Context, userID uuid.UUID, vector string, limit int, threshold float64) ([]domain.SearchResult, error)
 	FindRelated(ctx context.Context, userID uuid.UUID, memoryID uuid.UUID, vector string, limit int, threshold float64) ([]domain.SearchResult, error)
+
+	// Time capsule operations
+	SealMemory(ctx context.Context, userID, memoryID uuid.UUID, sealedUntil time.Time) error
+	UnsealMemory(ctx context.Context, userID, memoryID uuid.UUID) error
+	ListSealedMemories(ctx context.Context, userID uuid.UUID, page, limit int) ([]domain.Memory, int64, error)
+	GetRecentlyUnsealed(ctx context.Context, userID uuid.UUID, since time.Time) ([]domain.Memory, error)
 }
 
 // GormMemoryRepository implements MemoryRepository using GORM.
@@ -283,4 +289,52 @@ func (r *GormMemoryRepository) FindRelated(ctx context.Context, userID uuid.UUID
 		return nil, err
 	}
 	return results, nil
+}
+
+// SealMemory sets the sealed_until field for a memory, ensuring it belongs to the user.
+func (r *GormMemoryRepository) SealMemory(ctx context.Context, userID, memoryID uuid.UUID, sealedUntil time.Time) error {
+	return r.db.WithContext(ctx).
+		Model(&domain.Memory{}).
+		Where("id = ? AND user_id = ?", memoryID, userID).
+		Update("sealed_until", sealedUntil).Error
+}
+
+// UnsealMemory clears the sealed_until field for a memory, ensuring it belongs to the user.
+func (r *GormMemoryRepository) UnsealMemory(ctx context.Context, userID, memoryID uuid.UUID) error {
+	return r.db.WithContext(ctx).
+		Model(&domain.Memory{}).
+		Where("id = ? AND user_id = ?", memoryID, userID).
+		Update("sealed_until", nil).Error
+}
+
+// ListSealedMemories retrieves paginated memories that are currently sealed (sealed_until > NOW()).
+func (r *GormMemoryRepository) ListSealedMemories(ctx context.Context, userID uuid.UUID, page, limit int) ([]domain.Memory, int64, error) {
+	var memories []domain.Memory
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&domain.Memory{}).
+		Where("user_id = ?", userID).
+		Where("sealed_until > ?", time.Now())
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * limit
+	err := query.Order("sealed_until ASC").Offset(offset).Limit(limit).Find(&memories).Error
+	return memories, total, err
+}
+
+// GetRecentlyUnsealed retrieves memories whose seal expired recently (within the given since time).
+func (r *GormMemoryRepository) GetRecentlyUnsealed(ctx context.Context, userID uuid.UUID, since time.Time) ([]domain.Memory, error) {
+	var memories []domain.Memory
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Where("sealed_until IS NOT NULL").
+		Where("sealed_until <= ?", time.Now()).
+		Where("sealed_until >= ?", since).
+		Where("updated_at >= ?", since).
+		Order("sealed_until DESC").
+		Find(&memories).Error
+	return memories, err
 }
