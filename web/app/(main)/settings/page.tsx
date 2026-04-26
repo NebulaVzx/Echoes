@@ -8,6 +8,7 @@ import { api, LLMSettings, UserSettings } from '@/lib/api'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
+import { Flame, Trophy } from 'lucide-react'
 
 const settingsSchema = z.object({
   llm_provider: z.string().min(1, '提供商名称不能为空').max(50),
@@ -82,6 +83,9 @@ export default function SettingsPage() {
   const [isSavingUI, setIsSavingUI] = useState(false)
   const [isSavingAI, setIsSavingAI] = useState(false)
 
+  // Streak stats
+  const [streakData, setStreakData] = useState<{ current_streak: number; longest_streak: number; has_recorded_today: boolean } | null>(null)
+
   // Test connection state
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
 
@@ -124,6 +128,15 @@ export default function SettingsPage() {
 
   // Track last tested connection values
   const lastTestedRef = useRef<Partial<SettingsFormData> | null>(null)
+
+  // Load streak data
+  useEffect(() => {
+    api.getStreaks().then((res) => {
+      if (res.success && res.data) {
+        setStreakData(res.data)
+      }
+    }).catch(() => {})
+  }, [])
 
   // Load existing settings
   useEffect(() => {
@@ -437,6 +450,67 @@ export default function SettingsPage() {
       </ToastContainer>
 
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+        {/* Section 0: Memory Stats */}
+        <section className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-1">
+            记忆统计
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            记录是一种温柔的习惯
+          </p>
+
+          <div className="space-y-5">
+            {/* Streak counters */}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Flame className={`w-5 h-5 ${streakData?.has_recorded_today ? 'text-orange-400' : 'text-gray-300 dark:text-gray-600'}`} />
+                <div>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
+                    {streakData?.current_streak || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">当前连续</p>
+                </div>
+              </div>
+              <div className="w-px h-10 bg-gray-200 dark:bg-gray-700" />
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-amber-400" />
+                <div>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
+                    {streakData?.longest_streak || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">最长连续</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Milestone badges */}
+            <div className="flex flex-wrap gap-2">
+              {[7, 30, 100].map((milestone) => {
+                const achieved = (streakData?.longest_streak || 0) >= milestone
+                return (
+                  <span
+                    key={milestone}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      achieved
+                        ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800/30'
+                        : 'bg-gray-50 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-600'
+                    }`}
+                  >
+                    <Flame className={`w-3 h-3 ${achieved ? 'text-orange-400' : 'text-gray-300 dark:text-gray-600'}`} />
+                    {milestone} 天
+                  </span>
+                )
+              })}
+            </div>
+
+            {streakData && streakData.current_streak === 0 && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                每天记录一点点， streak 就会从这里开始生长
+              </p>
+            )}
+          </div>
+        </section>
+
         {/* Section 1: LLM Connection */}
         <section className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-1">
