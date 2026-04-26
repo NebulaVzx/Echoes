@@ -135,6 +135,11 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 		Visibility:       "private",
 	}
 
+	// Set sealed_until if provided and is in the future
+	if req.SealedUntil != nil && req.SealedUntil.After(time.Now()) {
+		memory.SealedUntil = req.SealedUntil
+	}
+
 	if err := s.repo.Create(ctx, memory); err != nil {
 		return nil, "", fmt.Errorf("failed to create memory: %w", err)
 	}
