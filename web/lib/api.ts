@@ -441,6 +441,27 @@ class ApiClient {
     return this.request<CategorizeTagsResponse>('POST', '/api/v1/tags/categorize')
   }
 
+  // Time capsule endpoints
+  async sealMemory(id: string, sealedUntil: string): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('POST', `/api/v1/memories/${id}/seal`, { sealed_until: sealedUntil })
+  }
+
+  async unsealMemory(id: string): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('DELETE', `/api/v1/memories/${id}/seal`)
+  }
+
+  async listSealedMemories(params?: { page?: number; limit?: number }): Promise<ApiResponse<ListMemoriesResponse>> {
+    const searchParams = new URLSearchParams()
+    if (params?.page) searchParams.set('page', String(params.page))
+    if (params?.limit) searchParams.set('limit', String(params.limit))
+    const query = searchParams.toString()
+    return this.request<ListMemoriesResponse>('GET', `/api/v1/memories/sealed${query ? '?' + query : ''}`)
+  }
+
+  async getRecentlyUnsealed(): Promise<ApiResponse<{ memories: Memory[] }>> {
+    return this.request<{ memories: Memory[] }>('GET', '/api/v1/memories/unsealed')
+  }
+
   // Chat endpoints
   async sendMessage(data: SendMessageRequest): Promise<ApiResponse<SendMessageResponse>> {
     return this.request<SendMessageResponse>('POST', '/api/v1/chat/messages', data)
