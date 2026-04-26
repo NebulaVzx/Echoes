@@ -1,5 +1,5 @@
 ---
-phase: 14
+phase: 15
 name: mood-echo
 title: 情绪日历与每日回响
 description: AI分析记忆情绪倾向生成可视化日历，并每日推送一条旧记忆让用户与过去重逢
@@ -7,7 +7,7 @@ milestone: v1.3 "记忆的回响"
 depends_on: [14-memory-covers-weaving]
 ---
 
-# Phase 14 Context
+# Phase 15 Context
 
 ## 目标
 
@@ -36,3 +36,35 @@ depends_on: [14-memory-covers-weaving]
 - 情绪日历可展示全年 365 天数据
 - 每日回响点击率 > 50%
 - 回响语有温度、不煽情
+
+---
+
+## 跨平台兼容性考虑
+
+### 推送通知机制
+
+| 平台 | 推送方式 | 实现要点 |
+|------|---------|---------|
+| **桌面端 (Tauri)** | 系统原生通知 (`tauri::notification`) | 支持点击通知直接打开对应记忆 |
+| **Web/PWA** | Web Push API + Service Worker | iOS 16.4+ 才支持 PWA 推送，需做 feature detection |
+| **移动端 (未来 Expo)** | 原生推送 (FCM/APNs) | 最可靠，但需要独立 App |
+
+**回退策略**：如果推送不可用，每日回响在首页以可折叠卡片形式展示，用户主动打开时看到。
+
+### 情绪日历的交互适配
+
+- **桌面端**：全年热力图一次展示，hover 显示当天情绪和记忆摘要
+- **移动端**：默认月视图，左右滑动切换月份；点击某天进入当日详情页
+- **平板端**：支持横屏展示季度视图，竖屏展示月视图
+
+### 情绪分析的本地存储
+
+情绪分析结果是计算密集型（LLM 调用），分析完成后应缓存到本地：
+- 桌面端：SQLite 缓存（和 Tauri 本地数据库共用）
+- Web/PWA：IndexedDB 缓存
+- 移动端：同 Web
+
+### 不在本 Phase 做的事
+
+- ❌ 桌面端系统级日历集成（iCal/Outlook 同步情绪事件）—— 放到 v1.5+
+- ❌ 移动端 widget（iOS 14+ / Android widget）—— 需要原生开发， Expo 阶段再考虑

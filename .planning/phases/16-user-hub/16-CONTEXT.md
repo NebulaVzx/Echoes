@@ -4,7 +4,7 @@ name: user-hub
 title: 用户管理中心 — "我的数字孪生"
 description: 将传统的"账户设置"升级为"AI用户画像管理中心"，让用户管理自己的记忆DNA、AI助手人格、数据主权和学习路径
 milestone: v1.3 "记忆的回响"
-depends_on: [15-web-clipper-bridges]
+depends_on: [15-mood-echo]
 ---
 
 # Phase 16 Context
@@ -125,3 +125,38 @@ depends_on: [15-web-clipper-bridges]
 - AI 助手人格切换后，建议风格明显变化
 - 数据可一键导出为 Markdown
 - 基础账户功能（头像/密码/注销）可用
+
+---
+
+## 跨平台兼容性考虑
+
+### 数据导出的平台差异
+
+| 平台 | 导出体验 | 实现方式 |
+|------|---------|---------|
+| **桌面端 (Tauri)** | 最优：弹出保存对话框，用户选择本地文件夹 | `tauri::api::dialog::save` + 流式写入大文件 |
+| **Web/PWA** | 中等：浏览器自动下载到默认目录 | 生成 blob URL，创建 `<a download>` 触发下载 |
+| **移动端** | 受限：通过分享面板发送 | `navigator.share({ files: [file] })`，受 iOS/Android 分享限制 |
+
+**大数据量处理**：用户可能有 10,000+ 条记忆，导出不能阻塞 UI：
+- 桌面端：后台线程写入，显示进度条
+- Web/PWA：Service Worker 后台生成，完成后通知
+
+### 头像上传的统一
+
+三端统一使用 MinIO 存储，但选择方式不同：
+- 桌面端：文件选择器 + 拖拽图片到头像区域
+- 移动端：相机拍照 + 相册选择（`<input capture="environment">`）
+- 裁剪组件：统一使用 `react-cropper`，触摸事件需测试
+
+### 账户安全功能的平台差异
+
+- **双因素认证 (TOTP)**：三端统一，扫码绑定用 `qrcode.react`
+- **活跃会话管理**：桌面端可显示"本机"标识，移动端显示设备型号
+- **注销账户**：桌面端增加"导出数据后再注销"的强提示（因为本地文件不会被自动删除）
+
+### 不在本 Phase 做的事
+
+- ❌ 桌面端与系统钥匙串集成（macOS Keychain / Windows Credential）—— 安全增强，放到 v1.4+
+- ❌ 生物识别登录（Face ID / Touch ID / Windows Hello）—— 需要原生模块， Expo 阶段再考虑
+- ❌ 跨设备同步设置 —— 依赖 v1.4+ 的同步协议

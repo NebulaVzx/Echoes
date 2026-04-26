@@ -7,7 +7,7 @@ milestone: v1.3 "记忆的回响"
 depends_on: []
 ---
 
-# Phase 17 Context
+# Phase 11 Context
 
 ## 问题诊断
 
@@ -319,3 +319,126 @@ interface CommandPaletteState {
 - [ ] 主题色切换实时生效，无刷新
 - [ ] 所有现有页面在新布局下正常显示
 - [ ] 暗黑/亮色切换有过渡动画
+- [ ] PWA 基础配置完成（manifest、icons、service worker）
+- [ ] Tauri 桌面端最小可运行封装
+- [ ] 设计 Token 提取为 `shared/design-tokens`，与 Tailwind 解耦
+- [ ] 移动端（<768px）信息架构重组完成，非简单缩放
+
+---
+
+## 跨平台架构策略
+
+> **原则：最多两套前端** —— Web + 桌面端共享一套代码，移动端独立一套（先 PWA，后 Expo）。
+
+### 平台矩阵
+
+| 平台 | 技术方案 | 与 Web 共享程度 | 优先级 |
+|------|---------|----------------|--------|
+| **Web** | Next.js 14（现有） | 100% | P0 |
+| **桌面端** | Next.js + Tauri 2.0 封装 | 100%（同一套代码） | P1 |
+| **移动端** | PWA（响应式 + Service Worker） | 100%（同一套代码） | P1 |
+| **移动端（未来）** | Expo（React Native） | API + 设计 Token + 类型 | P2（v1.5+ 评估） |
+
+### 为什么桌面端用 Tauri 而不是 Electron？
+
+| 维度 | Tauri 2.0 | Electron |
+|------|-----------|----------|
+| 包体积 | ~3MB | ~150MB |
+| 内存占用 | 系统 WebView | 自带 Chromium |
+| 本地扩展 | Rust 侧可跑 SQLite/ONNX | Node.js 绑定 |
+| 安全模型 | 显式 API allowlist | nodeIntegration 风险 |
+| 未来扩展 | 与 Echoes 可能的 Rust 向量库天然兼容 | 额外依赖 |
+
+桌面端本质是**无边框浏览器窗口 + 系统级能力**（全局快捷键、本地文件系统、离线优先）。Next.js 代码零改动，仅需 `tauri.conf.json` 配置窗口参数。
+
+### 移动端：先 PWA，后 Expo
+
+**Phase 11-12 先落地 PWA**：
+- `manifest.json` + `icons` + `theme-color`
+- Service Worker 缓存静态资源（Workbox）
+- 响应式断点适配三栏 → 单栏折叠
+- 这已经能解决 80% 的移动场景（快速记录、查看回响、搜索记忆）
+
+**v1.5+ 再评估 Expo**：
+- 只有在数据表明用户高频使用移动端时，才投入独立 App 开发
+- 届时 API 层已稳定，只需重写 UI 层
+- Expo 可复用 `shared/api`、`shared/types`、`shared/design-tokens`
+
+### 共享层设计
+
+所有平台共用以下资产，避免重复定义：
+
+```
+shared/
+├── api/              # OpenAPI 规范或统一封装的 HTTP 客户端
+├── design-tokens/    # 颜色、间距、字体、断点（JSON / Tailwind preset）
+│   ├── colors.json
+│   ├── spacing.json
+│   └── breakpoints.json
+├── types/            # TypeScript 类型定义（Memory、User、Tag 等）
+└── i18n/             # 文案 JSON（支持未来多语言）
+```
+
+**桌面端和 Web 端**：直接 import `shared/design-tokens`，Tailwind 配置继承 preset。
+
+**移动端（Expo 阶段）**：React Native 可 import JSON token 文件，用 StyleSheet 动态映射。
+
+### 本地数据与离线策略
+
+Echoes 的核心体验是"搜索记忆"，离线时搜不到 = 体验断裂。
+
+| 平台 | 本地存储 | 角色 | 同步策略 |
+|------|---------|------|---------|
+| Web | IndexedDB（Dexie.js） | 缓存 | 在线时增量同步 |
+| Desktop (Tauri) | SQLite（Rust 侧） | **主库** | 本地优先，后台同步云端 |
+| Mobile (PWA) | IndexedDB | 缓存 | 同 Web |
+| Mobile (Expo) | SQLite / WatermelonDB | 主库 | 同 Desktop |
+
+**关键设计**：桌面端用 SQLite 作为本地主数据库，云端 PostgreSQL 作为备份/多设备同步。这让桌面端成为**体验最好的版本**（离线全功能、毫秒级搜索）。Web/PWA 阶段先保留 IndexedDB 缓存，未来再评估是否需要更复杂的同步协议。
+
+### 三栏布局的跨平台自然适配
+
+同一套组件代码，通过响应式状态机适配不同平台：
+
+```
+Desktop (≥1280px):
+[Sidebar 200px] | [Main adaptive] | [Right Panel 280px]
+    ↑                ↑                     ↑
+  常驻导航        主内容区              上下文面板
+
+Tablet (768-1279px):
+[Sidebar 200px] | [Main 100%]
+    ↑                ↑
+  常驻导航        右侧面板隐藏
+
+Mobile (<768px):
+[Main 100%]
+    ↑
+  底部 Dock：[拾][星][胶][标][我]
+  右侧面板 → 全屏 Modal / 新页面
+```
+
+**状态管理统一**：
+- `sidebarCollapsed`、`rightPanelVisible`、`rightPanelWidth` 在同一套 React Context 中管理
+- 桌面端默认 `rightPanelVisible = true`
+- 移动端默认 `rightPanelVisible = false`（触发时全屏覆盖）
+- 不需要为桌面端或移动端写分叉逻辑
+
+### 对 Phase 11 实现的具体影响
+
+| 任务 | 说明 |
+|------|------|
+| **提取设计 Token** | Tailwind 配置中的颜色、间距抽成 `shared/design-tokens/*.json`，供未来 Expo 复用 |
+| **PWA 基础** | 新增 `manifest.json`、`icons/`、`service-worker.ts`，注册在 `app/layout.tsx` |
+| **Tauri 配置** | 新建 `apps/desktop/` 目录，放置 `tauri.conf.json` 和最小 Rust 入口（~50 行） |
+| **响应式断点策略** | 明确三档：Mobile `< 768px`、Tablet `768-1279px`、Desktop `≥ 1280px`，不是"缩小"而是"信息架构重组" |
+| **离线缓存策略** | Service Worker 至少缓存：静态资源、最近 50 条记忆、用户设置 |
+
+### 不在 Phase 11 做的事情（明确排除）
+
+- ❌ **Expo 移动端 App** — 仅预留 `shared/` 结构，不实现
+- ❌ **桌面端 SQLite 主库** — Tauri 侧先只做最小封装，SQLite 迁移放在 v1.4+ 或独立 Phase
+- ❌ **跨设备实时同步协议** — 先依赖"刷新拉取"，CRDT/OT 是远期课题
+- ❌ **原生推送通知** — PWA 的 Web Push 是未来选项，Phase 11 不实现
+
+---
