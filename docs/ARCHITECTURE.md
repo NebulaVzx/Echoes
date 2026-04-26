@@ -1,8 +1,8 @@
 # 架构说明 (ARCHITECTURE)
 
 > Echoes (拾忆) 系统架构设计文档
-> 版本：v0.2.0（对应 Sprint 1：认证体系）
-> 日期：2026-04-18
+> 版本：v1.2.0（对应 v1.2 "记忆的温度"）
+> 日期：2026-04-26
 
 ## 1. 架构概述
 
@@ -86,11 +86,17 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
 
 #### Gateway Service
 - **职责**：统一入口，路由分发，认证鉴权
-- **端口**：8080（容器内），对外映射 8088
+- **端口**：8088（对外）
 - **路由规则**：
   - `/api/v1/auth/*` → User Service
   - `/api/v1/memories/*` → Memory Service
   - `/api/v1/search` → Memory Service
+  - `/api/v1/tags/*` → Memory Service
+  - `/api/v1/streaks` → Memory Service
+  - `/api/v1/serendipity` → Memory Service
+  - `/api/v1/daily-review` → Memory Service
+  - `/api/v1/capsules/*` → Memory Service
+  - `/api/v1/chat/*` → Memory Service (Echo Assistant)
 - **中间件**：JWT 验证、请求日志、限流
 
 #### User Service
@@ -110,9 +116,15 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
 - **缓存**：Redis
 - **核心功能**：
   - 记忆 CRUD（文字、链接）
-  - 标签管理
-  - 语义搜索（pgvector 余弦相似度）
+  - 语义搜索（pgvector 余弦相似度，用户可配置阈值）
   - 相似内容推荐
+  - 标签管理（列表、统计、合并、共现关联）
+  - 标签过滤（多选 AND）
+  - AI 陪伴建议（异步生成，三种风格）
+  - 记忆 Streaks（连续记录天数统计）
+  - 那年今日 / 每日回顾
+  - 时间胶囊（封印/解锁）
+  - Echo Assistant（RAG 对话）
   - 异步任务发布（Redis Stream）
 
 #### LLM Provider（共享模块）
@@ -123,7 +135,8 @@ Echoes 采用**微服务架构**，将系统拆分为独立部署的服务单元
   - `OpenAIProvider`：调用 GPT-3.5/4 API
   - `AnthropicProvider`：调用 Claude API
   - 工厂函数 `NewLLMProvider(provider string) LLMProvider`
-- **配置**：环境变量 `LLM_PROVIDER`（`openai` / `anthropic`）
+- **配置**：环境变量 `LLM_PROVIDER`（`openai` / `anthropic`）、`LLM_MODEL`、`LLM_TEMPERATURE`
+- **Per-user 配置**：`users.settings` JSONB 存储 provider / model / temperature，publish 时附加到 Redis Stream 消息
 - **降级策略**：LLM 失败时使用本地 TF-IDF 关键词提取
 
 #### Processor Service
@@ -242,6 +255,32 @@ created_at: timestamp
 updated_at: timestamp
 ```
 
+#### AI Suggestion
+
+```
+id: UUID (PK)
+memory_id: UUID (FK → memories.id, ON DELETE CASCADE)
+content: text (建议内容)
+style: enum (gentle, practical, inspiring)
+status: enum (pending, generated, failed)
+feedback: enum (liked, disliked, none)
+created_at: timestamp
+updated_at: timestamp
+```
+
+#### Time Capsule
+
+```
+id: UUID (PK)
+memory_id: UUID (FK → memories.id)
+user_id: UUID (FK → users.id)
+seal_duration: int (封印天数：7/30/100/自定义)
+sealed_at: timestamp
+unlocked_at: timestamp (nullable)
+status: enum (sealed, unlocked)
+created_at: timestamp
+```
+
 ### 4.2 向量索引策略
 
 使用 IVFFlat 索引进行近似最近邻搜索：
@@ -264,6 +303,7 @@ USING ivfflat (vector vector_cosine_ops);
 | `link:fetch` | 链接抓取 | Memory Service | Processor |
 | `text:vectorize` | 文本向量化 | Memory Service | Vectorizer |
 | `tag:generate` | 自动标签 | Memory Service | Processor |
+| `suggestion:generate` | AI 陪伴建议 | Memory Service | Processor |
 
 ### 5.2 任务消息格式
 
@@ -427,16 +467,16 @@ K8s 配置位于 `k8s/` 目录，按编号顺序应用：
 
 ## 9. Phase 2/3 架构预留
 
-### 9.1 Phase 2：Echo Assistant
+### 9.1 Phase 2：Echo Assistant ✅ 已实现（v1.1）
 
 基于 Sprint 3 的 LLMProvider 复用，无需新开发 LLM 模块。
 
-| 组件 | 说明 |
-|------|------|
-| Chat UI | Web 界面侧边栏组件 |
-| RAG 检索 | 用户问题 → 语义搜索 → 获取相关记忆 → LLM 生成回答 |
-| 引用来源 | LLM 回答中标注引用的记忆标题/链接 |
-| 对话历史 | 数据库存储，表结构预留 |
+| 组件 | 说明 | 状态 |
+|------|------|------|
+| Chat UI | Web 界面侧边栏组件 | ✅ |
+| RAG 检索 | 用户问题 → 语义搜索 → 获取相关记忆 → LLM 生成回答 | ✅ |
+| 引用来源 | LLM 回答中标注引用的记忆标题/链接 | ✅ |
+| 对话历史 | 数据库存储 | ✅ |
 
 ### 9.2 Phase 3：Agent 平台
 

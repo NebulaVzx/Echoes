@@ -1,7 +1,7 @@
 # API 接口文档 (API)
 
 > Echoes (拾忆) RESTful API 接口定义
-> 版本：v0.2.0（对应 Sprint 1：认证体系）
+> 版本：v1.2.0（对应 v1.2 "记忆的温度"）
 > Base URL：`/api/v1`
 
 ## 通用规范
@@ -445,3 +445,73 @@ GitHub OAuth 回调
 | `INVALID_STATE` | OAuth state 参数无效或过期 | 400 |
 | `INTERNAL_ERROR` | 服务器内部错误 | 500 |
 | `SERVICE_UNAVAILABLE` | 服务暂时不可用 | 503 |
+
+---
+
+## 接口概览（v1.0 ~ v1.2 新增）
+
+以下接口已随 v1.0 MVP、v1.1 Echo Assistant、v1.2 "记忆的温度" 交付。详细参数定义和响应格式待后续补充。
+
+### 记忆接口
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/api/v1/memories` | 时间轴列表（分页：cursor / offset） |
+| POST | `/api/v1/memories` | 创建记忆（文字 / 链接） |
+| GET | `/api/v1/memories/:id` | 记忆详情 |
+| PUT | `/api/v1/memories/:id` | 更新记忆 |
+| DELETE | `/api/v1/memories/:id` | 删除记忆 |
+| POST | `/api/v1/memories/:id/retry` | 重试失败任务 |
+
+### 搜索接口
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/api/v1/search` | 语义搜索（`?q=&limit=&threshold=`） |
+| GET | `/api/v1/memories/:id/related` | 相似内容推荐 |
+
+### 标签接口
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/api/v1/tags` | 标签列表（含统计） |
+| GET | `/api/v1/tags/:name` | 标签详情 |
+| PUT | `/api/v1/tags/:name` | 更新标签（颜色等） |
+| POST | `/api/v1/tags/merge` | 标签合并 |
+| GET | `/api/v1/tags/:name/related` | 相关标签（共现统计） |
+| GET | `/api/v1/memories/:id/related-tags` | 记忆相关标签 |
+
+### AI 建议接口
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/api/v1/memories/:id/suggestion` | 获取记忆的 AI 建议 |
+| POST | `/api/v1/suggestions/:id/feedback` | 建议反馈（like / dislike） |
+
+### 温暖功能接口
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/api/v1/streaks` | 连续记录天数 |
+| GET | `/api/v1/serendipity` | 那年今日 |
+| GET | `/api/v1/daily-review` | 每日回顾 |
+| GET | `/api/v1/capsules` | 时间胶囊列表 |
+| POST | `/api/v1/capsules/:id/unlock` | 解锁时间胶囊 |
+
+### Echo Assistant 接口
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| POST | `/api/v1/chat` | 发送消息（RAG 问答） |
+| GET | `/api/v1/chat/history` | 对话历史 |
+
+### 用户设置接口
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/api/v1/auth/me/settings` | 获取用户设置（LLM / 搜索 / 分页） |
+| PUT | `/api/v1/auth/me/settings` | 更新用户设置 |
+
+---
+
+*API.md 最后更新：2026-04-26 — v1.2 接口概览已补充，详细定义待完善*

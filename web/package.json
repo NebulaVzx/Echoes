@@ -1,6 +1,6 @@
 {
   "name": "echoes-web",
-  "version": "0.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Echoes (拾忆) - Personal semantic search engine frontend",
   "scripts": {

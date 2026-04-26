@@ -2,7 +2,7 @@
 
 > 个人语义搜索引擎 - 拾起遗落的记忆
 
-[![Version](https://img.shields.io/badge/version-0.4.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue)](CHANGELOG.md)
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://golang.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14.2-000?logo=next.js)](https://nextjs.org)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org)
@@ -21,26 +21,44 @@
 - **发现意外关联**："原来我之前还存过类似的"
 
 **已实现功能：**
+
+*v1.0 MVP：*
 - 邮箱注册/登录 + GitHub OAuth
 - 文字/链接记忆捕获（时间轴展示）
 - 自动标签生成（LLM）+ 链接抓取（标题/摘要）
 - BGE-M3 向量存储（pgvector）
 - **语义搜索**（自然语言查询，返回相似度百分比）
 - **相似内容推荐**（"你可能还感兴趣"）
-- **Per-user LLM 配置**（模型/温度/协议独立设置，API Key 加密存储）
+- **Per-user LLM 配置**（provider / model / temperature 独立设置）
 - **搜索相似度阈值可配置**（默认 40%，范围 0%-100%）
 - 暗黑模式（系统偏好 + 手动切换）
 - Token 自动刷新（15分钟 access token + 7天 refresh token）
+
+*v1.1 Echo Assistant：*
+- **对话式 AI 助手**（Chat 侧边栏，基于 RAG 回答记忆相关问题）
+- 多轮对话 + 引用标注（回答中标注引用来源）
+- 双模式分页（cursor / offset）
+
+*v1.2 "记忆的温度"：*
+- **AI 陪伴建议**（保存记忆后异步生成温情/实用/启发型建议，支持反馈）
+- **标签过滤器**（首页横向标签栏，多选 AND 过滤）
+- **标签管理页**（`/tags` — 云图/卡片/列表视图、颜色选择器、标签合并）
+- **相关标签**（记忆详情页基于共现统计的关联发现）
+- **记忆 Streaks**（连续记录天数统计，创建表单状态显示）
+- **那年今日**（首页展示一年前的记忆，与过去的自己重逢）
+- **时间胶囊**（7/30/100 天封印，到期解锁仪式卡片，独立 `/capsules` 入口）
+- **每日回顾**（可折叠卡片展示今日记忆摘要）
 
 **目标用户：**
 - 信息囤积者：收藏100篇文章，需要时找不到
 - 知识工作者：需要建立个人知识库
 - 终身学习者：囤积课程/论文/教程
 
-**AI 层级：**
-- **Phase 1 (MVP)**：LLM 自动生成标签 + BGE-M3 向量化 + 语义搜索（已实现）
-- **Phase 2 (Echo Assistant)**：对话式 AI 助手，基于 RAG 回答关于用户记忆的问题
-- **Phase 3 (Agent 平台)**：架构预留扩展性，支持未来第三方 Agent 接入
+**版本里程碑：**
+- **v1.0 MVP**（2026-04-22）：认证 + 记忆捕获 + AI 处理 + 语义搜索 + 可观测性
+- **v1.1 Echo Assistant**（2026-04-25）：对话式 AI 助手（RAG 检索 + 多轮对话 + 引用标注）+ 质量修复
+- **v1.2 "记忆的温度"**（2026-04-26）：AI 陪伴建议 + 标签重生 + 情感化功能（Streaks / 那年今日 / 时间胶囊 / 每日回顾）
+- **v1.3**（待规划）：下一个里程碑
 
 ## 技术栈
 
@@ -146,9 +164,15 @@ Echoes/
 ├── .planning/                  # 开发计划（GSD 工作流产物）
 │   ├── phases/
 │   │   ├── 02-memory-capture/
-│   │   ├── 03-processing/
-│   │   └── 04-search-capability/
-│   └── codebase/               # 代码库分析文档
+│   │   ├── 03-ai-processing/
+│   │   ├── 04-search-capability/
+│   │   ├── 06-echo-assistant/
+│   │   ├── 07-bug-fixes-quality/
+│   │   ├── 08-ai-companion-suggestions/
+│   │   ├── 09-tag-rebirth/
+│   │   └── 10-warmth-of-memory/
+│   ├── codebase/               # 代码库分析文档
+│   └── milestones/             # 里程碑归档（v1.0 / v1.1 / v1.2）
 └── docs/                       # 项目文档
     ├── API.md                  # 接口文档
     ├── ARCHITECTURE.md         # 架构说明
@@ -183,16 +207,17 @@ make fmt-web
 
 ## 开发计划
 
-| Sprint | 周 | 目标 | 状态 |
-|--------|----|------|------|
-| 0 | 1 | 基础设施 - Docker Compose、数据库、目录结构 | 已完成 |
-| 1 | 2 | 认证体系 - User Service、Gateway、OAuth、Zod验证 | 已完成 |
-| 2 | 3 | 记忆捕获 - Memory Service、文字/链接、时间轴 | 已完成 |
-| 3 | 4 | 处理能力 - Processor、Vectorizer、自动标签、async queue | 已完成 |
-| 4 | 5 | 搜索能力 - 语义搜索、相似推荐、暗黑模式、per-user LLM 配置 | 已完成 |
-| 5 | 6 | 可观测性 + 打磨上线 - Prometheus/OTel/Zap、动画、响应式、E2E 测试 | 进行中 |
-| Phase 2 | +1-2周 | Echo Assistant - 对话式 AI 助手，基于 RAG 回答记忆相关问题 | 未开始 |
-| Phase 3 | 预留 | Agent 平台 - 架构预留，支持第三方 Agent 接入 | 预留 |
+| 阶段 | 时间 | 目标 | 状态 |
+|------|------|------|------|
+| Sprint 0 | W1 | 基础设施 - Docker Compose、数据库、目录结构 | 已完成 |
+| Sprint 1 | W2 | 认证体系 - User Service、Gateway、OAuth | 已完成 |
+| Sprint 2 | W3 | 记忆捕获 - Memory Service、时间轴、CRUD | 已完成 |
+| Sprint 3 | W4 | 处理能力 - Processor、Vectorizer、自动标签、Redis Stream | 已完成 |
+| Sprint 4 | W5 | 搜索能力 - 语义搜索、相似推荐、暗黑模式、per-user LLM | 已完成 |
+| Sprint 5 | W6 | 可观测性 + 打磨上线 - Prometheus/OTel/Zap、动画、E2E | 已完成 |
+| v1.1 | +2天 | Echo Assistant - RAG 对话助手、多轮对话、引用标注 | 已完成 |
+| v1.2 | +1天 | 记忆的温度 - AI 建议、标签重生、Streaks、时间胶囊 | 已完成 |
+| v1.3 | 待规划 | 下一个里程碑 | 规划中 |
 
 ## 文档
 
