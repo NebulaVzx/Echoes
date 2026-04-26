@@ -261,7 +261,9 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
         </div>
 
         {/* Time Capsule Toggle */}
-        <TimeCapsuleToggle sealedUntil={sealedUntil} onChange={setSealedUntil} />
+        <div className="mb-5">
+          <TimeCapsuleToggle sealedUntil={sealedUntil} onChange={setSealedUntil} />
+        </div>
 
         <button
           type="submit"
