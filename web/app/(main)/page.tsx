@@ -17,7 +17,7 @@ import ChatSidebar from '@/components/chat/chat-sidebar'
 import Pagination from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Clock } from 'lucide-react'
 import UnlockCeremony from '@/components/warmth/unlock-ceremony'
 import SerendipityCard from '@/components/warmth/serendipity-card'
 import DailyReviewCard from '@/components/warmth/daily-review-card'
@@ -269,6 +269,14 @@ function HomePage() {
             <ThemeToggle />
             {user && (
               <div className="flex items-center gap-1 ml-1">
+                <Link
+                  href="/capsules"
+                  className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
+                  title="时间胶囊"
+                >
+                  <Clock className="w-4 h-4" />
+                  <span className="hidden sm:inline">胶囊</span>
+                </Link>
                 <Link
                   href="/settings"
                   className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
