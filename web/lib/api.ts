@@ -462,6 +462,19 @@ class ApiClient {
     return this.request<{ memories: Memory[] }>('GET', '/api/v1/memories/unsealed')
   }
 
+  // Warmth endpoints
+  async getStreaks(): Promise<ApiResponse<{ current_streak: number; longest_streak: number; has_recorded_today: boolean }>> {
+    return this.request<{ current_streak: number; longest_streak: number; has_recorded_today: boolean }>('GET', '/api/v1/memories/streaks')
+  }
+
+  async getSerendipity(): Promise<ApiResponse<{ memory: Memory; memories_since: number; years_ago: number }>> {
+    return this.request<{ memory: Memory; memories_since: number; years_ago: number }>('GET', '/api/v1/memories/serendipity')
+  }
+
+  async getDailyReview(): Promise<ApiResponse<{ today_count: number; top_tags: string[]; worth_reviewing?: Memory }>> {
+    return this.request<{ today_count: number; top_tags: string[]; worth_reviewing?: Memory }>('GET', '/api/v1/memories/daily-review')
+  }
+
   // Chat endpoints
   async sendMessage(data: SendMessageRequest): Promise<ApiResponse<SendMessageResponse>> {
     return this.request<SendMessageResponse>('POST', '/api/v1/chat/messages', data)
