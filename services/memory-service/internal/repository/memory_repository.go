@@ -4,6 +4,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/google/uuid"
@@ -20,7 +21,12 @@ type MemoryRepository interface {
 	Create(ctx context.Context, memory *domain.Memory) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Memory, error)
 	GetVectorByID(ctx context.Context, id uuid.UUID) (string, error)
-	ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string) ([]domain.Memory, int64, error)
+	ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool) ([]domain.Memory, int64, error)
+	GetMemoriesByDateRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]domain.Memory, error)
+	GetRandomMemory(ctx context.Context, userID uuid.UUID, before time.Time) (domain.Memory, error)
+	GetMemoriesByDay(ctx context.Context, userID uuid.UUID, day time.Time) ([]domain.Memory, error)
+	GetMemoriesOnDate(ctx context.Context, userID uuid.UUID, month, day int) ([]domain.Memory, error)
+	CountMemoriesSince(ctx context.Context, userID uuid.UUID, since time.Time) (int64, error)
 	Update(ctx context.Context, memory *domain.Memory) error
 	UpdateVector(ctx context.Context, id uuid.UUID, vector string) error
 	Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
@@ -58,13 +64,17 @@ func (r *GormMemoryRepository) GetByID(ctx context.Context, id uuid.UUID) (*doma
 
 // ListByUser retrieves memories for a user with pagination and optional tag filter.
 // Supports multi-tag AND filtering using tags @> ARRAY[...].
-func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string) ([]domain.Memory, int64, error) {
+// When excludeSealed is true, filters out memories with sealed_until in the future.
+func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool) ([]domain.Memory, int64, error) {
 	var memories []domain.Memory
 	var total int64
 
 	query := r.db.WithContext(ctx).Model(&domain.Memory{}).Where("user_id = ?", userID)
 	if len(tags) > 0 {
 		query = query.Where("tags @> ?", pq.Array(tags))
+	}
+	if excludeSealed {
+		query = query.Where("sealed_until IS NULL OR sealed_until <= ?", time.Now())
 	}
 
 	if err := query.Count(&total).Error; err != nil {
@@ -78,6 +88,74 @@ func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID,
 	}
 
 	return memories, total, nil
+}
+
+// GetMemoriesByDateRange retrieves memories for a user within a date range, excluding sealed ones.
+func (r *GormMemoryRepository) GetMemoriesByDateRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]domain.Memory, error) {
+	var memories []domain.Memory
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Where("created_at >= ? AND created_at <= ?", start, end).
+		Where("sealed_until IS NULL OR sealed_until <= ?", time.Now()).
+		Order("created_at DESC").
+		Find(&memories).Error
+	return memories, err
+}
+
+// GetRandomMemory retrieves a random memory for a user created before the given time, excluding sealed ones.
+func (r *GormMemoryRepository) GetRandomMemory(ctx context.Context, userID uuid.UUID, before time.Time) (domain.Memory, error) {
+	var memory domain.Memory
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Where("created_at < ?", before).
+		Where("sealed_until IS NULL OR sealed_until <= ?", time.Now()).
+		Order("RANDOM()").
+		Limit(1).
+		First(&memory).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.Memory{}, ErrMemoryNotFound
+		}
+		return domain.Memory{}, err
+	}
+	return memory, nil
+}
+
+// GetMemoriesByDay retrieves memories for a user on a specific day (local timezone), excluding sealed ones.
+func (r *GormMemoryRepository) GetMemoriesByDay(ctx context.Context, userID uuid.UUID, day time.Time) ([]domain.Memory, error) {
+	startOfDay := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+	var memories []domain.Memory
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Where("created_at >= ? AND created_at < ?", startOfDay, endOfDay).
+		Where("sealed_until IS NULL OR sealed_until <= ?", time.Now()).
+		Order("created_at DESC").
+		Find(&memories).Error
+	return memories, err
+}
+
+// GetMemoriesOnDate retrieves memories for a user on a specific month/day across any year, excluding sealed ones.
+func (r *GormMemoryRepository) GetMemoriesOnDate(ctx context.Context, userID uuid.UUID, month, day int) ([]domain.Memory, error) {
+	var memories []domain.Memory
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Where("EXTRACT(MONTH FROM created_at) = ? AND EXTRACT(DAY FROM created_at) = ?", month, day).
+		Where("sealed_until IS NULL OR sealed_until <= ?", time.Now()).
+		Order("created_at DESC").
+		Find(&memories).Error
+	return memories, err
+}
+
+// CountMemoriesSince counts memories for a user created since a given time, excluding sealed ones.
+func (r *GormMemoryRepository) CountMemoriesSince(ctx context.Context, userID uuid.UUID, since time.Time) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&domain.Memory{}).
+		Where("user_id = ?", userID).
+		Where("created_at > ?", since).
+		Where("sealed_until IS NULL OR sealed_until <= ?", time.Now()).
+		Count(&count).Error
+	return count, err
 }
 
 // Update modifies an existing memory.
