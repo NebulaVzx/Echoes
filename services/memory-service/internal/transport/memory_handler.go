@@ -76,23 +76,25 @@ func NewMemoryHandler(memoryService *service.MemoryService) *MemoryHandler {
 func (h *MemoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/memories", h.Create)
 	router.GET("/memories", h.List)
+
+	// Warmth routes (must be BEFORE /memories/:id to avoid parameter shadowing)
+	router.GET("/memories/streaks", h.GetStreak)
+	router.GET("/memories/serendipity", h.GetSerendipity)
+	router.GET("/memories/daily-review", h.GetDailyReview)
+
+	// Time capsule routes (must be BEFORE /memories/:id)
+	router.GET("/memories/sealed", h.ListSealedMemories)
+	router.GET("/memories/unsealed", h.GetRecentlyUnsealed)
+	router.POST("/memories/:id/seal", h.SealMemory)
+	router.DELETE("/memories/:id/seal", h.UnsealMemory)
+
+	// Parameterized memory routes
 	router.GET("/memories/:id", h.Get)
 	router.PUT("/memories/:id", h.Update)
 	router.DELETE("/memories/:id", h.Delete)
 
 	router.GET("/search", h.Search)
 	router.GET("/memories/:id/related", h.GetRelated)
-
-	// Warmth routes (streaks, serendipity, daily review)
-	router.GET("/memories/streaks", h.GetStreak)
-	router.GET("/memories/serendipity", h.GetSerendipity)
-	router.GET("/memories/daily-review", h.GetDailyReview)
-
-	// Time capsule routes
-	router.POST("/memories/:id/seal", h.SealMemory)
-	router.DELETE("/memories/:id/seal", h.UnsealMemory)
-	router.GET("/memories/sealed", h.ListSealedMemories)
-	router.GET("/memories/unsealed", h.GetRecentlyUnsealed)
 
 	// Suggestion routes (public, authenticated)
 	router.GET("/memories/:id/suggestion", h.GetSuggestion)
