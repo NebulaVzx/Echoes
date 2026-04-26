@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers/auth-provider'
 import { ChatProvider, useChat } from '@/app/providers/chat-provider'
 import { api, Memory } from '@/lib/api'
@@ -9,13 +10,17 @@ import Link from 'next/link'
 import ThemeToggle from '@/components/theme-toggle'
 import CreateMemoryForm from '@/components/memory/create-memory-form'
 import MemoryList from '@/components/memory/memory-list'
+import TagFilterBar from '@/components/memory/tag-filter-bar'
 import SearchInput from '@/components/search/search-input'
 import EmptyState from '@/components/empty-state'
 import ChatSidebar from '@/components/chat/chat-sidebar'
 import Pagination from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Clock } from 'lucide-react'
+import UnlockCeremony from '@/components/warmth/unlock-ceremony'
+import SerendipityCard from '@/components/warmth/serendipity-card'
+import DailyReviewCard from '@/components/warmth/daily-review-card'
 
 function TimelineSkeleton() {
   return (
@@ -50,6 +55,8 @@ export default function HomePageWrapper() {
 }
 
 function HomePage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const { user, isLoading: authLoading, logout } = useAuth()
   const {
     isOpen,
@@ -75,6 +82,11 @@ function HomePage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [paginationMode, setPaginationMode] = useState<'load_more' | 'page_numbers'>('load_more')
 
+  // Tag filter state
+  const [allTags, setAllTags] = useState<{ name: string; count: number; color?: string }[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [tagColors, setTagColors] = useState<Record<string, string>>({})
+
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const showToast = (message: string, type: 'success' | 'error') => setToast({ message, type })
@@ -85,7 +97,11 @@ function HomePage() {
       if (targetPage === 1) setIsLoading(true)
       else setIsLoadingMore(true)
 
-      const response = await api.listMemories({ page: targetPage, limit })
+      const response = await api.listMemories({
+        page: targetPage,
+        limit,
+        tags: selectedTags.length > 0 ? selectedTags : undefined,
+      })
       if (response.success && response.data) {
         const data = response.data
         if (append) {
@@ -103,7 +119,73 @@ function HomePage() {
       setIsLoading(false)
       setIsLoadingMore(false)
     }
-  }, [limit])
+  }, [limit, selectedTags])
+
+  // Load tags and tag colors
+  const loadTags = useCallback(async () => {
+    try {
+      const [tagsResponse, settingsResponse] = await Promise.all([
+        api.getTags(),
+        api.getSettings(),
+      ])
+      if (tagsResponse.success && tagsResponse.data) {
+        const tags = tagsResponse.data.tags
+        const colors: Record<string, string> = {}
+        if (settingsResponse.success && settingsResponse.data?.tag_metadata) {
+          Object.entries(settingsResponse.data.tag_metadata).forEach(([name, meta]) => {
+            if (meta.color) colors[name] = meta.color
+          })
+        }
+        setAllTags(tags.map(t => ({ name: t.name, count: t.count, color: colors[t.name] })))
+        setTagColors(colors)
+      }
+    } catch {
+      // Silently fail
+    }
+  }, [])
+
+  // Update URL to reflect current tag selection
+  const updateTagURL = useCallback((tags: string[]) => {
+    const params = new URLSearchParams()
+    tags.forEach(t => params.append('tags', t))
+    const query = params.toString()
+    router.replace(query ? `/?${query}` : '/', { scroll: false })
+  }, [router])
+
+  const handleTagToggle = useCallback((tag: string) => {
+    setSelectedTags(prev => {
+      const next = prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+      updateTagURL(next)
+      return next
+    })
+  }, [updateTagURL])
+
+  const handleClearAllTags = useCallback(() => {
+    setSelectedTags([])
+    router.replace('/', { scroll: false })
+  }, [router])
+
+  const handleTagClickFromCard = useCallback((tag: string) => {
+    setSelectedTags(prev => {
+      if (prev.includes(tag)) return prev
+      const next = [...prev, tag]
+      updateTagURL(next)
+      return next
+    })
+  }, [updateTagURL])
+
+  // Sync selectedTags from URL query params on mount / external navigation
+  useEffect(() => {
+    const tagsParam = searchParams.getAll('tags')
+    if (tagsParam.length > 0) {
+      setSelectedTags(tagsParam)
+    } else {
+      const singleTag = searchParams.get('tag')
+      if (singleTag) {
+        setSelectedTags([singleTag])
+      }
+    }
+  }, [searchParams])
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || isLoadingMore) return
@@ -115,7 +197,7 @@ function HomePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [loadMemories])
 
-  // Load pagination mode from user settings on mount
+  // Load pagination mode and tags from user settings on mount
   useEffect(() => {
     const loadPaginationPreference = async () => {
       try {
@@ -128,11 +210,27 @@ function HomePage() {
       }
     }
     loadPaginationPreference()
-  }, [])
+    loadTags()
+  }, [loadTags])
 
   useEffect(() => {
     loadMemories(1, false)
   }, [loadMemories])
+
+  // Poll for processing status updates — when any memory is pending/processing,
+  // refresh the list every 3 seconds until all are completed/failed.
+  useEffect(() => {
+    const hasProcessing = memories.some(
+      (m) => m.processing_status === 'pending' || m.processing_status === 'processing'
+    )
+    if (!hasProcessing) return
+
+    const interval = setInterval(() => {
+      loadMemories(page, false)
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [memories, page, loadMemories])
 
   if (authLoading) {
     return (
@@ -172,6 +270,14 @@ function HomePage() {
             {user && (
               <div className="flex items-center gap-1 ml-1">
                 <Link
+                  href="/capsules"
+                  className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
+                  title="时间胶囊"
+                >
+                  <Clock className="w-4 h-4" />
+                  <span className="hidden sm:inline">胶囊</span>
+                </Link>
+                <Link
                   href="/settings"
                   className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
                 >
@@ -208,16 +314,31 @@ function HomePage() {
 
       {/* Main content */}
       <div className="max-w-3xl mx-auto px-4 py-8">
+        {/* Warmth cards */}
+        <UnlockCeremony />
+        <SerendipityCard />
+        <DailyReviewCard />
+
         {/* Create form */}
         <div className="mb-10">
           <CreateMemoryForm onSuccess={() => loadMemories(1, false)} />
         </div>
 
+        {/* Tag Filter */}
+        {allTags.length > 0 && (
+          <TagFilterBar
+            tags={allTags}
+            selectedTags={selectedTags}
+            onTagToggle={handleTagToggle}
+            onClearAll={handleClearAllTags}
+          />
+        )}
+
         {/* Timeline */}
         <div>
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              时间轴
+              {selectedTags.length > 0 ? `已筛选: ${selectedTags.join(', ')}` : '时间轴'}
             </h2>
             <span className="text-xs text-gray-400 dark:text-gray-500">
               {total > 0 ? `${total} 条记忆` : `${memories.length} 条记忆`}
@@ -233,7 +354,7 @@ function HomePage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               }
-              title="还没有记忆，上方创建第一条吧"
+              title={selectedTags.length > 0 ? '没有匹配该标签的记忆' : '还没有记忆，上方创建第一条吧'}
             />
           ) : (
             <MemoryList
@@ -241,6 +362,8 @@ function HomePage() {
               hasMore={paginationMode === 'load_more' ? hasMore : undefined}
               onLoadMore={paginationMode === 'load_more' ? handleLoadMore : undefined}
               isLoadingMore={isLoadingMore}
+              tagColors={tagColors}
+              onTagClick={handleTagClickFromCard}
             />
           )}
 

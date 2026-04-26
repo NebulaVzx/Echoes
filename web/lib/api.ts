@@ -53,10 +53,27 @@ export interface RAGSettings {
   rag_memory_limit: number
 }
 
+export interface AISettings {
+  ai_suggestion_enabled?: boolean
+  ai_suggestion_style?: 'gentle' | 'practical' | 'inspiring'
+  ai_suggestion_timeout?: number
+  ai_suggestion_max_retries?: number
+}
+
+export interface TagMeta {
+  color?: string
+}
+
 export interface UserSettings extends LLMSettings {
   search_similarity_threshold?: number
   rag_memory_limit?: number
   pagination_mode?: 'load_more' | 'page_numbers'
+  ai_suggestion_enabled?: boolean
+  ai_suggestion_style?: 'gentle' | 'practical' | 'inspiring'
+  ai_suggestion_timeout?: number
+  ai_suggestion_max_retries?: number
+  tag_metadata?: Record<string, TagMeta>
+  tag_categories?: TagCategory[]
 }
 
 export interface UpdateSettingsRequest {
@@ -64,6 +81,9 @@ export interface UpdateSettingsRequest {
   search?: SearchSettings
   rag?: RAGSettings
   pagination?: { mode?: 'load_more' | 'page_numbers' }
+  ai?: AISettings
+  tags?: Record<string, TagMeta>
+  tag_categories?: TagCategory[]
 }
 
 export interface AuthResponse {
@@ -83,6 +103,7 @@ export interface Memory {
   note?: string
   processing_status: 'pending' | 'processing' | 'completed' | 'failed'
   visibility: 'private' | 'public'
+  sealed_until?: string
   created_at: string
   updated_at: string
 }
@@ -107,6 +128,53 @@ export interface SearchResponse {
 export interface RelatedResponse {
   results: SearchResult[]
   memory_id: string
+}
+
+export interface TagInfo {
+  name: string
+  count: number
+  last_updated_at: string
+  related_tags?: string[]
+}
+
+export interface TagListResponse {
+  tags: TagInfo[]
+}
+
+export interface RelatedTagsResponse {
+  tag: string
+  related_tags: string[]
+}
+
+export interface SimilarTagsResponse {
+  pairs: { canonical: string; duplicate: string }[]
+}
+
+export interface TagCategory {
+  name: string
+  tags: string[]
+}
+
+export interface CategorizeTagsResponse {
+  categories: TagCategory[]
+}
+
+export interface AISuggestion {
+  id: string
+  memory_id: string
+  content: string
+  suggestion_type?: 'emotion_support' | 'knowledge_expand' | 'action_suggest' | 'connection' | 'general'
+  created_at: string
+  user_feedback?: 'liked' | 'disliked' | 'ignored'
+}
+
+export interface CreateMemoryResponse {
+  memory: Memory
+  suggestion_status: 'pending' | 'completed' | 'skipped' | 'failed'
+}
+
+export interface MemoryWithSuggestion extends Memory {
+  suggestion?: AISuggestion
 }
 
 class ApiClient {
@@ -296,15 +364,19 @@ class ApiClient {
     link_url?: string
     tags?: string[]
     note?: string
-  }): Promise<ApiResponse<Memory>> {
-    return this.request<Memory>('POST', '/api/v1/memories', data)
+    enable_ai_suggestion?: boolean
+  }): Promise<ApiResponse<CreateMemoryResponse>> {
+    return this.request<CreateMemoryResponse>('POST', '/api/v1/memories', data)
   }
 
-  async listMemories(params?: { page?: number; limit?: number; tag?: string }): Promise<ApiResponse<ListMemoriesResponse>> {
+  async listMemories(params?: { page?: number; limit?: number; tag?: string; tags?: string[] }): Promise<ApiResponse<ListMemoriesResponse>> {
     const searchParams = new URLSearchParams()
     if (params?.page) searchParams.set('page', String(params.page))
     if (params?.limit) searchParams.set('limit', String(params.limit))
     if (params?.tag) searchParams.set('tag', params.tag)
+    if (params?.tags) {
+      params.tags.forEach(tag => searchParams.append('tags', tag))
+    }
     const query = searchParams.toString()
     return this.request<ListMemoriesResponse>('GET', `/api/v1/memories${query ? '?' + query : ''}`)
   }
@@ -333,6 +405,75 @@ class ApiClient {
     if (params?.limit) searchParams.set('limit', String(params.limit))
     const query = searchParams.toString()
     return this.request<RelatedResponse>('GET', `/api/v1/memories/${id}/related${query ? '?' + query : ''}`)
+  }
+
+  // AI Suggestion endpoints
+  async getSuggestion(memoryId: string): Promise<ApiResponse<AISuggestion>> {
+    return this.request<AISuggestion>('GET', `/api/v1/memories/${memoryId}/suggestion`)
+  }
+
+  async updateSuggestionFeedback(memoryId: string, feedback: 'liked' | 'disliked' | 'ignored'): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('PATCH', `/api/v1/memories/${memoryId}/suggestion/feedback`, {
+      user_feedback: feedback,
+    })
+  }
+
+  // Tag endpoints
+  async getTags(): Promise<ApiResponse<TagListResponse>> {
+    return this.request<TagListResponse>('GET', '/api/v1/tags')
+  }
+
+  async getRelatedTags(tag: string): Promise<ApiResponse<RelatedTagsResponse>> {
+    return this.request<RelatedTagsResponse>('GET', `/api/v1/tags/${encodeURIComponent(tag)}/related`)
+  }
+
+  async mergeTags(sourceTag: string, targetTag: string): Promise<ApiResponse<{ affected: number }>> {
+    return this.request<{ affected: number }>('POST', '/api/v1/tags/merge', {
+      source_tag: sourceTag,
+      target_tag: targetTag,
+    })
+  }
+
+  async getSimilarTags(): Promise<ApiResponse<SimilarTagsResponse>> {
+    return this.request<SimilarTagsResponse>('GET', '/api/v1/tags/similar')
+  }
+
+  async categorizeTags(): Promise<ApiResponse<CategorizeTagsResponse>> {
+    return this.request<CategorizeTagsResponse>('POST', '/api/v1/tags/categorize')
+  }
+
+  // Time capsule endpoints
+  async sealMemory(id: string, sealedUntil: string): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('POST', `/api/v1/memories/${id}/seal`, { sealed_until: sealedUntil })
+  }
+
+  async unsealMemory(id: string): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('DELETE', `/api/v1/memories/${id}/seal`)
+  }
+
+  async listSealedMemories(params?: { page?: number; limit?: number }): Promise<ApiResponse<ListMemoriesResponse>> {
+    const searchParams = new URLSearchParams()
+    if (params?.page) searchParams.set('page', String(params.page))
+    if (params?.limit) searchParams.set('limit', String(params.limit))
+    const query = searchParams.toString()
+    return this.request<ListMemoriesResponse>('GET', `/api/v1/memories/sealed${query ? '?' + query : ''}`)
+  }
+
+  async getRecentlyUnsealed(): Promise<ApiResponse<{ memories: Memory[] }>> {
+    return this.request<{ memories: Memory[] }>('GET', '/api/v1/memories/unsealed')
+  }
+
+  // Warmth endpoints
+  async getStreaks(): Promise<ApiResponse<{ current_streak: number; longest_streak: number; has_recorded_today: boolean }>> {
+    return this.request<{ current_streak: number; longest_streak: number; has_recorded_today: boolean }>('GET', '/api/v1/memories/streaks')
+  }
+
+  async getSerendipity(): Promise<ApiResponse<{ memory: Memory; memories_since: number; years_ago: number }>> {
+    return this.request<{ memory: Memory; memories_since: number; years_ago: number }>('GET', '/api/v1/memories/serendipity')
+  }
+
+  async getDailyReview(): Promise<ApiResponse<{ today_count: number; top_tags: string[]; worth_reviewing?: Memory }>> {
+    return this.request<{ today_count: number; top_tags: string[]; worth_reviewing?: Memory }>('GET', '/api/v1/memories/daily-review')
   }
 
   // Chat endpoints

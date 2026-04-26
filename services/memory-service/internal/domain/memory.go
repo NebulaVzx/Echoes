@@ -26,9 +26,10 @@ type Memory struct {
 	Note             string    `gorm:"type:text" json:"note,omitempty"`
 	Metadata         string    `gorm:"type:jsonb" json:"metadata,omitempty"`
 	ProcessingStatus string    `gorm:"type:varchar(20);default:'pending'" json:"processing_status"`
-	Visibility       string    `gorm:"type:varchar(20);default:'private'" json:"visibility"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	Visibility       string     `gorm:"type:varchar(20);default:'private'" json:"visibility"`
+	SealedUntil      *time.Time `gorm:"type:timestamp with time zone" json:"sealed_until,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 // TableName specifies the table name for Memory.
@@ -50,6 +51,7 @@ func (m Memory) SafeResponse() map[string]interface{} {
 		"note":              m.Note,
 		"processing_status": m.ProcessingStatus,
 		"visibility":        m.Visibility,
+		"sealed_until":      m.SealedUntil,
 		"created_at":        m.CreatedAt,
 		"updated_at":        m.UpdatedAt,
 	}
@@ -57,11 +59,42 @@ func (m Memory) SafeResponse() map[string]interface{} {
 
 // CreateMemoryRequest represents a request to create a new memory.
 type CreateMemoryRequest struct {
-	ContentType string   `json:"content_type" binding:"required,oneof=text link"`
-	TextContent string   `json:"text_content" binding:"omitempty,max=10000"`
-	LinkURL     string   `json:"link_url" binding:"omitempty,url,max=2048"`
-	Tags        []string `json:"tags" binding:"omitempty,dive,max=50"`
-	Note        string   `json:"note" binding:"omitempty,max=1000"`
+	ContentType        string     `json:"content_type" binding:"required,oneof=text link"`
+	TextContent        string     `json:"text_content" binding:"omitempty,max=10000"`
+	LinkURL            string     `json:"link_url" binding:"omitempty,url,max=2048"`
+	Tags               []string   `json:"tags" binding:"omitempty,dive,max=50"`
+	Note               string     `json:"note" binding:"omitempty,max=1000"`
+	EnableAISuggestion bool       `json:"enable_ai_suggestion" binding:"omitempty"`
+	SealedUntil        *time.Time `json:"sealed_until,omitempty"`
+}
+
+// SealMemoryRequest represents a request to seal a memory until a future date.
+type SealMemoryRequest struct {
+	SealedUntil time.Time `json:"sealed_until" binding:"required"`
+}
+
+// UnsealMemoryRequest represents a request to unseal a memory.
+type UnsealMemoryRequest struct{}
+
+// DailyReview represents the daily review stats for a user.
+type DailyReview struct {
+	TodayCount     int      `json:"today_count"`
+	TopTags        []string `json:"top_tags"`
+	WorthReviewing *Memory  `json:"worth_reviewing,omitempty"`
+}
+
+// StreakResponse represents the user's streak information.
+type StreakResponse struct {
+	CurrentStreak    int  `json:"current_streak"`
+	LongestStreak    int  `json:"longest_streak"`
+	HasRecordedToday bool `json:"has_recorded_today"`
+}
+
+// SerendipityResponse represents a "that day in history" memory.
+type SerendipityResponse struct {
+	Memory       *Memory `json:"memory"`
+	MemoriesSince int    `json:"memories_since"`
+	YearsAgo     int     `json:"years_ago"`
 }
 
 // UpdateMemoryRequest represents a request to update a memory.
@@ -105,9 +138,48 @@ type RelatedResponse struct {
 	MemoryID uuid.UUID      `json:"memory_id"`
 }
 
+// AISuggestion represents an AI-generated companion suggestion for a memory.
+type AISuggestion struct {
+	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	MemoryID       uuid.UUID `gorm:"type:uuid;not null;index" json:"memory_id"`
+	Content        string    `gorm:"type:text;not null" json:"content"`
+	SuggestionType string    `gorm:"type:varchar(20)" json:"suggestion_type,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UserFeedback   string    `gorm:"type:varchar(20)" json:"user_feedback,omitempty"`
+	Metadata       string    `gorm:"type:jsonb" json:"metadata,omitempty"`
+}
+
+// TableName specifies the table name for AISuggestion.
+func (AISuggestion) TableName() string {
+	return "ai_suggestions"
+}
+
+// CreateSuggestionRequest represents a request to create an AI suggestion (internal API).
+type CreateSuggestionRequest struct {
+	MemoryID       uuid.UUID              `json:"memory_id" binding:"required"`
+	Content        string                 `json:"content" binding:"required,max=500"`
+	SuggestionType string                 `json:"suggestion_type" binding:"omitempty,oneof=emotion_support knowledge_expand action_suggest connection general"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// UpdateSuggestionFeedbackRequest represents a request to update user feedback on a suggestion.
+type UpdateSuggestionFeedbackRequest struct {
+	UserFeedback string `json:"user_feedback" binding:"required,oneof=liked disliked ignored"`
+}
+
+// SuggestionResponse represents a single AI suggestion in API responses.
+type SuggestionResponse struct {
+	ID             uuid.UUID `json:"id"`
+	MemoryID       uuid.UUID `json:"memory_id"`
+	Content        string    `json:"content"`
+	SuggestionType string    `json:"suggestion_type,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UserFeedback   string    `json:"user_feedback,omitempty"`
+}
+
 // TaskStatusUpdate is the request body for the internal task status API.
 type TaskStatusUpdate struct {
-	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate"`
+	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate suggestion:generate"`
 	Status   string                 `json:"status" binding:"required,oneof=pending processing completed failed"`
 	Error    string                 `json:"error,omitempty"`
 	Result   map[string]interface{} `json:"result,omitempty"` // e.g., {"tags": [...]}, {"vector": [...]}, {"title": "...", "summary": "..."}

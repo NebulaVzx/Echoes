@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { api } from '@/lib/api'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { api, CreateMemoryResponse } from '@/lib/api'
 import { Toast, ToastContainer } from '@/components/ui/toast'
+import { Sparkles } from 'lucide-react'
+import StreakIndicator from '@/components/warmth/streak-indicator'
+import TimeCapsuleToggle from '@/components/warmth/time-capsule-toggle'
+import AISuggestionCard from './ai-suggestion-card'
 
 interface CreateMemoryFormProps {
   onSuccess?: () => void
@@ -18,8 +22,22 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
   const [tagInput, setTagInput] = useState('')
   const [note, setNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [enableAISuggestion, setEnableAISuggestion] = useState(false)
+  const [sealedUntil, setSealedUntil] = useState<string | null>(null)
+  const [lastCreatedMemory, setLastCreatedMemory] = useState<CreateMemoryResponse | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const tagInputRef = useRef<HTMLInputElement>(null)
+
+  // Load global AI suggestion preference on mount
+  useEffect(() => {
+    api.getSettings().then((response) => {
+      if (response.success && response.data?.ai_suggestion_enabled) {
+        setEnableAISuggestion(true)
+      }
+    }).catch(() => {
+      // Silently fail — default to false
+    })
+  }, [])
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type })
@@ -73,8 +91,11 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
       link_url?: string
       tags?: string[]
       note?: string
+      enable_ai_suggestion?: boolean
+      sealed_until?: string
     } = {
       content_type: contentType,
+      enable_ai_suggestion: enableAISuggestion,
     }
 
     if (contentType === 'text') {
@@ -97,16 +118,21 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
     if (note.trim()) {
       data.note = note.trim()
     }
+    if (sealedUntil) {
+      data.sealed_until = sealedUntil
+    }
 
     setIsSubmitting(true)
     try {
       const response = await api.createMemory(data)
-      if (response.success) {
+      if (response.success && response.data) {
         setTextContent('')
         setLinkUrl('')
         setTagList([])
         setTagInput('')
         setNote('')
+        setSealedUntil(null)
+        setLastCreatedMemory(response.data)
         showToast('记忆已保存', 'success')
         onSuccess?.()
       } else {
@@ -132,6 +158,8 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
       </ToastContainer>
 
       <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 p-5 min-h-[360px] flex flex-col">
+        <StreakIndicator />
+
         {/* Content type toggle */}
         <div className="flex gap-2 mb-4">
           {(['text', 'link'] as ContentType[]).map((type) => (
@@ -213,6 +241,30 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
           className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 transition-colors text-sm mb-4"
         />
 
+        {/* AI Suggestion Toggle */}
+        <div className="flex items-center justify-between py-2 mb-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              AI 建议
+            </span>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={enableAISuggestion}
+              onChange={(e) => setEnableAISuggestion(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-400 dark:peer-focus:ring-amber-500 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:border-gray-500 peer-checked:bg-amber-500 dark:peer-checked:bg-amber-600" />
+          </label>
+        </div>
+
+        {/* Time Capsule Toggle */}
+        <div className="mb-5">
+          <TimeCapsuleToggle sealedUntil={sealedUntil} onChange={setSealedUntil} />
+        </div>
+
         <button
           type="submit"
           disabled={isSubmitting}
@@ -221,6 +273,16 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
           {isSubmitting ? '保存中...' : '保存记忆'}
         </button>
       </form>
+
+      {/* AI Suggestion Card */}
+      {lastCreatedMemory && lastCreatedMemory.suggestion_status !== 'skipped' && (
+        <AISuggestionCard
+          key={lastCreatedMemory.memory.id}
+          memoryId={lastCreatedMemory.memory.id}
+          suggestionStatus={lastCreatedMemory.suggestion_status}
+          onDismiss={() => setLastCreatedMemory(null)}
+        />
+      )}
     </>
   )
 }

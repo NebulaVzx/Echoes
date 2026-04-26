@@ -35,11 +35,12 @@ func Setup(logger *zap.Logger, db *gorm.DB) *gin.Engine {
 	// Register /metrics endpoint before route groups
 	observability.RegisterMetricsEndpoint(router)
 
-	// Rate limiters: 30 req/s for auth (relaxed for Docker shared IP), 60 req/s for APIs
-	// NOTE: In Docker all host requests share the same IP (e.g. 172.19.0.1), so auth
-	// burst must be high enough to avoid false-positive 429s across all users.
-	authLimiter := middleware.NewRateLimiter(time.Second, 30)
-	defaultLimiter := middleware.NewRateLimiter(time.Second, 60)
+	// Rate limiters: relaxed for local development — prevents abuse without blocking normal browsing.
+	// rate = interval between token refills. 50ms = 20 req/s average. 500ms = 2 req/s average.
+	// burst = max concurrent requests allowed in a single burst.
+	// NOTE: In Docker all host requests share the same IP, so per-IP auth limit must be generous.
+	authLimiter := middleware.NewRateLimiter(500*time.Millisecond, 30)   // 2 req/s avg, burst 30
+	defaultLimiter := middleware.NewRateLimiter(50*time.Millisecond, 200) // 20 req/s avg, burst 200
 
 	// Health check (no rate limit) — aggregated: gateway + downstream services
 	router.GET("/health", healthCheckHandler)
@@ -74,6 +75,14 @@ func Setup(logger *zap.Logger, db *gorm.DB) *gin.Engine {
 
 	// Search route → Memory Service
 	protected.Any("/search", func(c *gin.Context) {
+		memoryProxy.ServeHTTP(c.Writer, c.Request)
+	})
+
+	// Tag routes → Memory Service
+	protected.Any("/tags", func(c *gin.Context) {
+		memoryProxy.ServeHTTP(c.Writer, c.Request)
+	})
+	protected.Any("/tags/*path", func(c *gin.Context) {
 		memoryProxy.ServeHTTP(c.Writer, c.Request)
 	})
 
@@ -163,6 +172,7 @@ func newReverseProxy(envKey, defaultURL string) *httputil.ReverseProxy {
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
 	// Custom transport with explicit timeouts and OTel trace propagation to downstream services
+	// ResponseHeaderTimeout set to 60s to accommodate LLM API calls (e.g. tag categorization)
 	proxy.Transport = otelhttp.NewTransport(&http.Transport{
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 10,
@@ -173,7 +183,7 @@ func newReverseProxy(envKey, defaultURL string) *httputil.ReverseProxy {
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
 		TLSHandshakeTimeout:   5 * time.Second,
-		ResponseHeaderTimeout: 10 * time.Second,
+		ResponseHeaderTimeout: 60 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	})
 

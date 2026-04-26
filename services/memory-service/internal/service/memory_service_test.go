@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
@@ -37,17 +38,24 @@ func (m *mockMemoryRepository) GetVectorByID(ctx context.Context, id uuid.UUID) 
 	return "", nil
 }
 
-func (m *mockMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tag string) ([]domain.Memory, int64, error) {
+func (m *mockMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool) ([]domain.Memory, int64, error) {
 	var results []domain.Memory
 	for _, mem := range m.memories {
 		if mem.UserID != userID {
 			continue
 		}
-		if tag != "" {
-			found := false
-			for _, t := range mem.Tags {
-				if t == tag {
-					found = true
+		if len(tags) > 0 {
+			found := true
+			for _, tag := range tags {
+				tagFound := false
+				for _, t := range mem.Tags {
+					if t == tag {
+						tagFound = true
+						break
+					}
+				}
+				if !tagFound {
+					found = false
 					break
 				}
 			}
@@ -108,6 +116,119 @@ func (m *mockMemoryRepository) FindRelated(ctx context.Context, userID uuid.UUID
 	return nil, nil
 }
 
+func (m *mockMemoryRepository) GetMemoriesByDateRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]domain.Memory, error) {
+	var results []domain.Memory
+	for _, mem := range m.memories {
+		if mem.UserID != userID {
+			continue
+		}
+		if mem.CreatedAt.After(start) && mem.CreatedAt.Before(end) {
+			results = append(results, *mem)
+		}
+	}
+	return results, nil
+}
+
+func (m *mockMemoryRepository) GetRandomMemory(ctx context.Context, userID uuid.UUID, before time.Time) (domain.Memory, error) {
+	for _, mem := range m.memories {
+		if mem.UserID == userID && mem.CreatedAt.Before(before) {
+			return *mem, nil
+		}
+	}
+	return domain.Memory{}, repository.ErrMemoryNotFound
+}
+
+func (m *mockMemoryRepository) GetMemoriesByDay(ctx context.Context, userID uuid.UUID, day time.Time) ([]domain.Memory, error) {
+	var results []domain.Memory
+	for _, mem := range m.memories {
+		if mem.UserID != userID {
+			continue
+		}
+		if mem.CreatedAt.Year() == day.Year() && mem.CreatedAt.YearDay() == day.YearDay() {
+			results = append(results, *mem)
+		}
+	}
+	return results, nil
+}
+
+func (m *mockMemoryRepository) GetMemoriesOnDate(ctx context.Context, userID uuid.UUID, month, day int) ([]domain.Memory, error) {
+	var results []domain.Memory
+	for _, mem := range m.memories {
+		if mem.UserID != userID {
+			continue
+		}
+		if int(mem.CreatedAt.Month()) == month && mem.CreatedAt.Day() == day {
+			results = append(results, *mem)
+		}
+	}
+	return results, nil
+}
+
+func (m *mockMemoryRepository) CountMemoriesSince(ctx context.Context, userID uuid.UUID, since time.Time) (int64, error) {
+	var count int64
+	for _, mem := range m.memories {
+		if mem.UserID == userID && mem.CreatedAt.After(since) {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (m *mockMemoryRepository) SealMemory(ctx context.Context, userID, memoryID uuid.UUID, sealedUntil time.Time) error {
+	mem, ok := m.memories[memoryID]
+	if !ok {
+		return repository.ErrMemoryNotFound
+	}
+	if mem.UserID != userID {
+		return repository.ErrMemoryNotFound
+	}
+	mem.SealedUntil = &sealedUntil
+	return nil
+}
+
+func (m *mockMemoryRepository) UnsealMemory(ctx context.Context, userID, memoryID uuid.UUID) error {
+	mem, ok := m.memories[memoryID]
+	if !ok {
+		return repository.ErrMemoryNotFound
+	}
+	if mem.UserID != userID {
+		return repository.ErrMemoryNotFound
+	}
+	mem.SealedUntil = nil
+	return nil
+}
+
+func (m *mockMemoryRepository) ListSealedMemories(ctx context.Context, userID uuid.UUID, page, limit int) ([]domain.Memory, int64, error) {
+	var results []domain.Memory
+	now := time.Now()
+	for _, mem := range m.memories {
+		if mem.UserID == userID && mem.SealedUntil != nil && mem.SealedUntil.After(now) {
+			results = append(results, *mem)
+		}
+	}
+	total := int64(len(results))
+	offset := (page - 1) * limit
+	if offset >= len(results) {
+		return []domain.Memory{}, total, nil
+	}
+	end := offset + limit
+	if end > len(results) {
+		end = len(results)
+	}
+	return results[offset:end], total, nil
+}
+
+func (m *mockMemoryRepository) GetRecentlyUnsealed(ctx context.Context, userID uuid.UUID, since time.Time) ([]domain.Memory, error) {
+	var results []domain.Memory
+	now := time.Now()
+	for _, mem := range m.memories {
+		if mem.UserID == userID && mem.SealedUntil != nil && mem.SealedUntil.Before(now) && mem.SealedUntil.After(since) {
+			results = append(results, *mem)
+		}
+	}
+	return results, nil
+}
+
 // mockUserRepository implements the memory-service's UserRepository for tests.
 type mockUserRepo struct {
 	user *domain.User
@@ -159,8 +280,37 @@ func (m *mockTaskQueue) PublishTagGenerate(ctx context.Context, memoryID uuid.UU
 	return nil
 }
 
+func (m *mockTaskQueue) PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, timeout int, maxRetries int, llmConfig map[string]interface{}) error {
+	m.published = append(m.published, map[string]interface{}{
+		"type":         "suggestion:generate",
+		"memory":       memoryID,
+		"content_type": contentType,
+		"style":        style,
+	})
+	return nil
+}
+
 func (m *mockTaskQueue) PublishTask(ctx context.Context, stream string, data map[string]interface{}) error {
 	m.published = append(m.published, data)
+	return nil
+}
+
+// mockSuggestionRepository implements SuggestionRepository for testing.
+type mockSuggestionRepository struct{}
+
+func (m *mockSuggestionRepository) Create(ctx context.Context, suggestion *domain.AISuggestion) error {
+	return nil
+}
+
+func (m *mockSuggestionRepository) GetByMemoryID(ctx context.Context, memoryID uuid.UUID) (*domain.AISuggestion, error) {
+	return nil, repository.ErrSuggestionNotFound
+}
+
+func (m *mockSuggestionRepository) UpdateFeedback(ctx context.Context, memoryID uuid.UUID, feedback string) error {
+	return nil
+}
+
+func (m *mockSuggestionRepository) DeleteByMemoryID(ctx context.Context, memoryID uuid.UUID) error {
 	return nil
 }
 
@@ -172,7 +322,8 @@ func newTestMemoryService() (*MemoryService, *mockMemoryRepository, *mockTaskQue
 		},
 	}
 	queue := newMockTaskQueue()
-	svc := NewMemoryService(repo, userRepo, queue, nil)
+	suggestionRepo := &mockSuggestionRepository{}
+	svc := NewMemoryService(repo, userRepo, queue, nil, suggestionRepo)
 	return svc, repo, queue
 }
 
@@ -188,7 +339,7 @@ func TestMemoryService_Create_TextMemory(t *testing.T) {
 		Note:        "test note",
 	}
 
-	memory, err := svc.Create(ctx, userID, req)
+	memory, _, err := svc.Create(ctx, userID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -241,7 +392,7 @@ func TestMemoryService_Create_LinkMemory_InvalidURL(t *testing.T) {
 		LinkURL:     "ftp://example.com",
 	}
 
-	_, err := svc.Create(ctx, userID, req)
+	_, _, err := svc.Create(ctx, userID, req)
 	if err == nil {
 		t.Fatal("Create() expected error for ftp:// URL, got nil")
 	}
@@ -261,7 +412,7 @@ func TestMemoryService_Create_LinkMemory_ValidURL(t *testing.T) {
 		Note:        "interesting article",
 	}
 
-	memory, err := svc.Create(ctx, userID, req)
+	memory, _, err := svc.Create(ctx, userID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -304,7 +455,7 @@ func TestMemoryService_Get_Success(t *testing.T) {
 		TextContent: "test content for get",
 	}
 
-	created, err := svc.Create(ctx, userID, req)
+	created, _, err := svc.Create(ctx, userID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -335,7 +486,7 @@ func TestMemoryService_Get_Unauthorized(t *testing.T) {
 		TextContent: "private content",
 	}
 
-	created, err := svc.Create(ctx, ownerID, req)
+	created, _, err := svc.Create(ctx, ownerID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -374,14 +525,14 @@ func TestMemoryService_List_Pagination(t *testing.T) {
 			ContentType: "text",
 			TextContent: "memory content number",
 		}
-		_, err := svc.Create(ctx, userID, req)
+		_, _, err := svc.Create(ctx, userID, req)
 		if err != nil {
 			t.Fatalf("Create() #%d error: %v", i, err)
 		}
 	}
 
 	// List page 1 with limit 10
-	resp, err := svc.List(ctx, userID, 1, 10, "")
+	resp, err := svc.List(ctx, userID, 1, 10, nil)
 	if err != nil {
 		t.Fatalf("List() unexpected error: %v", err)
 	}
@@ -407,7 +558,7 @@ func TestMemoryService_List_Pagination(t *testing.T) {
 	}
 
 	// List page 3 with limit 10 (should return last 5 items)
-	resp2, err := svc.List(ctx, userID, 3, 10, "")
+	resp2, err := svc.List(ctx, userID, 3, 10, nil)
 	if err != nil {
 		t.Fatalf("List() page 3 unexpected error: %v", err)
 	}
@@ -432,7 +583,7 @@ func TestMemoryService_Update_Success(t *testing.T) {
 		Tags:        []string{"old"},
 	}
 
-	created, err := svc.Create(ctx, userID, req)
+	created, _, err := svc.Create(ctx, userID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -466,7 +617,7 @@ func TestMemoryService_Delete_Success(t *testing.T) {
 		TextContent: "content to delete",
 	}
 
-	created, err := svc.Create(ctx, userID, req)
+	created, _, err := svc.Create(ctx, userID, req)
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}

@@ -74,25 +74,56 @@ type PaginationSettings struct {
 	Mode string `json:"mode,omitempty" binding:"omitempty,oneof=load_more page_numbers"`
 }
 
+// TagMeta represents metadata for a single tag.
+type TagMeta struct {
+	Color string `json:"color,omitempty"`
+}
+
+// TagCategory represents a single category in the auto-categorize result.
+type TagCategory struct {
+	Name string   `json:"name"`
+	Tags []string `json:"tags"`
+}
+
 // UserSettings represents the complete user settings.
 type UserSettings struct {
 	LLMSettings
 	SearchSimilarityThreshold float64 `json:"search_similarity_threshold,omitempty" binding:"omitempty,gte=0,lte=1"`
 	RAGMemoryLimit            int     `json:"rag_memory_limit,omitempty" binding:"omitempty,gte=1,lte=20"`
 	PaginationMode            string  `json:"pagination_mode,omitempty" binding:"omitempty,oneof=load_more page_numbers"`
+	// AI Suggestion settings (Phase 8)
+	AISuggestionEnabled    bool   `json:"ai_suggestion_enabled" binding:"omitempty"`
+	AISuggestionStyle      string `json:"ai_suggestion_style,omitempty" binding:"omitempty,oneof=gentle practical inspiring"`
+	AISuggestionTimeout    int    `json:"ai_suggestion_timeout,omitempty" binding:"omitempty,gte=10,lte=60"`
+	AISuggestionMaxRetries int    `json:"ai_suggestion_max_retries,omitempty" binding:"omitempty,gte=1,lte=5"`
+	// Tag metadata (Phase 9)
+	TagMetadata map[string]TagMeta `json:"tag_metadata,omitempty"`
+	// Tag categories from auto-categorize
+	TagCategories []TagCategory `json:"tag_categories,omitempty"`
 }
 
 // UpdateSettingsRequest represents a request to update user settings.
 type UpdateSettingsRequest struct {
-	LLM        *LLMSettings        `json:"llm,omitempty"`
-	Search     *SearchSettings     `json:"search,omitempty"`
-	RAG        *RAGSettings        `json:"rag,omitempty"`
-	Pagination *PaginationSettings `json:"pagination,omitempty"`
+	LLM           *LLMSettings        `json:"llm,omitempty"`
+	Search        *SearchSettings     `json:"search,omitempty"`
+	RAG           *RAGSettings        `json:"rag,omitempty"`
+	Pagination    *PaginationSettings `json:"pagination,omitempty"`
+	AI            *AISettings         `json:"ai,omitempty"`
+	Tags          map[string]TagMeta  `json:"tags,omitempty"`
+	TagCategories *[]TagCategory      `json:"tag_categories,omitempty"`
 }
 
 // TestLLMRequest represents a request to test LLM connectivity.
 type TestLLMRequest struct {
 	LLM LLMSettings `json:"llm" binding:"required"`
+}
+
+// AISettings represents per-user AI suggestion configuration.
+type AISettings struct {
+	Enabled    bool   `json:"ai_suggestion_enabled" binding:"omitempty"`
+	Style      string `json:"ai_suggestion_style,omitempty" binding:"omitempty,oneof=gentle practical inspiring"`
+	Timeout    int    `json:"ai_suggestion_timeout,omitempty" binding:"omitempty,gte=10,lte=60"`
+	MaxRetries int    `json:"ai_suggestion_max_retries,omitempty" binding:"omitempty,gte=1,lte=5"`
 }
 
 // GitHubOAuthState stores state for OAuth CSRF protection.

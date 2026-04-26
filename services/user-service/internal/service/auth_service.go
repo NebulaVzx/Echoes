@@ -206,6 +206,39 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 		existing.PaginationMode = req.Pagination.Mode
 	}
 
+	// Update AI suggestion settings if provided
+	if req.AI != nil {
+		existing.AISuggestionEnabled = req.AI.Enabled
+		if req.AI.Style != "" {
+			existing.AISuggestionStyle = req.AI.Style
+		}
+		if req.AI.Timeout > 0 {
+			existing.AISuggestionTimeout = req.AI.Timeout
+		}
+		if req.AI.MaxRetries > 0 {
+			existing.AISuggestionMaxRetries = req.AI.MaxRetries
+		}
+	}
+
+	// Update tag metadata if provided (Phase 9)
+	if req.Tags != nil {
+		if existing.TagMetadata == nil {
+			existing.TagMetadata = make(map[string]domain.TagMeta)
+		}
+		for tag, meta := range req.Tags {
+			if meta.Color == "" {
+				delete(existing.TagMetadata, tag)
+			} else {
+				existing.TagMetadata[tag] = meta
+			}
+		}
+	}
+
+	// Update tag categories if provided
+	if req.TagCategories != nil {
+		existing.TagCategories = *req.TagCategories
+	}
+
 	settingsJSON, err := json.Marshal(existing)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal settings: %w", err)

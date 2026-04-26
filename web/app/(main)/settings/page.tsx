@@ -8,6 +8,7 @@ import { api, LLMSettings, UserSettings } from '@/lib/api'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
+import { Flame, Trophy } from 'lucide-react'
 
 const settingsSchema = z.object({
   llm_provider: z.string().min(1, '提供商名称不能为空').max(50),
@@ -20,6 +21,10 @@ const settingsSchema = z.object({
   similarity_threshold: z.number().min(0).max(1),
   rag_memory_limit: z.number().min(1).max(20),
   pagination_mode: z.enum(['load_more', 'page_numbers']).optional(),
+  ai_suggestion_enabled: z.boolean().optional(),
+  ai_suggestion_style: z.enum(['gentle', 'practical', 'inspiring']).optional(),
+  ai_suggestion_timeout: z.number().min(10).max(60).optional(),
+  ai_suggestion_max_retries: z.number().min(1).max(5).optional(),
 })
 
 type SettingsFormData = z.infer<typeof settingsSchema>
@@ -76,6 +81,10 @@ export default function SettingsPage() {
   const [isSavingProcessing, setIsSavingProcessing] = useState(false)
   const [isSavingSearch, setIsSavingSearch] = useState(false)
   const [isSavingUI, setIsSavingUI] = useState(false)
+  const [isSavingAI, setIsSavingAI] = useState(false)
+
+  // Streak stats
+  const [streakData, setStreakData] = useState<{ current_streak: number; longest_streak: number; has_recorded_today: boolean } | null>(null)
 
   // Test connection state
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
@@ -108,6 +117,10 @@ export default function SettingsPage() {
       similarity_threshold: 0.4,
       rag_memory_limit: 5,
       pagination_mode: 'load_more',
+      ai_suggestion_enabled: false,
+      ai_suggestion_style: 'inspiring',
+      ai_suggestion_timeout: 30,
+      ai_suggestion_max_retries: 3,
     },
   })
 
@@ -115,6 +128,15 @@ export default function SettingsPage() {
 
   // Track last tested connection values
   const lastTestedRef = useRef<Partial<SettingsFormData> | null>(null)
+
+  // Load streak data
+  useEffect(() => {
+    api.getStreaks().then((res) => {
+      if (res.success && res.data) {
+        setStreakData(res.data)
+      }
+    }).catch(() => {})
+  }, [])
 
   // Load existing settings
   useEffect(() => {
@@ -134,6 +156,10 @@ export default function SettingsPage() {
             similarity_threshold: data.search_similarity_threshold ?? 0.4,
             rag_memory_limit: data.rag_memory_limit ?? 5,
             pagination_mode: (data.pagination_mode as 'load_more' | 'page_numbers') || 'load_more',
+            ai_suggestion_enabled: data.ai_suggestion_enabled ?? false,
+            ai_suggestion_style: (data.ai_suggestion_style as 'gentle' | 'practical' | 'inspiring') || 'inspiring',
+            ai_suggestion_timeout: data.ai_suggestion_timeout ?? 30,
+            ai_suggestion_max_retries: data.ai_suggestion_max_retries ?? 3,
           })
         }
       } catch (err) {
@@ -336,6 +362,36 @@ export default function SettingsPage() {
     }
   }
 
+  const onSaveAI = async () => {
+    setIsSavingAI(true)
+    dismissToast()
+    const data = getValues()
+    const payload = {
+      ai: {
+        ai_suggestion_enabled: data.ai_suggestion_enabled ?? false,
+        ai_suggestion_style: data.ai_suggestion_style || 'inspiring',
+        ai_suggestion_timeout: typeof data.ai_suggestion_timeout === 'string'
+          ? parseInt(data.ai_suggestion_timeout, 10)
+          : (data.ai_suggestion_timeout ?? 30),
+        ai_suggestion_max_retries: typeof data.ai_suggestion_max_retries === 'string'
+          ? parseInt(data.ai_suggestion_max_retries, 10)
+          : (data.ai_suggestion_max_retries ?? 3),
+      },
+    }
+    try {
+      const response = await api.updateSettings(payload)
+      if (response.success) {
+        showToast('AI 建议设置已保存', 'success')
+      } else {
+        showToast(response.error?.message || '保存失败', 'error')
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '保存失败', 'error')
+    } finally {
+      setIsSavingAI(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -394,6 +450,67 @@ export default function SettingsPage() {
       </ToastContainer>
 
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+        {/* Section 0: Memory Stats */}
+        <section className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-1">
+            记忆统计
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            记录是一种温柔的习惯
+          </p>
+
+          <div className="space-y-5">
+            {/* Streak counters */}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Flame className={`w-5 h-5 ${streakData?.has_recorded_today ? 'text-orange-400' : 'text-gray-300 dark:text-gray-600'}`} />
+                <div>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
+                    {streakData?.current_streak || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">当前连续</p>
+                </div>
+              </div>
+              <div className="w-px h-10 bg-gray-200 dark:bg-gray-700" />
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-amber-400" />
+                <div>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
+                    {streakData?.longest_streak || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">最长连续</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Milestone badges */}
+            <div className="flex flex-wrap gap-2">
+              {[7, 30, 100].map((milestone) => {
+                const achieved = (streakData?.longest_streak || 0) >= milestone
+                return (
+                  <span
+                    key={milestone}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      achieved
+                        ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800/30'
+                        : 'bg-gray-50 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-600'
+                    }`}
+                  >
+                    <Flame className={`w-3 h-3 ${achieved ? 'text-orange-400' : 'text-gray-300 dark:text-gray-600'}`} />
+                    {milestone} 天
+                  </span>
+                )
+              })}
+            </div>
+
+            {streakData && streakData.current_streak === 0 && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                每天记录一点点， streak 就会从这里开始生长
+              </p>
+            )}
+          </div>
+        </section>
+
         {/* Section 1: LLM Connection */}
         <section className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-1">
@@ -725,6 +842,137 @@ export default function SettingsPage() {
                 className="px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-md text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingUI ? '保存中...' : '保存界面偏好'}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 5: AI Suggestion Preferences */}
+        <section className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-1">
+            AI 建议
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            配置 AI 陪伴建议的生成行为
+          </p>
+
+          <div className="space-y-5">
+            {/* Enable AI Suggestion Toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  开启 AI 建议
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  开启后，创建记忆时默认启用 AI 建议生成
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  {...register('ai_suggestion_enabled')}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-400 dark:peer-focus:ring-amber-500 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-500 peer-checked:bg-amber-500 dark:peer-checked:bg-amber-600" />
+              </label>
+            </div>
+
+            {/* Style Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                建议风格
+              </label>
+              <div className="flex gap-3">
+                {[
+                  { value: 'gentle', label: '温柔型', emoji: '\u{1FAC2}', desc: '情绪支持为主' },
+                  { value: 'practical', label: '实用型', emoji: '\u{1F9E0}', desc: '知识拓展、行动建议' },
+                  { value: 'inspiring', label: '启发型', emoji: '\u{1F4A1}', desc: '灵感催化、连接发现' },
+                ].map((style) => (
+                  <label
+                    key={style.value}
+                    className={`flex-1 flex flex-col items-center gap-1 px-3 py-3 border rounded-lg cursor-pointer transition-colors ${
+                      watch('ai_suggestion_style') === style.value
+                        ? 'border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-950/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      {...register('ai_suggestion_style')}
+                      value={style.value}
+                      className="sr-only"
+                    />
+                    <span className="text-lg">{style.emoji}</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {style.label}
+                    </span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      {style.desc}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Advanced Options (collapsible) */}
+            <details className="group">
+              <summary className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+                <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+                高级选项
+              </summary>
+              <div className="mt-4 space-y-4 pl-6">
+                {/* Timeout */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    生成超时时间（秒）
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      {...register('ai_suggestion_timeout', { valueAsNumber: true })}
+                      min="10"
+                      max="60"
+                      step="5"
+                      className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <span className="text-sm text-gray-600 dark:text-gray-400 w-12 text-right">
+                      {watch('ai_suggestion_timeout') || 30}s
+                    </span>
+                  </div>
+                </div>
+
+                {/* Max Retries */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    最大重试次数
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      {...register('ai_suggestion_max_retries', { valueAsNumber: true })}
+                      min="1"
+                      max="5"
+                      step="1"
+                      className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <span className="text-sm text-gray-600 dark:text-gray-400 w-12 text-right">
+                      {watch('ai_suggestion_max_retries') || 3}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={onSaveAI}
+                disabled={isSavingAI}
+                className="px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-md text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingAI ? '保存中...' : '保存 AI 建议设置'}
               </button>
             </div>
           </div>

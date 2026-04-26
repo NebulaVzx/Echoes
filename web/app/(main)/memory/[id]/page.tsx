@@ -4,14 +4,17 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { Lock, Unlock } from 'lucide-react'
 import { api, Memory } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
 import { useTheme } from '@/app/providers/theme-provider'
 import Logo from '@/components/logo'
 import RelatedMemories from '@/components/search/related-memories'
 import SearchInput from '@/components/search/search-input'
+import SuggestionDetailSection from '@/components/memory/suggestion-detail-section'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
+import { getTagStyle } from '@/components/memory/tag-filter-bar'
 
 function ThemeToggle() {
   const { resolvedTheme, toggleTheme } = useTheme()
@@ -84,6 +87,7 @@ export default function MemoryDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
+  const [relatedTags, setRelatedTags] = useState<Record<string, string[]>>({})
 
   // Toast for delete errors
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
@@ -101,6 +105,23 @@ export default function MemoryDetailPage() {
         const response = await api.getMemory(memoryId)
         if (response.success && response.data) {
           setMemory(response.data)
+          // Load related tags for each tag
+          if (response.data.tags && response.data.tags.length > 0) {
+            const related: Record<string, string[]> = {}
+            await Promise.all(
+              response.data.tags.map(async (tag) => {
+                try {
+                  const resp = await api.getRelatedTags(tag)
+                  if (resp.success && resp.data) {
+                    related[tag] = resp.data.related_tags
+                  }
+                } catch {
+                  // Silently fail
+                }
+              })
+            )
+            setRelatedTags(related)
+          }
         } else {
           setError('记忆不存在')
         }
@@ -116,14 +137,14 @@ export default function MemoryDetailPage() {
 
   // Poll for processing status updates
   useEffect(() => {
-    if (!memory || memory.processing_status !== 'pending') return
+    if (!memory || (memory.processing_status !== 'pending' && memory.processing_status !== 'processing')) return
 
     const interval = setInterval(async () => {
       try {
         const response = await api.getMemory(memoryId)
         if (response.success && response.data) {
           setMemory(response.data)
-          if (response.data.processing_status !== 'pending') {
+          if (response.data.processing_status !== 'pending' && response.data.processing_status !== 'processing') {
             clearInterval(interval)
           }
         }
@@ -150,6 +171,23 @@ export default function MemoryDetailPage() {
       showToast(err instanceof Error ? err.message : '删除失败', 'error')
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleSeal = async () => {
+    // Default seal for 30 days from detail page
+    const d = new Date()
+    d.setDate(d.getDate() + 30)
+    const res = await api.sealMemory(memoryId, d.toISOString())
+    if (res.success) {
+      setMemory(prev => prev ? { ...prev, sealed_until: d.toISOString() } : prev)
+    }
+  }
+
+  const handleUnseal = async () => {
+    const res = await api.unsealMemory(memoryId)
+    if (res.success) {
+      setMemory(prev => prev ? { ...prev, sealed_until: undefined } : prev)
     }
   }
 
@@ -320,6 +358,23 @@ export default function MemoryDetailPage() {
             >
               返回
             </Link>
+            {memory.sealed_until ? (
+              <button
+                onClick={handleUnseal}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+              >
+                <Unlock className="w-4 h-4" />
+                解除封印（{new Date(memory.sealed_until).toLocaleDateString('zh-CN')} 解锁）
+              </button>
+            ) : (
+              <button
+                onClick={handleSeal}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              >
+                <Lock className="w-4 h-4" />
+                封印这段记忆
+              </button>
+            )}
             <button
               onClick={handleDelete}
               disabled={isDeleting}
@@ -328,6 +383,34 @@ export default function MemoryDetailPage() {
               {isDeleting ? '删除中...' : '删除'}
             </button>
           </div>
+
+          {/* Related Tags */}
+          {Object.keys(relatedTags).length > 0 && (
+            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">相关标签</p>
+              <div className="space-y-2">
+                {Object.entries(relatedTags).map(([tag, related]) =>
+                  related.length > 0 ? (
+                    <div key={tag} className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{tag}:</span>
+                      {related.map((r) => (
+                        <Link
+                          key={r}
+                          href={`/?tags=${encodeURIComponent(r)}`}
+                          className={`inline-flex px-2 py-0.5 text-xs rounded-full transition-colors hover:opacity-80 ${getTagStyle(undefined, false)}`}
+                        >
+                          {r}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* AI Suggestion */}
+          <SuggestionDetailSection memoryId={memoryId} />
 
           {/* Related memories */}
           <RelatedMemories memoryId={memoryId} />

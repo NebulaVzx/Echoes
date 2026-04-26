@@ -9,7 +9,7 @@ description: 拾忆产品开发路线图
 
 - ✅ **v1.0 MVP** — Phases 0-5 (shipped 2026-04-22)
 - ✅ **v1.1 Echo Assistant** — Phases 6-7 (shipped 2026-04-25)
-- 🚧 **v1.2** — 待定
+- ✅ **v1.2 "记忆的温度"** — Phases 8-10 (shipped 2026-04-26)
 
 ## 已发布
 
@@ -41,25 +41,28 @@ description: 拾忆产品开发路线图
 
 </details>
 
+<details>
+<summary>✅ v1.2 "记忆的温度" (Phases 8-10) — SHIPPED 2026-04-26</summary>
+
+| Phase | 名称 | 计划数 | 完成日期 |
+|-------|------|--------|----------|
+| 8 | AI 陪伴建议 | 5 | 2026-04-25 |
+| 9 | 标签重生 | 4 | 2026-04-25 |
+| 10 | 记忆的温度 | 4 | 2026-04-26 |
+
+**核心方向：**
+1. **AI 陪伴建议** — 保存记忆后生成温情的、有建设性的 AI 反馈，持久化保存
+2. **标签重生** — 标签从静态附属品变为可过滤、可管理、可发现的知识节点
+3. **记忆的温度** — Streaks、那年今日、时间胶囊，让记忆有情感价值
+
+完整归档见 `.planning/milestones/v1.2-ROADMAP.md`
+
+</details>
+
 ## 进行中
 
-### 🚧 v1.2 (规划中)
-
-待开始下一个里程碑规划。
-
-## 进度
-
-| Phase | 里程碑 | 计划完成 | 状态 | 完成日期 |
-|-------|--------|----------|------|----------|
-| 0. Foundation | v1.0 | — | Complete | 2026-04-19 |
-| 1. Authentication | v1.0 | — | Complete | 2026-04-19 |
-| 2. Memory Capture | v1.0 | — | Complete | 2026-04-19 |
-| 3. AI Processing | v1.0 | 4/4 | Complete | 2026-04-19 |
-| 4. Search | v1.0 | 4/4 | Complete | 2026-04-21 |
-| 5. Observability + Polish | v1.0 | 7/7 | Complete | 2026-04-22 |
-| 6. Echo Assistant | v1.1 | 5/5 | Complete | 2026-04-22 |
-| 7. Bug Fixes & Quality | v1.1 | 4/4 | Complete | 2026-04-25 |
+*暂无进行中的里程碑。使用 `/gsd-new-milestone` 开始下一个里程碑。*
 
 ---
 
-*Roadmap updated: 2026-04-25 for v1.1 milestone completion*
+*Roadmap updated: 2026-04-26 — v1.2 milestone shipped*

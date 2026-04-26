@@ -13,7 +13,7 @@ class LLMProvider(ABC):
         self.temperature = temperature
 
     @abstractmethod
-    async def generate(self, prompt: str, temperature: float = None, max_tokens: int = 500) -> str:
+    async def generate(self, prompt: str, temperature: float = None, max_tokens: int = 500, timeout: float = None) -> str:
         pass
 
     @abstractmethod
@@ -24,4 +24,19 @@ class LLMProvider(ABC):
     @abstractmethod
     async def chat(self, messages: List[LLMMessage], temperature: float = None, max_tokens: int = 500) -> str:
         """Generate a response given a conversation history."""
+        pass
+
+    @abstractmethod
+    async def generate_suggestion(self, prompt: str, temperature: float = None, max_tokens: int = 200, timeout: float = None) -> str:
+        """Generate an AI companion suggestion given a crafted prompt.
+
+        Args:
+            prompt: The fully constructed suggestion prompt.
+            temperature: Override temperature for this call.
+            max_tokens: Maximum tokens for the response (default 200 for ~150 Chinese chars).
+            timeout: Optional timeout in seconds for the LLM API call.
+
+        Returns:
+            The generated suggestion text.
+        """
         pass

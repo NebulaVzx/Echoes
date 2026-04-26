@@ -17,12 +17,15 @@ import (
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"go.uber.org/zap"
 )
 
 var (
-	ErrMemoryNotFound = errors.New("memory not found")
-	ErrUnauthorized   = errors.New("unauthorized access to memory")
-	ErrInvalidURL     = errors.New("invalid URL: must be http or https")
+	ErrMemoryNotFound     = errors.New("memory not found")
+	ErrUnauthorized       = errors.New("unauthorized access to memory")
+	ErrInvalidURL         = errors.New("invalid URL: must be http or https")
+	ErrSuggestionNotFound = errors.New("suggestion not found")
+	ErrInvalidRequest     = errors.New("invalid request")
 )
 
 // dangerousHTMLTags matches potentially harmful HTML tags.
@@ -71,10 +74,11 @@ func validateLinkURL(rawURL string) error {
 
 // MemoryService handles memory CRUD business logic.
 type MemoryService struct {
-	repo       repository.MemoryRepository
-	userRepo   repository.UserRepository
-	queue      TaskQueue
-	vectorizer *VectorizerClient
+	repo           repository.MemoryRepository
+	userRepo       repository.UserRepository
+	queue          TaskQueue
+	vectorizer     *VectorizerClient
+	suggestionRepo repository.SuggestionRepository
 }
 
 // TaskQueue defines the interface for publishing async tasks.
@@ -82,32 +86,35 @@ type TaskQueue interface {
 	PublishLinkFetch(ctx context.Context, memoryID uuid.UUID, linkURL string, note string, llmConfig map[string]interface{}) error
 	PublishTextVectorize(ctx context.Context, memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
 	PublishTagGenerate(ctx context.Context, memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error
+	PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, timeout int, maxRetries int, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
 // NewMemoryService creates a new memory service.
-func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue, vectorizer *VectorizerClient) *MemoryService {
+func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue, vectorizer *VectorizerClient, suggestionRepo repository.SuggestionRepository) *MemoryService {
 	return &MemoryService{
-		repo:       repo,
-		userRepo:   userRepo,
-		queue:      queue,
-		vectorizer: vectorizer,
+		repo:           repo,
+		userRepo:       userRepo,
+		queue:          queue,
+		vectorizer:     vectorizer,
+		suggestionRepo: suggestionRepo,
 	}
 }
 
 // Create creates a new memory and publishes async tasks.
-func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain.CreateMemoryRequest) (*domain.Memory, error) {
+// Returns the created memory, suggestion status ("pending", "skipped", "failed"), and any error.
+func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain.CreateMemoryRequest) (*domain.Memory, string, error) {
 	// Validate request based on content type
 	if req.ContentType == "text" && strings.TrimSpace(req.TextContent) == "" {
-		return nil, errors.New("text content is required for text memories")
+		return nil, "", errors.New("text content is required for text memories")
 	}
 	if req.ContentType == "link" && strings.TrimSpace(req.LinkURL) == "" {
-		return nil, errors.New("link URL is required for link memories")
+		return nil, "", errors.New("link URL is required for link memories")
 	}
 	// Validate and sanitize link URL
 	if req.ContentType == "link" {
 		if err := validateLinkURL(req.LinkURL); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	}
 
@@ -129,15 +136,36 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 		Visibility:       "private",
 	}
 
+	// Set sealed_until if provided and is in the future
+	if req.SealedUntil != nil && req.SealedUntil.After(time.Now()) {
+		memory.SealedUntil = req.SealedUntil
+	}
+
 	if err := s.repo.Create(ctx, memory); err != nil {
-		return nil, fmt.Errorf("failed to create memory: %w", err)
+		return nil, "", fmt.Errorf("failed to create memory: %w", err)
 	}
 
 	// Fetch user LLM settings and publish async tasks
 	llmConfig, _ := s.getUserLLMConfig(ctx, userID)
 	s.publishTasks(ctx, memory, llmConfig)
 
-	return memory, nil
+	// Publish suggestion generation task if user enabled it
+	suggestionStatus := "skipped"
+	if req.EnableAISuggestion {
+		style, timeout, maxRetries := s.getUserSuggestionConfig(ctx, userID)
+		content := s.extractContent(memory)
+		if content != "" {
+			err := s.queue.PublishSuggestionGenerate(ctx, memory.ID, memory.ContentType, content, memory.Note, style, timeout, maxRetries, llmConfig)
+			if err != nil {
+				zap.L().Error("failed to publish suggestion task", zap.Error(err), zap.String("memory_id", memory.ID.String()))
+				suggestionStatus = "failed"
+			} else {
+				suggestionStatus = "pending"
+			}
+		}
+	}
+
+	return memory, suggestionStatus, nil
 }
 
 // getUserLLMConfig fetches user settings and extracts LLM config as a flat map.
@@ -217,7 +245,7 @@ func (s *MemoryService) extractContent(memory *domain.Memory) string {
 }
 
 // List returns paginated memories for a user.
-func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit int, tag string) (*domain.ListMemoriesResponse, error) {
+func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit int, tags []string) (*domain.ListMemoriesResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -225,7 +253,7 @@ func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit 
 		limit = 20
 	}
 
-	memories, total, err := s.repo.ListByUser(ctx, userID, page, limit, tag)
+	memories, total, err := s.repo.ListByUser(ctx, userID, page, limit, tags, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list memories: %w", err)
 	}
@@ -243,6 +271,208 @@ func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit 
 		Page:     page,
 		Limit:    limit,
 		HasMore:  hasMore,
+	}, nil
+}
+
+// GetStreak calculates the user's current and longest recording streaks.
+// Uses grace-based logic: allows a 1-day gap before breaking the streak.
+func (s *MemoryService) GetStreak(ctx context.Context, userID uuid.UUID) (int, int, bool, error) {
+	// Fetch all non-sealed memories for the user, ordered by creation date desc
+	memories, err := s.repo.GetMemoriesByDateRange(ctx, userID, time.Time{}, time.Now())
+	if err != nil {
+		return 0, 0, false, fmt.Errorf("failed to fetch memories for streak: %w", err)
+	}
+	if len(memories) == 0 {
+		return 0, 0, false, nil
+	}
+
+	// Extract unique dates (normalized to UTC midnight)
+	dateSet := make(map[string]bool)
+	var dates []time.Time
+	for _, m := range memories {
+		dateKey := m.CreatedAt.UTC().Format("2006-01-02")
+		if !dateSet[dateKey] {
+			dateSet[dateKey] = true
+			// Normalize to midnight UTC for consistent gap calculation
+			normalized := time.Date(m.CreatedAt.UTC().Year(), m.CreatedAt.UTC().Month(), m.CreatedAt.UTC().Day(), 0, 0, 0, 0, time.UTC)
+			dates = append(dates, normalized)
+		}
+	}
+
+	// Sort dates descending (most recent first)
+	for i := 0; i < len(dates)-1; i++ {
+		for j := i + 1; j < len(dates); j++ {
+			if dates[i].Before(dates[j]) {
+				dates[i], dates[j] = dates[j], dates[i]
+			}
+		}
+	}
+
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	yesterday := today.Add(-24 * time.Hour)
+
+	hasRecordedToday := false
+	if len(dates) > 0 && dates[0].Equal(today) {
+		hasRecordedToday = true
+	}
+
+	// Calculate current streak with 1-day grace period
+	currentStreak := 0
+	if hasRecordedToday {
+		currentStreak = 1
+	} else if len(dates) > 0 && dates[0].Equal(yesterday) {
+		// Grace: recorded yesterday, today is still within grace
+		currentStreak = 1
+	}
+
+	for i := 1; i < len(dates); i++ {
+		gap := dates[i-1].Sub(dates[i]).Hours() / 24
+		if gap <= 2 { // Within 2 days = consecutive with grace (1-day gap allowed)
+			if currentStreak == 0 {
+				// Starting from a grace period
+				if dates[i-1].Equal(yesterday) && dates[i].Before(yesterday.Add(-24*time.Hour)) {
+					break
+				}
+			}
+			currentStreak++
+		} else {
+			break
+		}
+	}
+
+	// Calculate longest streak
+	longestStreak := 0
+	if len(dates) > 0 {
+		longestStreak = 1
+	}
+	currentRun := 1
+	for i := 1; i < len(dates); i++ {
+		gap := dates[i-1].Sub(dates[i]).Hours() / 24
+		if gap <= 2 {
+			currentRun++
+			if currentRun > longestStreak {
+				longestStreak = currentRun
+			}
+		} else {
+			currentRun = 1
+		}
+	}
+
+	return currentStreak, longestStreak, hasRecordedToday, nil
+}
+
+// GetSerendipity returns a "that day in history" memory for the user.
+// Prioritizes a memory from exactly 1 year ago; falls back to a random old memory.
+func (s *MemoryService) GetSerendipity(ctx context.Context, userID uuid.UUID) (*domain.SerendipityResponse, error) {
+	now := time.Now()
+
+	// Try to find memory from exactly 1 year ago (same month/day)
+	memories, err := s.repo.GetMemoriesOnDate(ctx, userID, int(now.Month()), now.Day())
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch memories on date: %w", err)
+	}
+
+	var selected *domain.Memory
+	yearsAgo := 1
+
+	// Filter to memories from approximately 1 year ago (within a 30-day window)
+	for i := range memories {
+		age := now.Sub(memories[i].CreatedAt).Hours() / 24
+		if age >= 335 && age <= 395 { // ~1 year with tolerance
+			selected = &memories[i]
+			break
+		}
+	}
+
+	// Fallback: random memory older than 30 days
+	if selected == nil {
+		cutoff := now.AddDate(0, 0, -30)
+		randomMem, err := s.repo.GetRandomMemory(ctx, userID, cutoff)
+		if err != nil {
+			if errors.Is(err, repository.ErrMemoryNotFound) {
+				return nil, ErrMemoryNotFound
+			}
+			return nil, fmt.Errorf("failed to fetch random memory: %w", err)
+		}
+		selected = &randomMem
+		yearsAgo = 0
+	}
+
+	// Count memories created since the selected memory
+	countSince, err := s.repo.CountMemoriesSince(ctx, userID, selected.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count memories since: %w", err)
+	}
+
+	return &domain.SerendipityResponse{
+		Memory:        selected,
+		MemoriesSince: int(countSince),
+		YearsAgo:      yearsAgo,
+	}, nil
+}
+
+// GetDailyReview returns daily stats: today's count, top tags, and a memory worth reviewing.
+func (s *MemoryService) GetDailyReview(ctx context.Context, userID uuid.UUID) (*domain.DailyReview, error) {
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	// Get today's memories
+	todayMemories, err := s.repo.GetMemoriesByDateRange(ctx, userID, startOfDay, endOfDay)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch today's memories: %w", err)
+	}
+
+	// Count and extract top tags
+	tagCounts := make(map[string]int)
+	for _, m := range todayMemories {
+		for _, tag := range m.Tags {
+			tagCounts[tag]++
+		}
+	}
+
+	// Get top 3 tags by frequency
+	type tagCount struct {
+		Tag   string
+		Count int
+	}
+	var tagList []tagCount
+	for tag, count := range tagCounts {
+		tagList = append(tagList, tagCount{Tag: tag, Count: count})
+	}
+	for i := 0; i < len(tagList)-1; i++ {
+		for j := i + 1; j < len(tagList); j++ {
+			if tagList[i].Count < tagList[j].Count {
+				tagList[i], tagList[j] = tagList[j], tagList[i]
+			}
+		}
+	}
+
+	topTags := make([]string, 0, 3)
+	for i := 0; i < len(tagList) && i < 3; i++ {
+		topTags = append(topTags, tagList[i].Tag)
+	}
+
+	// Find a memory worth reviewing: old, has tags/content, not from today
+	var worthReviewing *domain.Memory
+	cutoff := now.AddDate(0, 0, -30)
+	oldMemories, err := s.repo.GetMemoriesByDateRange(ctx, userID, time.Time{}, cutoff)
+	if err == nil && len(oldMemories) > 0 {
+		// Pick the one with the most tags (proxy for "rich content")
+		best := oldMemories[0]
+		for _, m := range oldMemories {
+			if len(m.Tags) > len(best.Tags) {
+				best = m
+			}
+		}
+		worthReviewing = &best
+	}
+
+	return &domain.DailyReview{
+		TodayCount:     len(todayMemories),
+		TopTags:        topTags,
+		WorthReviewing: worthReviewing,
 	}, nil
 }
 
@@ -496,7 +726,7 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 	}
 
 	// Validate task type
-	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true}
+	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true}
 	if !validTypes[taskType] {
 		return fmt.Errorf("invalid task_type: %s", taskType)
 	}
@@ -541,6 +771,28 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 		data["content"] = content
 		if memory.Note != "" {
 			data["note"] = memory.Note
+		}
+	case "suggestion:generate":
+		style, timeout, maxRetries := s.getUserSuggestionConfig(ctx, memory.UserID)
+		content := s.extractContent(memory)
+		if content == "" {
+			return fmt.Errorf("memory has no content for suggestion:generate task")
+		}
+		data["content_type"] = memory.ContentType
+		data["content"] = content
+		data["style"] = style
+		data["timeout"] = timeout
+		data["max_retries"] = maxRetries
+		if memory.Note != "" {
+			data["note"] = memory.Note
+		}
+		if memory.ContentType == "link" {
+			if memory.LinkTitle != "" {
+				data["link_title"] = memory.LinkTitle
+			}
+			if memory.LinkSummary != "" {
+				data["link_summary"] = memory.LinkSummary
+			}
 		}
 	}
 
@@ -601,4 +853,142 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 	memory.ProcessingStatus = domain.AggregateStatus(tasks)
 
 	return s.repo.Update(ctx, memory)
+}
+
+// getUserSuggestionConfig fetches the user's AI suggestion configuration.
+// Returns style (default "inspiring"), timeout seconds (default 30), maxRetries (default 3).
+func (s *MemoryService) getUserSuggestionConfig(ctx context.Context, userID uuid.UUID) (string, int, int) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return "inspiring", 30, 3
+	}
+	settingsStr := user.Settings.String()
+	if len(user.Settings) == 0 || settingsStr == "{}" || settingsStr == "null" {
+		return "inspiring", 30, 3
+	}
+	var settings struct {
+		AISuggestionStyle      string `json:"ai_suggestion_style"`
+		AISuggestionTimeout    int    `json:"ai_suggestion_timeout"`
+		AISuggestionMaxRetries int    `json:"ai_suggestion_max_retries"`
+	}
+	if err := json.Unmarshal([]byte(settingsStr), &settings); err != nil {
+		return "inspiring", 30, 3
+	}
+	style := settings.AISuggestionStyle
+	if style == "" {
+		style = "inspiring"
+	}
+	timeout := settings.AISuggestionTimeout
+	if timeout <= 0 {
+		timeout = 30
+	}
+	maxRetries := settings.AISuggestionMaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+	return style, timeout, maxRetries
+}
+
+// GetSuggestion retrieves the AI suggestion for a memory, verifying ownership.
+func (s *MemoryService) GetSuggestion(ctx context.Context, memoryID, userID uuid.UUID) (*domain.AISuggestion, error) {
+	// Verify memory ownership first
+	memory, err := s.Get(ctx, memoryID, userID)
+	if err != nil {
+		return nil, err
+	}
+	suggestion, err := s.suggestionRepo.GetByMemoryID(ctx, memory.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrSuggestionNotFound) {
+			return nil, ErrSuggestionNotFound
+		}
+		return nil, err
+	}
+	return suggestion, nil
+}
+
+// CreateSuggestion creates an AI suggestion for a memory (called by internal API from Processor).
+func (s *MemoryService) CreateSuggestion(ctx context.Context, memoryID uuid.UUID, req domain.CreateSuggestionRequest) (*domain.AISuggestion, error) {
+	suggestion := &domain.AISuggestion{
+		ID:             uuid.New(),
+		MemoryID:       memoryID,
+		Content:        req.Content,
+		SuggestionType: req.SuggestionType,
+		Metadata:       "{}",
+	}
+	if req.Metadata != nil {
+		metaJSON, err := json.Marshal(req.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+		suggestion.Metadata = string(metaJSON)
+	}
+	if err := s.suggestionRepo.Create(ctx, suggestion); err != nil {
+		return nil, fmt.Errorf("failed to create suggestion: %w", err)
+	}
+	return suggestion, nil
+}
+
+// UpdateSuggestionFeedback updates user feedback for a suggestion.
+func (s *MemoryService) UpdateSuggestionFeedback(ctx context.Context, memoryID, userID uuid.UUID, feedback string) error {
+	// Verify memory ownership
+	_, err := s.Get(ctx, memoryID, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.suggestionRepo.UpdateFeedback(ctx, memoryID, feedback); err != nil {
+		if errors.Is(err, repository.ErrSuggestionNotFound) {
+			return ErrSuggestionNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// SealMemory seals a memory until a future date.
+func (s *MemoryService) SealMemory(ctx context.Context, userID, memoryID uuid.UUID, sealedUntil time.Time) error {
+	if sealedUntil.Before(time.Now()) {
+		return ErrInvalidRequest
+	}
+	return s.repo.SealMemory(ctx, userID, memoryID, sealedUntil)
+}
+
+// UnsealMemory removes the seal from a memory.
+func (s *MemoryService) UnsealMemory(ctx context.Context, userID, memoryID uuid.UUID) error {
+	return s.repo.UnsealMemory(ctx, userID, memoryID)
+}
+
+// ListSealedMemories returns paginated memories that are currently sealed.
+func (s *MemoryService) ListSealedMemories(ctx context.Context, userID uuid.UUID, page, limit int) (*domain.ListMemoriesResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	memories, total, err := s.repo.ListSealedMemories(ctx, userID, page, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sealed memories: %w", err)
+	}
+
+	items := make([]map[string]interface{}, len(memories))
+	for i, m := range memories {
+		items[i] = m.SafeResponse()
+	}
+
+	hasMore := int64(page*limit) < total
+
+	return &domain.ListMemoriesResponse{
+		Memories: items,
+		Total:    total,
+		Page:     page,
+		Limit:    limit,
+		HasMore:  hasMore,
+	}, nil
+}
+
+// GetRecentlyUnsealed returns memories that became unsealed in the last 24 hours.
+func (s *MemoryService) GetRecentlyUnsealed(ctx context.Context, userID uuid.UUID) ([]domain.Memory, error) {
+	since := time.Now().Add(-24 * time.Hour)
+	return s.repo.GetRecentlyUnsealed(ctx, userID, since)
 }
