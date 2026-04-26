@@ -234,6 +234,11 @@ func (s *AuthService) UpdateUserSettings(ctx context.Context, id uuid.UUID, req 
 		}
 	}
 
+	// Update tag categories if provided
+	if req.TagCategories != nil {
+		existing.TagCategories = *req.TagCategories
+	}
+
 	settingsJSON, err := json.Marshal(existing)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal settings: %w", err)

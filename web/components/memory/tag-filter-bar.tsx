@@ -59,15 +59,37 @@ export default function TagFilterBar({
   }
 
   return (
-    <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
-      <div className="flex items-center gap-1.5 flex-nowrap">
+    <div className="mb-6">
+      {/* Header row: label + clear button */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-400 dark:text-gray-500">标签</span>
+          {selectedTags.length > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+              已选 {selectedTags.length}
+            </span>
+          )}
+        </div>
+        {selectedTags.length > 0 && (
+          <button
+            onClick={onClearAll}
+            className="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <X className="w-3 h-3" />
+            清除全部
+          </button>
+        )}
+      </div>
+
+      {/* Tags row: wraps to multiple lines */}
+      <div className="flex flex-wrap items-center gap-1.5">
         {visibleTags.map((tag) => {
           const isSelected = selectedTags.includes(tag.name)
           return (
             <button
               key={tag.name}
               onClick={() => handleTagClick(tag.name)}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full transition-all duration-150 whitespace-nowrap ${getTagStyle(tag.color, isSelected)} hover:opacity-80`}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full transition-all duration-150 ${getTagStyle(tag.color, isSelected)} hover:opacity-80`}
             >
               {tag.name}
               <span className={`text-[10px] opacity-60 ${isSelected ? 'text-white/70 dark:text-gray-900/70' : ''}`}>
@@ -80,22 +102,12 @@ export default function TagFilterBar({
         {hasMore && (
           <Link
             href="/tags"
-            className="inline-flex items-center px-2.5 py-1 text-xs rounded-full bg-gray-50 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+            className="inline-flex items-center px-2.5 py-1 text-xs rounded-full bg-gray-50 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             更多 →
           </Link>
         )}
       </div>
-
-      {selectedTags.length > 0 && (
-        <button
-          onClick={onClearAll}
-          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors whitespace-nowrap flex-shrink-0 ml-1"
-        >
-          <X className="w-3 h-3" />
-          清除全部
-        </button>
-      )}
     </div>
   )
 }

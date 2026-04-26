@@ -147,3 +147,13 @@ skipped: 0
 - **问题**: 首页点击标签过滤时 URL 不更新
 - **修复**: 添加 useRouter，在 handleTagToggle/handleClearAllTags/handleTagClickFromCard 中同步更新 URL query params
 - **提交**: 32a126a
+
+### Fix 2: Gateway 超时导致 categorize 返回空响应
+- **问题**: 自动分类调用 LLM API 需要 15-20 秒，Gateway `ResponseHeaderTimeout` 仅 10 秒，导致超时返回 502，前端 `response.json()` 解析空响应抛出 "Unexpected end of JSON input"
+- **修复**: `services/gateway/internal/router/router.go` 将 `ResponseHeaderTimeout` 从 10 秒提升至 60 秒
+- **根因**: LLM API 调用耗时超过 Gateway 代理超时设置
+
+### Fix 3: 未配置 LLM 时返回友好错误提示
+- **问题**: 用户未在设置页面配置 LLM 时，自动分类 fallback 到环境变量中的无效 API Key，返回 401 "LLM API returned 401"
+- **修复**: `services/memory-service/internal/service/tag_service.go` 在 `CategorizeTags` 中检查 `llmConfig` 为空时返回明确错误 "LLM not configured. Please configure LLM settings in the settings page first."
+- **根因**: 用户级 LLM 配置缺失时应提前返回友好提示，而非尝试用无效的全局配置调用第三方 API

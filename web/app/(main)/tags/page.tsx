@@ -76,12 +76,19 @@ export default function TagsPage() {
       if (tagsResponse.success && tagsResponse.data) {
         setTags(tagsResponse.data.tags)
       }
-      if (settingsResponse.success && settingsResponse.data?.tag_metadata) {
-        const colors: Record<string, string> = {}
-        Object.entries(settingsResponse.data.tag_metadata).forEach(([name, meta]) => {
-          if (meta.color) colors[name] = meta.color
-        })
-        setTagColors(colors)
+      if (settingsResponse.success && settingsResponse.data) {
+        // Load tag colors
+        if (settingsResponse.data.tag_metadata) {
+          const colors: Record<string, string> = {}
+          Object.entries(settingsResponse.data.tag_metadata).forEach(([name, meta]) => {
+            if (meta.color) colors[name] = meta.color
+          })
+          setTagColors(colors)
+        }
+        // Load persisted tag categories
+        if (settingsResponse.data.tag_categories && settingsResponse.data.tag_categories.length > 0) {
+          setTagCategories(settingsResponse.data.tag_categories)
+        }
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : '加载失败', 'error')
@@ -157,6 +164,8 @@ export default function TagsPage() {
       const response = await api.categorizeTags()
       if (response.success && response.data) {
         setTagCategories(response.data.categories)
+        // Persist categorize result to settings
+        await api.updateSettings({ tag_categories: response.data.categories })
         showToast('分类完成', 'success')
       } else {
         showToast(response.error?.message || '分类失败', 'error')
@@ -165,6 +174,15 @@ export default function TagsPage() {
       showToast(err instanceof Error ? err.message : '分类失败', 'error')
     } finally {
       setIsCategorizing(false)
+    }
+  }
+
+  const handleClearCategories = async () => {
+    setTagCategories(null)
+    try {
+      await api.updateSettings({ tag_categories: [] })
+    } catch {
+      // Silently fail
     }
   }
 
@@ -420,7 +438,7 @@ export default function TagsPage() {
               </div>
             )}
             <button
-              onClick={() => setTagCategories(null)}
+              onClick={handleClearCategories}
               className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
               清除分类，恢复默认视图

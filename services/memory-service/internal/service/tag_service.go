@@ -87,6 +87,9 @@ func (s *TagService) CategorizeTags(ctx context.Context, userID uuid.UUID) (*dom
 	if err != nil {
 		return nil, fmt.Errorf("failed to get LLM config: %w", err)
 	}
+	if llmConfig == nil || len(llmConfig) == 0 {
+		return nil, fmt.Errorf("LLM not configured. Please configure LLM settings in the settings page first.")
+	}
 
 	// 3. Call LLM to categorize
 	categories, err := s.callLLMCategorize(ctx, tagNames, llmConfig)

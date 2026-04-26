@@ -172,6 +172,7 @@ func newReverseProxy(envKey, defaultURL string) *httputil.ReverseProxy {
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
 	// Custom transport with explicit timeouts and OTel trace propagation to downstream services
+	// ResponseHeaderTimeout set to 60s to accommodate LLM API calls (e.g. tag categorization)
 	proxy.Transport = otelhttp.NewTransport(&http.Transport{
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 10,
@@ -182,7 +183,7 @@ func newReverseProxy(envKey, defaultURL string) *httputil.ReverseProxy {
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
 		TLSHandshakeTimeout:   5 * time.Second,
-		ResponseHeaderTimeout: 10 * time.Second,
+		ResponseHeaderTimeout: 60 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	})
 

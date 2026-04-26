@@ -73,6 +73,7 @@ export interface UserSettings extends LLMSettings {
   ai_suggestion_timeout?: number
   ai_suggestion_max_retries?: number
   tag_metadata?: Record<string, TagMeta>
+  tag_categories?: TagCategory[]
 }
 
 export interface UpdateSettingsRequest {
@@ -82,6 +83,7 @@ export interface UpdateSettingsRequest {
   pagination?: { mode?: 'load_more' | 'page_numbers' }
   ai?: AISettings
   tags?: Record<string, TagMeta>
+  tag_categories?: TagCategory[]
 }
 
 export interface AuthResponse {

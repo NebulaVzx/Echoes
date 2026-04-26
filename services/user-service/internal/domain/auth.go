@@ -79,6 +79,12 @@ type TagMeta struct {
 	Color string `json:"color,omitempty"`
 }
 
+// TagCategory represents a single category in the auto-categorize result.
+type TagCategory struct {
+	Name string   `json:"name"`
+	Tags []string `json:"tags"`
+}
+
 // UserSettings represents the complete user settings.
 type UserSettings struct {
 	LLMSettings
@@ -92,16 +98,19 @@ type UserSettings struct {
 	AISuggestionMaxRetries int    `json:"ai_suggestion_max_retries,omitempty" binding:"omitempty,gte=1,lte=5"`
 	// Tag metadata (Phase 9)
 	TagMetadata map[string]TagMeta `json:"tag_metadata,omitempty"`
+	// Tag categories from auto-categorize
+	TagCategories []TagCategory `json:"tag_categories,omitempty"`
 }
 
 // UpdateSettingsRequest represents a request to update user settings.
 type UpdateSettingsRequest struct {
-	LLM        *LLMSettings        `json:"llm,omitempty"`
-	Search     *SearchSettings     `json:"search,omitempty"`
-	RAG        *RAGSettings        `json:"rag,omitempty"`
-	Pagination *PaginationSettings `json:"pagination,omitempty"`
-	AI         *AISettings         `json:"ai,omitempty"`
-	Tags       map[string]TagMeta  `json:"tags,omitempty"`
+	LLM           *LLMSettings        `json:"llm,omitempty"`
+	Search        *SearchSettings     `json:"search,omitempty"`
+	RAG           *RAGSettings        `json:"rag,omitempty"`
+	Pagination    *PaginationSettings `json:"pagination,omitempty"`
+	AI            *AISettings         `json:"ai,omitempty"`
+	Tags          map[string]TagMeta  `json:"tags,omitempty"`
+	TagCategories *[]TagCategory      `json:"tag_categories,omitempty"`
 }
 
 // TestLLMRequest represents a request to test LLM connectivity.
