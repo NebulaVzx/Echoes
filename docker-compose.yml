@@ -187,6 +187,7 @@ services:
       - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-${ANTHROPIC_API_KEY:-}}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-echoes_dev_secret_key_change_in_production}
       - ENV=development
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - LOG_LEVEL=info

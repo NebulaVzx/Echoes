@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NebulaVzx/Echoes/services/memory-service/internal/crypto"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
 	"github.com/google/uuid"
@@ -133,7 +134,12 @@ func (s *TagService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) (ma
 		config["llm_temperature"] = settings.LLMTemperature
 	}
 	if settings.APIKey != "" {
-		config["api_key"] = settings.APIKey
+		decrypted, err := crypto.Decrypt(settings.APIKey)
+		if err == nil && decrypted != "" {
+			config["api_key"] = decrypted
+		} else {
+			config["api_key"] = settings.APIKey
+		}
 	}
 	if settings.BaseURL != "" {
 		config["base_url"] = settings.BaseURL
