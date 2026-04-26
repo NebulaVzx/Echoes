@@ -25,6 +25,7 @@ var (
 	ErrUnauthorized       = errors.New("unauthorized access to memory")
 	ErrInvalidURL         = errors.New("invalid URL: must be http or https")
 	ErrSuggestionNotFound = errors.New("suggestion not found")
+	ErrInvalidRequest     = errors.New("invalid request")
 )
 
 // dangerousHTMLTags matches potentially harmful HTML tags.
@@ -941,4 +942,53 @@ func (s *MemoryService) UpdateSuggestionFeedback(ctx context.Context, memoryID, 
 		return err
 	}
 	return nil
+}
+
+// SealMemory seals a memory until a future date.
+func (s *MemoryService) SealMemory(ctx context.Context, userID, memoryID uuid.UUID, sealedUntil time.Time) error {
+	if sealedUntil.Before(time.Now()) {
+		return ErrInvalidRequest
+	}
+	return s.repo.SealMemory(ctx, userID, memoryID, sealedUntil)
+}
+
+// UnsealMemory removes the seal from a memory.
+func (s *MemoryService) UnsealMemory(ctx context.Context, userID, memoryID uuid.UUID) error {
+	return s.repo.UnsealMemory(ctx, userID, memoryID)
+}
+
+// ListSealedMemories returns paginated memories that are currently sealed.
+func (s *MemoryService) ListSealedMemories(ctx context.Context, userID uuid.UUID, page, limit int) (*domain.ListMemoriesResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	memories, total, err := s.repo.ListSealedMemories(ctx, userID, page, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sealed memories: %w", err)
+	}
+
+	items := make([]map[string]interface{}, len(memories))
+	for i, m := range memories {
+		items[i] = m.SafeResponse()
+	}
+
+	hasMore := int64(page*limit) < total
+
+	return &domain.ListMemoriesResponse{
+		Memories: items,
+		Total:    total,
+		Page:     page,
+		Limit:    limit,
+		HasMore:  hasMore,
+	}, nil
+}
+
+// GetRecentlyUnsealed returns memories that became unsealed in the last 24 hours.
+func (s *MemoryService) GetRecentlyUnsealed(ctx context.Context, userID uuid.UUID) ([]domain.Memory, error) {
+	since := time.Now().Add(-24 * time.Hour)
+	return s.repo.GetRecentlyUnsealed(ctx, userID, since)
 }
