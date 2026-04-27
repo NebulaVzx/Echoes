@@ -107,6 +107,10 @@ EOF
 
 ### 2.1 系统初始化
 
+> 本文档以 **Ubuntu 22.04** 为主进行演示，同时提供 **CentOS 8/RHEL 8** 的对应命令。请根据你的实际系统选择执行。
+
+**Ubuntu：**
+
 ```bash
 # 更新系统包
 sudo apt update && sudo apt upgrade -y
@@ -114,17 +118,38 @@ sudo apt update && sudo apt upgrade -y
 # 安装必要工具
 sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release software-properties-common
 
-# 关闭防火墙（学习环境简化操作，生产环境应配置正确的防火墙规则）
+# 关闭防火墙（ufw）
 sudo ufw disable
 
 # 关闭 SELinux（Ubuntu 默认未安装，以防万一）
 sudo setenforce 0 2>/dev/null || true
 ```
 
+**CentOS / RHEL：**
+
+```bash
+# 更新系统包
+sudo dnf update -y
+
+# 安装必要工具
+sudo dnf install -y yum-utils device-mapper-persistent-data lvm2 curl
+
+# 关闭防火墙（firewalld）
+sudo systemctl stop firewalld
+sudo systemctl disable firewalld
+
+# 关闭 SELinux（CentOS 默认启用，必须关闭）
+sudo setenforce 0
+sudo sed -i 's/^SELINUX=enforcing$/SELINUX=disabled/' /etc/selinux/config
+```
+
 **💡 学习重点&常见误区**
 
 - **为什么关闭防火墙？** 学习环境为了简化，直接关闭防火墙。生产环境中应该开放 K8s 所需的特定端口（6443, 10250, 2379-2380, 10251, 10252 等），而不是完全关闭。
+  - Ubuntu 使用 `ufw`，CentOS 使用 `firewalld`。两者的命令完全不同！
 - **为什么关闭 SELinux？** SELinux 是强制访问控制安全模块，默认策略可能会阻止容器运行时访问某些资源。生产环境应该配置正确的 SELinux 策略，而不是直接关闭。
+  - **CentOS 必须同时做两件事：** `setenforce 0` 临时关闭 + 修改 `/etc/selinux/config` 永久关闭。**只做其中一项，重启后 SELinux 会重新启用，导致 K8s 无法正常启动！**
+- **常见坑：** CentOS 8 的默认软件仓库中 containerd 版本可能较旧，建议配置 Docker 官方 yum 源安装较新版本。
 
 ---
 
@@ -192,6 +217,8 @@ sysctl net.ipv4.ip_forward
 
 K8s 1.24+ 版本移除了对 Docker 的直接支持（dockershim 被移除），推荐使用 **containerd** 作为容器运行时。
 
+**Ubuntu：**
+
 ```bash
 # 安装 containerd
 sudo apt install -y containerd
@@ -212,15 +239,44 @@ sudo systemctl status containerd
 # 应该显示 Active: active (running)
 ```
 
+**CentOS / RHEL：**
+
+```bash
+# 添加 Docker 官方 yum 源（containerd 版本更新）
+sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+# 安装 containerd
+sudo dnf install -y containerd.io
+
+# 生成默认配置
+sudo mkdir -p /etc/containerd
+sudo containerd config default | sudo tee /etc/containerd/config.toml
+
+# 修改配置：使用 systemd 作为 cgroup 驱动
+sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+
+# 重启 containerd
+sudo systemctl restart containerd
+sudo systemctl enable containerd
+
+# 验证
+sudo systemctl status containerd
+# 应该显示 Active: active (running)
+```
+
 **💡 学习重点&常见误区**
 
 - **containerd vs Docker 的关系：** Docker 其实是一个完整的容器平台，包含了 Docker Daemon、Docker CLI、containerd 等组件。K8s 直接使用 containerd（Docker 底层的运行时），跳过了 Docker Daemon 这一层，更加轻量高效。
 - **为什么必须用 systemd cgroup 驱动？** K8s 默认使用 systemd 管理 cgroup。如果 containerd 使用 cgroupfs 而 K8s 使用 systemd，会导致 cgroup 层级不一致，可能引发资源限制失效、Pod 无法启动等问题。
+  - **CentOS 特别注意：** 有些旧版本的 containerd 默认使用 `cgroupfs`，必须通过上述 `sed` 命令修改为 `systemd`！
 - **验证容器运行时可以执行容器：** `sudo ctr run --rm docker.io/library/hello-world:latest hello` —— 注意 containerd 使用 `ctr` 命令，和 Docker 的 `docker` 命令不同。
+- **常见坑（CentOS）：** 如果使用 `dnf install containerd`（不带 `.io`），安装的是 CentOS 官方仓库的版本，可能较旧。建议使用 Docker 官方仓库的 `containerd.io` 包。
 
 ---
 
 ### 2.5 安装 kubeadm、kubelet、kubectl
+
+**Ubuntu：**
 
 ```bash
 # 添加 K8s 官方 apt 仓库
@@ -246,14 +302,53 @@ kubeadm version
 kubectl version --client
 ```
 
+**CentOS / RHEL：**
+
+```bash
+# 添加 K8s 官方 yum 仓库
+# 注意：这里使用 1.29 版本，你可以根据需要调整
+KUBERNETES_VERSION=1.29
+
+# 添加仓库（使用阿里云镜像加速，国内访问更快）
+cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://pkgs.k8s.io/core:/stable:/v${KUBERNETES_VERSION}/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v${KUBERNETES_VERSION}/rpm/repodata/repomd.xml.key
+EOF
+
+# 也可以直接使用官方仓库（海外服务器）
+# sudo dnf install -y 'dnf-command(config-manager)'
+# sudo dnf config-manager --add-repo https://pkgs.k8s.io/core:/stable:/v${KUBERNETES_VERSION}/rpm/
+
+# 安装
+sudo dnf install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+
+# 固定版本，防止自动升级
+sudo dnf mark install kubelet kubeadm kubectl
+
+# 启动 kubelet
+sudo systemctl enable --now kubelet
+
+# 验证版本
+kubeadm version
+kubectl version --client
+```
+
 **💡 学习重点&常见误区**
 
 - **三个工具的分工：**
   - `kubeadm`：集群管理工具，负责初始化 Master、加入 Worker、升级集群。
   - `kubelet`：节点代理，运行在每个节点上，负责管理 Pod 生命周期（创建、销毁、监控）。
   - `kubectl`：集群 CLI，用于与 K8s API Server 交互，查看和管理资源。
-- **为什么要 `apt-mark hold`？** K8s 对版本一致性要求非常严格。如果 Master 是 1.29.0，Worker 升级到 1.29.2 通常没问题，但如果 Master 是 1.29，Worker 升级到 1.30，可能导致 API 不兼容。升级时必须按照官方流程：先升级 Master，再逐个升级 Worker。
-- **常见坑：** 如果之前安装过其他版本的 K8s，apt 源可能冲突。建议先 `sudo apt remove kubelet kubeadm kubectl` 再重新安装。
+- **为什么要固定版本？**
+  - Ubuntu：`apt-mark hold` 阻止 apt 自动升级。
+  - CentOS：`dnf mark install` 标记为手动安装，不会被 `dnf autoremove` 删除。但 CentOS 不会自动升级，除非显式执行 `dnf update`。
+  - **K8s 对版本一致性要求非常严格。** 如果 Master 是 1.29.0，Worker 升级到 1.29.2 通常没问题，但如果 Master 是 1.29，Worker 升级到 1.30，可能导致 API 不兼容。升级时必须按照官方流程：先升级 Master，再逐个升级 Worker。
+- **常见坑（Ubuntu）：** 如果之前安装过其他版本的 K8s，apt 源可能冲突。建议先 `sudo apt remove kubelet kubeadm kubectl` 再重新安装。
+- **常见坑（CentOS）：** `kubelet` 安装后默认会不断重启（因为它还没有加入集群），这是正常的。`systemctl status kubelet` 看到 `activating` 或失败状态不必担心，等 `kubeadm init` 或 `kubeadm join` 后就会正常。
 
 ---
 
