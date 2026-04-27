@@ -1,0 +1,102 @@
+# 23-vectorizer-service.yaml
+# Vectorizer Service：Python + FastAPI + BGE-M3，负责文本向量化
+# 注意：BGE-M3 模型首次启动时会下载（~1GB），启动较慢，需设置较长的 initialDelaySeconds
+apiVersion: v1
+kind: Service
+metadata:
+  name: vectorizer-service
+  namespace: echoes
+  labels:
+    app: vectorizer-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8004
+      targetPort: 8004
+      name: http
+  selector:
+    app: vectorizer-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vectorizer-service
+  namespace: echoes
+  labels:
+    app: vectorizer-service
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: vectorizer-service
+  template:
+    metadata:
+      labels:
+        app: vectorizer-service
+    spec:
+      containers:
+        - name: vectorizer-service
+          image: echoes/vectorizer-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8004
+              name: http
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: VECTORIZER_SERVICE_PORT
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: ENV
+            # === Redis ===
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)/$(REDIS_DB)"
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: REDIS_PORT
+            - name: REDIS_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: REDIS_DB
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: echoes-secrets
+                  key: REDIS_PASSWORD
+          resources:
+            requests:
+              memory: "512Mi"    # BGE-M3 模型加载需要较多内存
+              cpu: "250m"
+            limits:
+              memory: "2Gi"      # 模型运行时峰值内存
+              cpu: "1000m"
+          # 模型下载较慢，给较长的启动时间
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 30
+            periodSeconds: 5

@@ -1,0 +1,49 @@
+# 01-configmap.yaml
+# ConfigMap：存放非敏感的配置信息（URL、端口、环境标识等）
+# 注意：密码、密钥等敏感信息必须放在 Secret 中，不要放 ConfigMap！
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: echoes-config
+  namespace: echoes
+data:
+  # === 基础设施连接地址 ===
+  # K8s 中通过 Service 名称进行服务发现，无需写 IP
+  # 格式：<service-name>.<namespace>.svc.cluster.local
+  POSTGRES_HOST: "postgres.echoes.svc.cluster.local"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "echoes"
+  POSTGRES_USER: "echoes_user"
+
+  REDIS_HOST: "redis.echoes.svc.cluster.local"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+
+  MINIO_HOST: "minio.echoes.svc.cluster.local"
+  MINIO_PORT: "9000"
+  MINIO_CONSOLE_PORT: "9001"
+
+  # === 微服务间调用地址 ===
+  USER_SERVICE_URL: "http://user-service.echoes.svc.cluster.local:8001"
+  MEMORY_SERVICE_URL: "http://memory-service.echoes.svc.cluster.local:8002"
+  PROCESSOR_SERVICE_URL: "http://processor-service.echoes.svc.cluster.local:8003"
+  VECTORIZER_SERVICE_URL: "http://vectorizer-service.echoes.svc.cluster.local:8004"
+  GATEWAY_URL: "http://gateway.echoes.svc.cluster.local:8080"
+
+  # === 各服务监听端口 ===
+  GATEWAY_PORT: "8080"
+  USER_SERVICE_PORT: "8001"
+  MEMORY_SERVICE_PORT: "8002"
+  PROCESSOR_SERVICE_PORT: "8003"
+  VECTORIZER_SERVICE_PORT: "8004"
+  WEB_PORT: "3000"
+
+  # === 环境标识 ===
+  ENV: "production"
+  NODE_ENV: "production"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+  # === LLM 默认配置（用户可在前端覆盖）===
+  LLM_PROVIDER: "openai"
+  LLM_MODEL: "gpt-4o-mini"
+  LLM_TEMPERATURE: "0.7"

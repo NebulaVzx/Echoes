@@ -1,0 +1,10 @@
+# 00-namespace.yaml
+# 命名空间：将 Echoes 的所有资源隔离在一个独立的命名空间中
+# 这是多租户环境或大型集群中的最佳实践，避免资源冲突
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: echoes           # 命名空间名称，所有后续资源都会放在这里
+  labels:
+    app: echoes
+    env: production

@@ -1,0 +1,139 @@
+# 21-memory-service.yaml
+# Memory Service：Go + GORM 记忆管理微服务，负责 CRUD、向量搜索、Redis Stream 发布
+apiVersion: v1
+kind: Service
+metadata:
+  name: memory-service
+  namespace: echoes
+  labels:
+    app: memory-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8002
+      targetPort: 8002
+      name: http
+  selector:
+    app: memory-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memory-service
+  namespace: echoes
+  labels:
+    app: memory-service
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: memory-service
+  template:
+    metadata:
+      labels:
+        app: memory-service
+    spec:
+      containers:
+        - name: memory-service
+          image: echoes/memory-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8002
+              name: http
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: MEMORY_SERVICE_PORT
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: ENV
+            # === 数据库 ===
+            - name: DATABASE_URL
+              value: "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable"
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: POSTGRES_PORT
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: echoes-secrets
+                  key: POSTGRES_PASSWORD
+            # === Redis ===
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)/$(REDIS_DB)"
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: REDIS_PORT
+            - name: REDIS_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: REDIS_DB
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: echoes-secrets
+                  key: REDIS_PASSWORD
+            # === 下游服务地址 ===
+            - name: VECTORIZER_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: VECTORIZER_SERVICE_URL
+            - name: PROCESSOR_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: PROCESSOR_SERVICE_URL
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 5
+            periodSeconds: 5

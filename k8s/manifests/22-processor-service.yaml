@@ -1,0 +1,127 @@
+# 22-processor-service.yaml
+# Processor Service：Python + FastAPI，消费 Redis Stream 执行链接抓取和自动标签生成
+# 无状态，可多副本并行消费（需配置 Redis Stream 消费者组）
+apiVersion: v1
+kind: Service
+metadata:
+  name: processor-service
+  namespace: echoes
+  labels:
+    app: processor-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8003
+      targetPort: 8003
+      name: http
+  selector:
+    app: processor-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: processor-service
+  namespace: echoes
+  labels:
+    app: processor-service
+spec:
+  replicas: 2               # 2 副本并行消费任务队列
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: processor-service
+  template:
+    metadata:
+      labels:
+        app: processor-service
+    spec:
+      containers:
+        - name: processor-service
+          image: echoes/processor-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8003
+              name: http
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: PROCESSOR_SERVICE_PORT
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: ENV
+            # === Redis ===
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)/$(REDIS_DB)"
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: REDIS_PORT
+            - name: REDIS_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: REDIS_DB
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: echoes-secrets
+                  key: REDIS_PASSWORD
+            # === LLM API Keys（Processor 调用 LLM 进行标签生成）===
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: echoes-secrets
+                  key: OPENAI_API_KEY
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: echoes-secrets
+                  key: ANTHROPIC_API_KEY
+            - name: LLM_PROVIDER
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: LLM_PROVIDER
+            - name: LLM_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: LLM_MODEL
+            - name: LLM_TEMPERATURE
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: LLM_TEMPERATURE
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 5
+            periodSeconds: 5
