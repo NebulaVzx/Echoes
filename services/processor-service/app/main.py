@@ -18,6 +18,7 @@ from app.clients.memory_client import MemoryServiceClient
 from app.consumers.link_consumer import LinkConsumer
 from app.consumers.tag_consumer import TagConsumer
 from app.consumers.suggestion_consumer import SuggestionConsumer
+from app.consumers.file_consumer import FileConsumer
 from app.observability import setup_observability
 from opentelemetry import trace
 
@@ -60,6 +61,12 @@ async def lifespan(app: FastAPI):
         await suggestion_consumer.start()
         consumers.append(suggestion_consumer)
         print("Suggestion consumer started")
+
+    if settings.enable_file_consumer:
+        file_consumer = FileConsumer(redis_client, memory_client)
+        await file_consumer.start()
+        consumers.append(file_consumer)
+        print("File consumer started")
 
     app.state.redis = redis_client
     app.state.memory_client = memory_client

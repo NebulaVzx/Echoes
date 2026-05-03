@@ -98,6 +98,19 @@ func (q *RedisTaskQueue) PublishSuggestionGenerate(ctx context.Context, memoryID
 	return q.PublishTask(ctx, "suggestion:generate", fields)
 }
 
+// PublishFileExtract publishes a file text extraction task to Redis Stream.
+// Called after a file memory is created — the consumer will download from MinIO,
+// extract text, and publish text:vectorize + tag:generate tasks.
+func (q *RedisTaskQueue) PublishFileExtract(ctx context.Context, memoryID uuid.UUID, fileName string, mediaURL string, llmConfig map[string]interface{}) error {
+	fields := map[string]interface{}{
+		"memory_id":  memoryID.String(),
+		"file_name":  fileName,
+		"media_url":  mediaURL,
+	}
+	mergeLLMConfig(fields, llmConfig)
+	return q.PublishTask(ctx, "file:extract", fields)
+}
+
 // mergeLLMConfig merges LLM settings into the message fields if present.
 func mergeLLMConfig(fields map[string]interface{}, llmConfig map[string]interface{}) {
 	if llmConfig == nil {

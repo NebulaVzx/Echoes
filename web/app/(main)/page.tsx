@@ -214,17 +214,21 @@ function HomePage() {
     loadMemories(1, false)
   }, [loadMemories])
 
-  // Poll for processing status updates — when any memory is pending/processing,
-  // refresh the list every 3 seconds until all are completed/failed.
+  // Poll for processing status updates — adaptive interval based on content type.
+  // text: 3s (fast), link: 5s (web fetch), file: 10s (download + extract + vectorize).
   useEffect(() => {
-    const hasProcessing = memories.some(
+    const processing = memories.filter(
       (m) => m.processing_status === 'pending' || m.processing_status === 'processing'
     )
-    if (!hasProcessing) return
+    if (processing.length === 0) return
+
+    const hasFile = processing.some((m) => m.content_type === 'file')
+    const hasLink = processing.some((m) => m.content_type === 'link')
+    const intervalMs = hasFile ? 10000 : hasLink ? 5000 : 3000
 
     const interval = setInterval(() => {
       loadMemories(page, false)
-    }, 3000)
+    }, intervalMs)
 
     return () => clearInterval(interval)
   }, [memories, page, loadMemories])

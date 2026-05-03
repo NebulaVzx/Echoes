@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Star, FileText } from 'lucide-react'
 import { api, Memory } from '@/lib/api'
 import { getTagStyle } from './tag-filter-bar'
 
@@ -27,6 +27,9 @@ function getPreviewContent(memory: Memory): string {
   if (memory.content_type === 'text') {
     return memory.text_content || ''
   }
+  if (memory.content_type === 'file') {
+    return memory.file_name || memory.text_content || ''
+  }
   return memory.link_title || memory.link_url || ''
 }
 
@@ -46,6 +49,7 @@ function StatusDot({ status }: { status: string }) {
 export default function MemoryCard({ memory, tagColors, onTagClick }: MemoryCardProps) {
   const preview = getPreviewContent(memory)
   const isLink = memory.content_type === 'link'
+  const isFile = memory.content_type === 'file'
   const isProcessing = memory.processing_status === 'pending' || memory.processing_status === 'processing'
 
   const [hasSuggestion, setHasSuggestion] = useState(false)
@@ -84,6 +88,8 @@ export default function MemoryCard({ memory, tagColors, onTagClick }: MemoryCard
                   <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
                   </svg>
+                ) : isFile ? (
+                  <FileText className="w-3.5 h-3.5 text-purple-500" />
                 ) : (
                   <svg className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
@@ -91,8 +97,11 @@ export default function MemoryCard({ memory, tagColors, onTagClick }: MemoryCard
                 )}
               </div>
               <span className="text-xs text-gray-400 dark:text-gray-500">
-                {isLink ? '链接' : '文字'}
+                {isLink ? '链接' : isFile ? '文件' : '文字'}
               </span>
+              {memory.is_starred && (
+                <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+              )}
             </div>
             <div className="flex items-center gap-2">
               {isProcessing && <StatusDot status={memory.processing_status} />}
@@ -110,6 +119,16 @@ export default function MemoryCard({ memory, tagColors, onTagClick }: MemoryCard
               </span>
             </div>
           </div>
+
+          {/* Source attribution */}
+          {memory.source && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 flex items-center gap-1">
+              <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              </svg>
+              来源：{memory.source}
+            </p>
+          )}
 
           {/* Content preview */}
           <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3 leading-relaxed mb-3">

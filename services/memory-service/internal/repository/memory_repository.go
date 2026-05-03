@@ -21,7 +21,7 @@ type MemoryRepository interface {
 	Create(ctx context.Context, memory *domain.Memory) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Memory, error)
 	GetVectorByID(ctx context.Context, id uuid.UUID) (string, error)
-	ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool) ([]domain.Memory, int64, error)
+	ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool, starredOnly bool) ([]domain.Memory, int64, error)
 	GetMemoriesByDateRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]domain.Memory, error)
 	GetRandomMemory(ctx context.Context, userID uuid.UUID, before time.Time) (domain.Memory, error)
 	GetMemoriesByDay(ctx context.Context, userID uuid.UUID, day time.Time) ([]domain.Memory, error)
@@ -71,7 +71,7 @@ func (r *GormMemoryRepository) GetByID(ctx context.Context, id uuid.UUID) (*doma
 // ListByUser retrieves memories for a user with pagination and optional tag filter.
 // Supports multi-tag AND filtering using tags @> ARRAY[...].
 // When excludeSealed is true, filters out memories with sealed_until in the future.
-func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool) ([]domain.Memory, int64, error) {
+func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool, starredOnly bool) ([]domain.Memory, int64, error) {
 	var memories []domain.Memory
 	var total int64
 
@@ -81,6 +81,9 @@ func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID,
 	}
 	if excludeSealed {
 		query = query.Where("sealed_until IS NULL OR sealed_until <= ?", time.Now())
+	}
+	if starredOnly {
+		query = query.Where("is_starred = ?", true)
 	}
 
 	if err := query.Count(&total).Error; err != nil {

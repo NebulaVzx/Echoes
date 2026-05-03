@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     enable_link_consumer: bool = True
     enable_tag_consumer: bool = True
     enable_suggestion_consumer: bool = True
+    enable_file_consumer: bool = True
 
     class Config:
         env_file = ".env"

@@ -79,6 +79,7 @@ type MemoryService struct {
 	queue          TaskQueue
 	vectorizer     *VectorizerClient
 	suggestionRepo repository.SuggestionRepository
+	minioClient    *MinIOClient
 }
 
 // TaskQueue defines the interface for publishing async tasks.
@@ -87,17 +88,67 @@ type TaskQueue interface {
 	PublishTextVectorize(ctx context.Context, memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
 	PublishTagGenerate(ctx context.Context, memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error
 	PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, timeout int, maxRetries int, llmConfig map[string]interface{}) error
+	PublishFileExtract(ctx context.Context, memoryID uuid.UUID, fileName string, mediaURL string, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
 // NewMemoryService creates a new memory service.
-func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue, vectorizer *VectorizerClient, suggestionRepo repository.SuggestionRepository) *MemoryService {
+func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue, vectorizer *VectorizerClient, suggestionRepo repository.SuggestionRepository, minioClient *MinIOClient) *MemoryService {
 	return &MemoryService{
 		repo:           repo,
 		userRepo:       userRepo,
 		queue:          queue,
 		vectorizer:     vectorizer,
 		suggestionRepo: suggestionRepo,
+		minioClient:    minioClient,
+	}
+}
+
+// UpdateFileInfo updates the file-related fields of a memory after upload.
+func (s *MemoryService) UpdateFileInfo(ctx context.Context, memoryID uuid.UUID, mediaURL string, fileName string, fileSize int64) error {
+	memory, err := s.repo.GetByID(ctx, memoryID)
+	if err != nil {
+		return err
+	}
+	memory.MediaURL = mediaURL
+	memory.FileName = fileName
+	memory.FileSize = fileSize
+	return s.repo.Update(ctx, memory)
+}
+
+// UpdateTextContent updates the text_content field of a memory (used by file extraction).
+func (s *MemoryService) UpdateTextContent(ctx context.Context, memoryID uuid.UUID, textContent string) error {
+	memory, err := s.repo.GetByID(ctx, memoryID)
+	if err != nil {
+		return err
+	}
+	memory.TextContent = sanitizeText(textContent)
+	return s.repo.Update(ctx, memory)
+}
+
+// MinIOClient exposes the MinIO client for handler use.
+func (s *MemoryService) MinIOClient() *MinIOClient {
+	return s.minioClient
+}
+
+// GetUserLLMConfig fetches user LLM settings as a flat map.
+func (s *MemoryService) GetUserLLMConfig(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error) {
+	return s.getUserLLMConfig(ctx, userID)
+}
+
+// PublishFileTasks publishes file extraction task after upload is complete.
+// Uses presigned URL so the consumer can download without MinIO credentials.
+func (s *MemoryService) PublishFileTasks(ctx context.Context, memory *domain.Memory, llmConfig map[string]interface{}) {
+	if memory.ContentType == "file" && memory.MediaURL != "" && s.minioClient != nil {
+		objectPath := BuildObjectPath(memory.UserID.String(), memory.ID.String(), memory.FileName)
+		presignedURL, err := s.minioClient.GetPresignedGetURL(ctx, objectPath)
+		if err != nil {
+			zap.L().Error("failed to generate presigned URL", zap.Error(err), zap.String("memory_id", memory.ID.String()))
+			return
+		}
+		if err := s.queue.PublishFileExtract(ctx, memory.ID, memory.FileName, presignedURL, llmConfig); err != nil {
+			zap.L().Error("failed to publish file:extract task", zap.Error(err), zap.String("memory_id", memory.ID.String()))
+		}
 	}
 }
 
@@ -110,6 +161,10 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 	}
 	if req.ContentType == "link" && strings.TrimSpace(req.LinkURL) == "" {
 		return nil, "", errors.New("link URL is required for link memories")
+	}
+	if req.ContentType == "file" && strings.TrimSpace(req.TextContent) == "" {
+		// File memories have empty text_content initially — extraction is async
+		// The caller must provide file metadata separately
 	}
 	// Validate and sanitize link URL
 	if req.ContentType == "link" {
@@ -131,6 +186,8 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 		LinkURL:          req.LinkURL,
 		Tags:             pq.StringArray(tags),
 		Note:             note,
+		Source:           sanitizeText(req.Source),
+		IsStarred:        req.IsStarred,
 		Metadata:         "{}",
 		ProcessingStatus: "pending",
 		Visibility:       "private",
@@ -225,7 +282,13 @@ func (s *MemoryService) publishTasks(ctx context.Context, memory *domain.Memory,
 		_ = s.queue.PublishLinkFetch(ctx, memory.ID, memory.LinkURL, memory.Note, llmConfig)
 	}
 
-	// For all memories, publish text vectorization
+	// For file memories, publish file extraction task
+	if memory.ContentType == "file" && memory.MediaURL != "" {
+		_ = s.queue.PublishFileExtract(ctx, memory.ID, memory.FileName, memory.MediaURL, llmConfig)
+		return // File extraction will trigger vectorize + tag after text is extracted
+	}
+
+	// For text/link memories, publish text vectorization directly
 	content := s.extractContent(memory)
 	if content != "" {
 		_ = s.queue.PublishTextVectorize(ctx, memory.ID, content, llmConfig)
@@ -241,11 +304,14 @@ func (s *MemoryService) extractContent(memory *domain.Memory) string {
 	if memory.ContentType == "link" {
 		return memory.LinkURL
 	}
+	if memory.ContentType == "file" {
+		return memory.TextContent // Extracted text from file
+	}
 	return ""
 }
 
 // List returns paginated memories for a user.
-func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit int, tags []string) (*domain.ListMemoriesResponse, error) {
+func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, starredOnly bool) (*domain.ListMemoriesResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -253,7 +319,7 @@ func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit 
 		limit = 20
 	}
 
-	memories, total, err := s.repo.ListByUser(ctx, userID, page, limit, tags, true)
+	memories, total, err := s.repo.ListByUser(ctx, userID, page, limit, tags, true, starredOnly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list memories: %w", err)
 	}
@@ -503,6 +569,10 @@ func (s *MemoryService) Update(ctx context.Context, memoryID, userID uuid.UUID, 
 	// Sanitize user inputs
 	memory.Tags = pq.StringArray(sanitizeTags(req.Tags))
 	memory.Note = sanitizeText(req.Note)
+	memory.Source = sanitizeText(req.Source)
+	if req.IsStarred != nil {
+		memory.IsStarred = *req.IsStarred
+	}
 
 	if err := s.repo.Update(ctx, memory); err != nil {
 		return nil, fmt.Errorf("failed to update memory: %w", err)

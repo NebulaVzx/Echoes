@@ -4,9 +4,12 @@ package transport
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/service"
@@ -72,6 +75,13 @@ func NewMemoryHandler(memoryService *service.MemoryService) *MemoryHandler {
 	return &MemoryHandler{memoryService: memoryService}
 }
 
+// allowedFileExtensions defines permitted file types for upload.
+var allowedFileExtensions = map[string]bool{
+	".txt":  true,
+	".md":   true,
+	".docx": true,
+}
+
 // RegisterRoutes registers memory routes on the given router.
 func (h *MemoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/memories", h.Create)
@@ -106,6 +116,7 @@ func (h *MemoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	internal.PATCH("/memories/:id/tasks", h.UpdateTaskStatus)
 	internal.POST("/memories/:id/tasks/:task_type/retry", h.RetryTask)
 	internal.POST("/memories/:id/suggestion", h.CreateSuggestion)
+	internal.PATCH("/memories/:id/text", h.UpdateTextContent)
 }
 
 // getUserID extracts user ID from X-User-ID header (set by Gateway JWT middleware).
@@ -122,9 +133,20 @@ func getUserID(c *gin.Context) (uuid.UUID, bool) {
 }
 
 // Create handles creating a new memory.
+// Supports both JSON (text/link) and multipart/form-data (file upload).
 func (h *MemoryHandler) Create(c *gin.Context) {
+	contentType := c.ContentType()
+	if strings.Contains(contentType, "multipart/form-data") {
+		h.createFromMultipart(c)
+		return
+	}
+	h.createFromJSON(c)
+}
+
+// createFromJSON handles JSON-based memory creation (text/link).
+func (h *MemoryHandler) createFromJSON(c *gin.Context) {
 	tracer := otel.Tracer("memory-service")
-	ctx, span := tracer.Start(c.Request.Context(), "CreateMemory")
+	ctx, span := tracer.Start(c.Request.Context(), "CreateMemoryJSON")
 	defer span.End()
 
 	userID, ok := getUserID(c)
@@ -145,6 +167,127 @@ func (h *MemoryHandler) Create(c *gin.Context) {
 		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		return
 	}
+
+	span.SetAttributes(attribute.String("memory_id", memory.ID.String()))
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"data": gin.H{
+			"memory":            memory.SafeResponse(),
+			"suggestion_status": suggestionStatus,
+		},
+	})
+}
+
+// createFromMultipart handles file upload memory creation.
+func (h *MemoryHandler) createFromMultipart(c *gin.Context) {
+	tracer := otel.Tracer("memory-service")
+	ctx, span := tracer.Start(c.Request.Context(), "CreateMemoryMultipart")
+	defer span.End()
+
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	// Parse multipart form (max 10MB + 1MB buffer for fields)
+	if err := c.Request.ParseMultipartForm(11 << 20); err != nil {
+		respondWithError(c, http.StatusBadRequest, "BAD_REQUEST", "Failed to parse multipart form: "+err.Error())
+		return
+	}
+
+	// Extract file
+	file, fileHeader, err := c.Request.FormFile("file")
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "BAD_REQUEST", "File is required for file upload")
+		return
+	}
+	defer file.Close()
+
+	// Validate file extension
+	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
+	if !allowedFileExtensions[ext] {
+		respondWithError(c, http.StatusBadRequest, "BAD_REQUEST", "Invalid file type. Allowed: .txt, .md, .docx")
+		return
+	}
+
+	// Validate file size (<= 10MB)
+	const maxFileSize = 10 << 20
+	if fileHeader.Size > maxFileSize {
+		respondWithError(c, http.StatusBadRequest, "BAD_REQUEST", "File size exceeds 10MB limit")
+		return
+	}
+
+	// Build request from form fields
+	req := domain.CreateMemoryRequest{
+		ContentType: "file",
+		Source:      c.PostForm("source"),
+	}
+	if c.PostForm("is_starred") == "true" {
+		req.IsStarred = true
+	}
+	if tagsStr := c.PostForm("tags"); tagsStr != "" {
+		req.Tags = strings.Split(tagsStr, ",")
+	}
+	if note := c.PostForm("note"); note != "" {
+		req.Note = note
+	}
+	if enableStr := c.PostForm("enable_ai_suggestion"); enableStr == "true" {
+		req.EnableAISuggestion = true
+	}
+
+	// Create memory record first (without file info)
+	memory, suggestionStatus, err := h.memoryService.Create(ctx, userID, req)
+	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		return
+	}
+
+	// Upload file to MinIO
+	minioClient := h.memoryService.MinIOClient()
+	if minioClient == nil {
+		respondWithError(c, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "File upload service is not available")
+		return
+	}
+
+	objectPath := service.BuildObjectPath(userID.String(), memory.ID.String(), fileHeader.Filename)
+
+	// Save uploaded file to temp location
+	tempFile, err := os.CreateTemp("", "echoes-upload-*"+ext)
+	if err != nil {
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create temp file")
+		return
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+
+	if _, err := io.Copy(tempFile, file); err != nil {
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to save uploaded file")
+		return
+	}
+	tempFile.Close()
+
+	// Upload to MinIO
+	mediaURL, err := minioClient.UploadFile(ctx, objectPath, tempFile.Name(), fileHeader.Header.Get("Content-Type"))
+	if err != nil {
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to upload file: "+err.Error())
+		return
+	}
+
+	// Update memory with file info
+	if err := h.memoryService.UpdateFileInfo(ctx, memory.ID, mediaURL, fileHeader.Filename, fileHeader.Size); err != nil {
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update memory file info")
+		return
+	}
+
+	memory.MediaURL = mediaURL
+	memory.FileName = fileHeader.Filename
+	memory.FileSize = fileHeader.Size
+
+	// Publish file extraction task now that file is uploaded
+	llmConfig, _ := h.memoryService.GetUserLLMConfig(ctx, userID)
+	h.memoryService.PublishFileTasks(ctx, memory, llmConfig)
 
 	span.SetAttributes(attribute.String("memory_id", memory.ID.String()))
 	c.JSON(http.StatusCreated, gin.H{
@@ -186,7 +329,10 @@ func (h *MemoryHandler) List(c *gin.Context) {
 		}
 	}
 
-	resp, err := h.memoryService.List(c.Request.Context(), userID, page, limit, tags)
+	// Starred filter: ?starred=true
+	starredOnly := c.Query("starred") == "true"
+
+	resp, err := h.memoryService.List(c.Request.Context(), userID, page, limit, tags, starredOnly)
 	if err != nil {
 		zap.L().Error("failed to list memories", zap.Error(err), zap.String("user_id", userID.String()))
 		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
@@ -322,7 +468,7 @@ func (h *MemoryHandler) RetryTask(c *gin.Context) {
 	}
 
 	taskType := c.Param("task_type")
-	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true}
+	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true, "file:extract": true}
 	if !validTypes[taskType] {
 		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid task_type")
 		return
@@ -631,6 +777,37 @@ func (h *MemoryHandler) GetDailyReview(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": data})
+}
+
+// UpdateTextContent handles PATCH /api/v1/internal/memories/:id/text
+// Called by Processor Service after extracting text from uploaded files.
+func (h *MemoryHandler) UpdateTextContent(c *gin.Context) {
+	memoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
+		return
+	}
+
+	var req struct {
+		TextContent string `json:"text_content" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithValidationError(c, err)
+		return
+	}
+
+	if err := h.memoryService.UpdateTextContent(c.Request.Context(), memoryID, req.TextContent); err != nil {
+		switch err {
+		case service.ErrMemoryNotFound:
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Memory not found")
+		default:
+			zap.L().Error("failed to update text content", zap.Error(err), zap.String("memory_id", memoryID.String()))
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // CreateSuggestion handles POST /api/v1/internal/memories/:id/suggestion

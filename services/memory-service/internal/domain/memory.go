@@ -24,6 +24,11 @@ type Memory struct {
 	Vector           string    `gorm:"type:vector(1024);->:false;<-:false" json:"-"` // exclude from JSON, handled separately
 	Tags             pq.StringArray `gorm:"type:varchar(50)[]" json:"tags"`
 	Note             string    `gorm:"type:text" json:"note,omitempty"`
+	Source           string    `gorm:"type:text" json:"source,omitempty"`
+	IsStarred        bool      `gorm:"type:boolean;default:false" json:"is_starred"`
+	CoverURL         string    `gorm:"type:text" json:"cover_url,omitempty"`
+	FileName         string    `gorm:"type:text" json:"file_name,omitempty"`
+	FileSize         int64     `gorm:"type:bigint" json:"file_size,omitempty"`
 	Metadata         string    `gorm:"type:jsonb" json:"metadata,omitempty"`
 	ProcessingStatus string    `gorm:"type:varchar(20);default:'pending'" json:"processing_status"`
 	Visibility       string     `gorm:"type:varchar(20);default:'private'" json:"visibility"`
@@ -49,6 +54,11 @@ func (m Memory) SafeResponse() map[string]interface{} {
 		"link_summary":      m.LinkSummary,
 		"tags":              m.Tags,
 		"note":              m.Note,
+		"source":            m.Source,
+		"is_starred":        m.IsStarred,
+		"cover_url":         m.CoverURL,
+		"file_name":         m.FileName,
+		"file_size":         m.FileSize,
 		"processing_status": m.ProcessingStatus,
 		"visibility":        m.Visibility,
 		"sealed_until":      m.SealedUntil,
@@ -59,11 +69,13 @@ func (m Memory) SafeResponse() map[string]interface{} {
 
 // CreateMemoryRequest represents a request to create a new memory.
 type CreateMemoryRequest struct {
-	ContentType        string     `json:"content_type" binding:"required,oneof=text link"`
+	ContentType        string     `json:"content_type" binding:"required,oneof=text link file"`
 	TextContent        string     `json:"text_content" binding:"omitempty,max=10000"`
 	LinkURL            string     `json:"link_url" binding:"omitempty,url,max=2048"`
 	Tags               []string   `json:"tags" binding:"omitempty,dive,max=50"`
 	Note               string     `json:"note" binding:"omitempty,max=1000"`
+	Source             string     `json:"source" binding:"omitempty,max=500"`
+	IsStarred          bool       `json:"is_starred" binding:"omitempty"`
 	EnableAISuggestion bool       `json:"enable_ai_suggestion" binding:"omitempty"`
 	SealedUntil        *time.Time `json:"sealed_until,omitempty"`
 }
@@ -99,8 +111,10 @@ type SerendipityResponse struct {
 
 // UpdateMemoryRequest represents a request to update a memory.
 type UpdateMemoryRequest struct {
-	Tags []string `json:"tags" binding:"omitempty,dive,max=50"`
-	Note string   `json:"note" binding:"omitempty,max=1000"`
+	Tags      []string `json:"tags" binding:"omitempty,dive,max=50"`
+	Note      string   `json:"note" binding:"omitempty,max=1000"`
+	Source    string   `json:"source" binding:"omitempty,max=500"`
+	IsStarred *bool    `json:"is_starred,omitempty" binding:"omitempty"`
 }
 
 // ListMemoriesResponse represents a paginated list of memories.
@@ -179,7 +193,7 @@ type SuggestionResponse struct {
 
 // TaskStatusUpdate is the request body for the internal task status API.
 type TaskStatusUpdate struct {
-	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate suggestion:generate"`
+	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate suggestion:generate file:extract"`
 	Status   string                 `json:"status" binding:"required,oneof=pending processing completed failed"`
 	Error    string                 `json:"error,omitempty"`
 	Result   map[string]interface{} `json:"result,omitempty"` // e.g., {"tags": [...]}, {"vector": [...]}, {"title": "...", "summary": "..."}

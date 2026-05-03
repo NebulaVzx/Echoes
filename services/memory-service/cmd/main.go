@@ -55,8 +55,17 @@ func main() {
 	// Initialize vectorizer client
 	vectorizerClient := service.NewVectorizerClient()
 
+	// Initialize MinIO client (optional — nil if not configured)
+	var minioClient *service.MinIOClient
+	if mc, err := service.NewMinIOClient(); err == nil {
+		minioClient = mc
+		logger.Info("MinIO client initialized")
+	} else {
+		logger.Warn("MinIO client initialization failed, file uploads disabled", zap.Error(err))
+	}
+
 	// Initialize services
-	memoryService := service.NewMemoryService(memoryRepo, userRepo, taskQueue, vectorizerClient, suggestionRepo)
+	memoryService := service.NewMemoryService(memoryRepo, userRepo, taskQueue, vectorizerClient, suggestionRepo, minioClient)
 	tagService := service.NewTagService(tagRepo, userRepo)
 
 	// Initialize handlers

@@ -53,7 +53,8 @@ class SuggestionConsumer(RedisStreamConsumer):
         logger.info(f"[suggestion:generate] memory={memory_id} type={content_type} style={style}")
 
         # Build the appropriate prompt based on content type
-        if content_type == "text":
+        # File memories are treated as text after extraction
+        if content_type == "text" or content_type == "file":
             prompt = build_text_suggestion_prompt(content, note, style)
         elif content_type == "link":
             # For links, content is the URL; we don't have title/summary here
