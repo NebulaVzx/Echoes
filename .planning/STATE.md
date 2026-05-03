@@ -8,14 +8,14 @@ type: state
 
 **最后更新：** 2026-05-03
 **当前分支：** develop
-**当前里程碑：** v1.3 "记忆的回响"（Phase 11 UI 架构重设计已完成）
+**当前里程碑：** v1.3 "记忆的回响"（Phase 11 UI 架构重设计已完成，Phase 12 文件上传开发中）
 
 ---
 
 ## 当前位置
 
-**状态：** v1.2 里程碑已完成并归档，v1.3 Phase 11 已完成（12/12 plans）
-**最近活动：** 2026-05-03 — Phase 11 UI 架构重设计全部完成（12/12 plans）。补完 PWA 基础（manifest + Serwist SW + icons）
+**状态：** v1.2 里程碑已完成并归档，v1.3 Phase 11 已完成（12/12 plans），Phase 12 文件记忆上传功能开发中
+**最近活动：** 2026-05-03 — Phase 12 文件记忆上传 + AI 处理链路开发完成，修复 4 个线上 bug（PublishFileTasks 静默失败、presigned URL 过期、processor 漏发 suggestion、file_consumer 403 下载）
 
 ---
 

@@ -26,6 +26,24 @@
 
 **目标**: 构建三栏自适应工作台（Sidebar + Main + RightPanel）、Command Palette（Cmd+K）、AI 时代交互特征，为 v1.3 "记忆的回响" 奠定前端架构基础。
 
+### 🔄 进行中：Phase 12 — 记忆捕获扩展（文件上传）
+
+**目标**: 支持文件记忆上传（txt/md/docx），提取文本后走完整的 AI 处理链路（向量化、标签、建议）。
+
+**已完成**:
+- 前端文件上传表单 + 文件类型记忆卡片展示
+- MinIO 文件存储 + presigned URL 生成
+- processor FileConsumer 文本提取（txt/md/docx）
+- 文件提取后自动发布 text:vectorize + tag:generate + suggestion:generate
+
+**线上 Bug 修复** (2026-05-03):
+1. **PublishFileTasks 静默忽略错误** — `_ = s.queue.PublishFileExtract(...)` 改为显式错误日志
+2. **presigned URL 过期时间 0** — `PresignedGetObject` 过期时间从 `0` 改为 `300` 秒
+3. **processor 漏发 suggestion:generate** — file_consumer 提取后补发 suggestion
+4. **suggestion_consumer 不支持 content_type=file** — 添加 file 作为 text 别名
+5. **file_consumer MinIO 403** — 新增 MinIO 客户端直接下载（带认证），不再依赖 presigned URL
+6. **前端轮询间隔优化** — 按记忆类型区分刷新间隔（text 3s / link 5s / file 10s）
+
 **核心方向**:
 1. **三栏自适应布局** — CSS Grid 桌面三栏 + 移动端底部导航（MobileDock）
 2. **设计系统 Tokens** — shared/design-tokens/ 统一颜色/间距/断点/排版
