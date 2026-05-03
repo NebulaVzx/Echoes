@@ -11,7 +11,7 @@
 |------|------|
 | **名称** | Echoes（拾忆）— 个人语义搜索引擎 |
 | **当前版本** | v1.2.0 "记忆的温度"（2026-04-26） |
-| **当前分支** | `develop`（领先 origin/develop 14 commits） |
+| **当前分支** | `develop`（领先 origin/develop 20 commits） |
 | **主分支** | `main` |
 | **技术栈** | Next.js 14 + Go/Gin + Python/FastAPI + PostgreSQL/pgvector + Redis Stream |
 | **部署方式** | Docker Compose（开发），Kubernetes（生产） |
@@ -52,27 +52,33 @@
 
 | Commit | 描述 |
 |--------|------|
+| `5609f17` | docs: align PROGRESS.md and STATE.md with actual project status |
+| `f00a429` | fix(11): resolve three visual issues — layout center, header sticky, dropdown blue ring |
+| `ddb3d0d` | fix(11): viewport-center content and unify dropdown item focus styles |
+| `13c78d9` | fix(11): fix content centering and dropdown focus outline |
+| `4c4b8ae` | fix(11): remove active ring in collapsed sidebar, suppress dropdown outline, sticky header |
+| `d6ed5aa` | fix(11): fix homepage errors and blue focus outlines |
 | `7e04313` | fix(11): return 200 instead of 404 when serendipity has no match |
 | `4a38e43` | fix(11): resolve hydration error caused by nested button in UserMenu |
-| `7fd1655` | fix(11): suppress Chrome default blue focus-visible outline |
+| `7fd1655` | fix(11): suppress Chrome default blue focus-visible outline on navigation elements |
 | `00df083` | fix(11): fix focus ring and sidebar scroll behavior |
 | `fb9a1cd` | refactor(11): declutter timeline layout |
 
 ### 已修复问题（2026-05-03）
 
-1. **内容偏左**（关闭 right panel 后未居中）— `layout-provider.tsx` 默认值修正 + `globals.css` padding 补偿
-2. **Header 滚动消失** — `globals.css` 添加 `position: sticky; top: 0`
-3. **收缩 sidebar active item 蓝框** — 移除 `ring-1 ring-primary/30`
-4. **Dropdown 聚焦蓝色边框** — `ring-1 ring-foreground/10` 替换为 `border border-border`
+1. **首页报错**（hydration 不匹配）— `layout-provider.tsx` SSR 状态统一为固定默认值
+2. **内容偏左**（关闭 right panel 后未居中）— `layout-provider.tsx` 默认值修正 + `globals.css` padding 补偿
+3. **Header 滚动消失** — `globals.css` 添加 `position: sticky; top: 0`
+4. **收缩 sidebar active item 蓝框** — 移除 `ring-1 ring-primary/30`
+5. **Dropdown 聚焦蓝色边框** — `ring-1 ring-foreground/10` 替换为 `border border-border`
 
 ### 待解决问题
 
-1. **首页报错**：用户反馈首页存在报错，尚未定位到具体原因
+> 当前无活跃待解决问题。首页报错、布局居中、header sticky、dropdown 蓝框已全部修复。
 
 ### 未跟踪文件
 
-- `web/components.json` — shadcn/ui 配置文件
-- `web/components/ui/button.tsx` — shadcn/ui Button 组件
+> 无。所有文件已纳入版本控制。
 
 ---
 
