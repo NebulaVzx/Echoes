@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const withSerwist = require('@serwist/next').default
+
 const nextConfig = {
   // Enable standalone output for Docker deployment
   output: 'standalone',
@@ -15,4 +17,8 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+module.exports = withSerwist({
+  swSrc: 'app/sw.ts',
+  swDest: 'public/sw.js',
+  reloadOnOnline: true,
+})(nextConfig)

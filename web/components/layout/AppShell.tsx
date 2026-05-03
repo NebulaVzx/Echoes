@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { RightPanel } from '@/components/layout/RightPanel'
 import { MobileDock } from '@/components/layout/MobileDock'
 import { CommandPalette } from '@/components/command/CommandPalette'
+import { ServiceWorkerRegister } from '@/components/layout/ServiceWorkerRegister'
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -37,6 +38,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Command Palette: portal-based overlay, renders at root level */}
       <CommandPalette />
+
+      {/* Service Worker registration (production only) */}
+      <ServiceWorkerRegister />
     </>
   )
 }

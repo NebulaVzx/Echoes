@@ -20,7 +20,7 @@
 
 ## 2. 当前工作状态
 
-### 活跃计划：Phase 11 — UI 架构重设计
+### ✅ 已完成：Phase 11 — UI 架构重设计（12/12 plans）
 
 **计划目录**: `.planning/phases/11-ui-redesign/`
 
@@ -66,11 +66,11 @@
 
 ### 已修复问题（2026-05-03）
 
-1. **首页报错**（hydration 不匹配）— `layout-provider.tsx` SSR 状态统一为固定默认值
-2. **内容偏左**（关闭 right panel 后未居中）— `layout-provider.tsx` 默认值修正 + `globals.css` padding 补偿
-3. **Header 滚动消失** — `globals.css` 添加 `position: sticky; top: 0`
-4. **收缩 sidebar active item 蓝框** — 移除 `ring-1 ring-primary/30`
-5. **Dropdown 聚焦蓝色边框** — `ring-1 ring-foreground/10` 替换为 `border border-border`
+1. ~~首页报错（hydration 不匹配）~~ ✅ 已修复
+2. ~~内容偏左（关闭 right panel 后未居中）~~ ✅ 已修复
+3. ~~Header 滚动消失~~ ✅ 已修复
+4. ~~收缩 sidebar active item 蓝框~~ ✅ 已修复
+5. ~~Dropdown 聚焦蓝色边框~~ ✅ 已修复
 
 ### 待解决问题
 

@@ -11,9 +11,13 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: '拾忆 - Echoes',
   description: '个人语义搜索引擎 - 拾起遗落的记忆',
+  manifest: '/manifest.json',
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: [
+      { url: '/icons/apple-icon-180.png', sizes: '180x180' },
     ],
   },
 }
