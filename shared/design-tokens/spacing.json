@@ -1,0 +1,23 @@
+{
+  "scale": {
+    "xs": "4px",
+    "sm": "8px",
+    "md": "16px",
+    "lg": "24px",
+    "xl": "32px",
+    "2xl": "48px",
+    "3xl": "64px"
+  },
+  "layout": {
+    "sidebarWidth": "200px",
+    "sidebarCollapsedWidth": "48px",
+    "rightPanelWidth": "280px",
+    "rightPanelMinWidth": "200px",
+    "rightPanelMaxWidth": "400px",
+    "headerHeight": "48px",
+    "mobileDockHeight": "56px",
+    "contentMaxWidthTimeline": "640px",
+    "contentMaxWidthDetail": "720px",
+    "contentMaxWidthFull": "100%"
+  }
+}
