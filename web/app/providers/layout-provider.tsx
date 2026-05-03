@@ -44,7 +44,7 @@ function saveLayoutState(state: LayoutState) {
 }
 
 export function LayoutProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<LayoutState>(loadLayoutState)
+  const [state, setState] = useState<LayoutState>({ sidebarCollapsed: false, rightPanelVisible: true, rightPanelWidth: 280 })
   const [mounted, setMounted] = useState(false)
 
   // Hydrate from localStorage on mount

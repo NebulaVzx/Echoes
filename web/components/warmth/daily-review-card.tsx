@@ -57,7 +57,7 @@ export default function DailyReviewCard() {
             <>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                 今天保存了 {data.today_count} 条记忆
-                {data.top_tags.length > 0 && (
+                {data.top_tags && data.top_tags.length > 0 && (
                   <>，主题：{data.top_tags.map(t => `#${t}`).join(' ')}</>
                 )}
               </p>

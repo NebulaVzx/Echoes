@@ -31,7 +31,8 @@ export function MobileDock() {
               'flex flex-col items-center gap-0.5 px-2 py-1 min-w-0 text-xs transition-colors',
               isActive
                 ? 'text-primary'
-                : 'text-muted-foreground hover:text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+              'focus-visible:outline-none'
             )}
           >
             <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />

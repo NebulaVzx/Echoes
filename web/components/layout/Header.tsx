@@ -12,7 +12,7 @@ export function Header() {
   return (
     <div className="flex items-center justify-between h-12 px-4 border-b border-border bg-background">
       {/* Left: Logo + Brand */}
-      <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 group" aria-label="拾忆 - 首页">
+      <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 group focus-visible:outline-none" aria-label="拾忆 - 首页">
         <div className="flex items-center gap-2">
           <Logo size={28} className="text-foreground" />
           <div className="flex flex-col leading-tight">
@@ -38,7 +38,7 @@ export function Header() {
         ) : (
           <Link
             href="/login"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none"
           >
             登录
           </Link>

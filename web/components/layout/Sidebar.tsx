@@ -82,6 +82,7 @@ export function Sidebar() {
           className={cn(
             'flex items-center justify-center rounded-md text-muted-foreground',
             'hover:bg-muted hover:text-foreground transition-colors',
+            'focus-visible:outline-none',
             sidebarCollapsed ? 'h-8 w-8' : 'h-7 px-2 gap-1.5'
           )}
           aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
