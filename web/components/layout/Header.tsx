@@ -11,9 +11,19 @@ export function Header() {
 
   return (
     <div className="flex items-center justify-between h-12 px-4 border-b border-border bg-background">
-      {/* Left: Logo */}
-      <Link href="/" className="flex items-center gap-2 flex-shrink-0" aria-label="拾忆 - 首页">
-        <Logo size={24} className="text-foreground" />
+      {/* Left: Logo + Brand */}
+      <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 group" aria-label="拾忆 - 首页">
+        <div className="flex items-center gap-2">
+          <Logo size={28} className="text-foreground" />
+          <div className="flex flex-col leading-tight">
+            <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+              Echoes
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              拾忆
+            </span>
+          </div>
+        </div>
       </Link>
 
       {/* Center: Global Search — grows to fill space */}

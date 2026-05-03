@@ -66,9 +66,7 @@ export function Sidebar() {
   return (
     <nav
       className={cn(
-        'flex flex-col h-full bg-sidebar/50 border-r border-border',
-        sidebarCollapsed ? 'w-12' : 'w-[200px]',
-        'transition-all duration-200 ease-out'
+        'flex flex-col h-full w-full bg-sidebar/50 border-r border-border'
       )}
     >
       {/* Nav items with scroll area */}
