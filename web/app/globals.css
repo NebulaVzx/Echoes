@@ -1,3 +1,5 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,19 +9,89 @@
 
 @layer base {
   :root {
-    --background: #ffffff;
-    --foreground: #1a1a1a;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
   }
 
   .dark {
-    --background: #1a1a1a;
-    --foreground: #f7f7f7;
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
   }
 
   body {
     background-color: var(--background);
     color: var(--foreground);
     font-feature-settings: "rlig" 1, "calt" 1;
+    @apply bg-background text-foreground;
+  }
+  .theme {
+    --font-heading: var(--font-sans);
+    --font-sans: var(--font-sans);
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
   }
 }
 
@@ -60,4 +132,175 @@
 
 .btn-scale:active {
   transform: scale(0.97);
+}
+
+/* ===== Phase 11: Three-Column Layout Shell ===== */
+
+/* Layout CSS custom properties — defaults for desktop */
+:root {
+  --sidebar-width: 200px;
+  --panel-width: 0px;
+  --header-height: 48px;
+
+  /* Density (comfortable is default) */
+  --card-padding: 16px;
+  --element-spacing: 16px;
+}
+
+/* Right panel visible state */
+:root[data-panel-visible="true"] {
+  --panel-width: 280px;
+}
+
+/* Sidebar collapsed state */
+:root[data-sidebar-collapsed="true"] {
+  --sidebar-width: 48px;
+}
+
+/* Density: compact */
+:root[data-density="compact"] {
+  --card-padding: 12px;
+  --element-spacing: 8px;
+}
+
+/* Density: loose */
+:root[data-density="loose"] {
+  --card-padding: 24px;
+  --element-spacing: 24px;
+}
+
+/* ===== AppShell Grid Container ===== */
+
+.app-shell {
+  display: grid;
+  grid-template-rows: var(--header-height) 1fr;
+  grid-template-columns: var(--sidebar-width) 1fr var(--panel-width);
+  min-height: 100dvh;
+  transition: grid-template-columns 200ms ease-out;
+}
+
+.app-shell-header {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.app-shell-sidebar {
+  grid-row: 2;
+  overflow: hidden;
+  min-width: 0;
+  border-right: 1px solid hsl(var(--border));
+  background-color: hsl(var(--sidebar) / 0.5);
+}
+
+.app-shell-main {
+  grid-row: 2;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.app-shell-panel {
+  grid-row: 2;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* When right panel is hidden (0px track), hide content to prevent overflow */
+.app-shell-panel[data-visible="false"] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ===== Mobile Dock ===== */
+
+.mobile-dock {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background-color: hsl(var(--background));
+  border-top: 1px solid hsl(var(--border));
+  z-index: 50;
+}
+
+/* Safe-area fallback for older browsers */
+@supports not (padding-bottom: env(safe-area-inset-bottom, 0px)) {
+  .mobile-dock {
+    padding-bottom: 8px;
+  }
+}
+
+/* ===== Right Panel ===== */
+
+.right-panel {
+  overflow: hidden;
+  min-width: 0;
+  border-left: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+}
+
+.right-panel[data-visible="false"] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ===== Theme Transition ===== */
+
+/* Per D-09 and UI-SPEC: 300ms ease-out cross-fade on all color properties */
+*,
+*::before,
+*::after {
+  transition-property: background-color, color, border-color, box-shadow;
+  transition-duration: 300ms;
+  transition-timing-function: ease-out;
+}
+
+/* Instant transitions for elements that should NOT animate */
+.app-shell,
+.app-shell *[data-no-transition],
+.no-theme-transition {
+  transition-duration: 0ms !important;
+}
+
+/* ===== Responsive Breakpoints ===== */
+
+/* Tablet: two columns, no right panel */
+@media (max-width: 1279px) {
+  :root {
+    --panel-width: 0px;
+  }
+
+  .app-shell {
+    grid-template-columns: var(--sidebar-width) 1fr 0px;
+  }
+}
+
+/* Tablet narrow: sidebar as overlay drawer when collapsed */
+@media (max-width: 1023px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+
+  .app-shell {
+    grid-template-columns: 0px 1fr 0px;
+  }
+}
+
+/* Mobile: single column, dock at bottom */
+@media (max-width: 767px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-shell-sidebar,
+  .app-shell-panel {
+    display: none;
+  }
+}
+
+/* Prevent transition on initial page load (flash prevention) */
+.preload * {
+  transition: none !important;
 }

@@ -1,10 +1,13 @@
 import type { Config } from 'tailwindcss'
+import echoesPreset from '../../shared/design-tokens/tailwind-preset'
 
 const config: Config = {
+  presets: [echoesPreset],
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    '../../shared/design-tokens/**/*.{js,ts,jsx,tsx,mdx,json}',
   ],
   darkMode: 'class',
   theme: {
