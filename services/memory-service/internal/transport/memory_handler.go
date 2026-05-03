@@ -587,7 +587,9 @@ func (h *MemoryHandler) GetSerendipity(c *gin.Context) {
 	resp, err := h.memoryService.GetSerendipity(c.Request.Context(), userID)
 	if err != nil {
 		if errors.Is(err, service.ErrMemoryNotFound) {
-			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "No memories found for serendipity")
+			// No serendipity match is a normal state — return 200 with null data
+			// so the browser doesn't flag it as a network error.
+			c.JSON(http.StatusOK, gin.H{"success": true, "data": nil})
 			return
 		}
 		zap.L().Error("failed to get serendipity", zap.Error(err), zap.String("user_id", userID.String()))
