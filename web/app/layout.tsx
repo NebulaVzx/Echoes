@@ -1,13 +1,18 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Geist } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from './providers/auth-provider'
 import { ThemeProvider } from './providers/theme-provider'
+import { LayoutProvider } from './providers/layout-provider'
+import { DensityProvider } from './providers/density-provider'
+import { ThemeColorProvider } from './providers/theme-color-provider'
+import { cn } from "@/lib/utils"
 
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans' })
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Echoes - 拾忆',
+  title: '拾忆 - Echoes',
   description: '个人语义搜索引擎 - 拾起遗落的记忆',
   icons: {
     icon: [
@@ -17,7 +22,11 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FFFFFF' },
+    { media: '(prefers-color-scheme: dark)', color: '#0A0A0A' },
+  ],
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
@@ -26,10 +35,32 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                document.documentElement.classList.add('preload');
+                window.addEventListener('load', function() {
+                  document.documentElement.classList.remove('preload');
+                });
+              } catch(e) {}
+            `,
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <LayoutProvider>
+              <DensityProvider>
+                <ThemeColorProvider>
+                  {children}
+                </ThemeColorProvider>
+              </DensityProvider>
+            </LayoutProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
