@@ -4,11 +4,21 @@ import tempfile
 
 import httpx
 import redis.asyncio as redis
+from minio import Minio
 from app.consumers.base import RedisStreamConsumer
 from app.clients.memory_client import MemoryServiceClient
 from app.services.file_extractor import extract_text
 
 logger = logging.getLogger(__name__)
+
+
+def _get_minio_client():
+    """Create MinIO client from environment variables."""
+    endpoint = os.getenv("MINIO_ENDPOINT", "echoes-minio:9000")
+    access_key = os.getenv("MINIO_ACCESS_KEY", "echoes_minio")
+    secret_key = os.getenv("MINIO_SECRET_KEY", "echoes_minio_secret")
+    secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
+    return Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
 
 
 class FileConsumer(RedisStreamConsumer):
@@ -23,6 +33,7 @@ class FileConsumer(RedisStreamConsumer):
         )
         self._redis = redis_client
         self._http = httpx.AsyncClient(timeout=30.0)
+        self._minio = _get_minio_client()
 
     async def process_message(self, msg_id: str, fields: dict):
         memory_id = fields.get("memory_id", "")
@@ -43,10 +54,26 @@ class FileConsumer(RedisStreamConsumer):
             tmp_path = tmp.name
 
         try:
-            resp = await self._http.get(media_url)
-            resp.raise_for_status()
-            with open(tmp_path, "wb") as f:
-                f.write(resp.content)
+            # Try MinIO direct download first (handles private buckets)
+            # Parse bucket/object from URL: http://host:port/bucket/object-path
+            url_parts = media_url.replace("http://", "").replace("https://", "").split("/")
+            if len(url_parts) >= 3:
+                bucket = url_parts[1]
+                object_name = "/".join(url_parts[2:])
+                try:
+                    self._minio.fget_object(bucket, object_name, tmp_path)
+                    logger.info(f"[file:extract] memory={memory_id} downloaded via MinIO client")
+                except Exception as e:
+                    logger.warning(f"[file:extract] MinIO download failed, falling back to HTTP: {e}")
+                    resp = await self._http.get(media_url)
+                    resp.raise_for_status()
+                    with open(tmp_path, "wb") as f:
+                        f.write(resp.content)
+            else:
+                resp = await self._http.get(media_url)
+                resp.raise_for_status()
+                with open(tmp_path, "wb") as f:
+                    f.write(resp.content)
 
             # Extract text
             logger.info(f"[file:extract] memory={memory_id} extracting text from {file_name}")
