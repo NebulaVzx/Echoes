@@ -20,7 +20,7 @@ const LayoutContext = createContext<LayoutContextType | undefined>(undefined)
 
 function loadLayoutState(): LayoutState {
   if (typeof window === 'undefined') {
-    return { sidebarCollapsed: false, rightPanelVisible: true, rightPanelWidth: 280 }
+    return { sidebarCollapsed: false, rightPanelVisible: false, rightPanelWidth: 280 }
   }
   try {
     const saved = localStorage.getItem('echoes_layout')
@@ -33,7 +33,7 @@ function loadLayoutState(): LayoutState {
       }
     }
   } catch { /* ignore parse errors */ }
-  return { sidebarCollapsed: false, rightPanelVisible: true, rightPanelWidth: 280 }
+  return { sidebarCollapsed: false, rightPanelVisible: false, rightPanelWidth: 280 }
 }
 
 function saveLayoutState(state: LayoutState) {
@@ -44,7 +44,7 @@ function saveLayoutState(state: LayoutState) {
 }
 
 export function LayoutProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<LayoutState>({ sidebarCollapsed: false, rightPanelVisible: true, rightPanelWidth: 280 })
+  const [state, setState] = useState<LayoutState>({ sidebarCollapsed: false, rightPanelVisible: false, rightPanelWidth: 280 })
   const [mounted, setMounted] = useState(false)
 
   // Hydrate from localStorage on mount

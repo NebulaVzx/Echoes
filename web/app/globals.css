@@ -346,6 +346,14 @@ body {
 /* outline-hidden is a Tailwind v4 utility; shadcn v4 components use it.
    In Tailwind v3 this class doesn't exist, so Chrome's default blue
    focus-visible outline leaks through. */
+/* Aggressive focus outline suppression for @base-ui/react components */
+[data-slot="dropdown-menu-content"]:focus,
+[data-slot="dropdown-menu-content"]:focus-visible,
+[data-slot="dropdown-menu-item"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .outline-hidden {
   outline: none;
 }
