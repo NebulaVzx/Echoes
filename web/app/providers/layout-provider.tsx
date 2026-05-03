@@ -1,87 +1,119 @@
-'use client'
+"use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
 
 interface LayoutState {
-  sidebarCollapsed: boolean
-  rightPanelVisible: boolean
-  rightPanelWidth: number
+  sidebarCollapsed: boolean;
+  rightPanelVisible: boolean;
+  rightPanelWidth: number;
 }
 
 interface LayoutContextType extends LayoutState {
-  toggleSidebar: () => void
-  setSidebarCollapsed: (collapsed: boolean) => void
-  toggleRightPanel: () => void
-  setRightPanelVisible: (visible: boolean) => void
-  setRightPanelWidth: (width: number) => void
+  toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  toggleRightPanel: () => void;
+  setRightPanelVisible: (visible: boolean) => void;
+  setRightPanelWidth: (width: number) => void;
 }
 
-const LayoutContext = createContext<LayoutContextType | undefined>(undefined)
+const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
 
 function loadLayoutState(): LayoutState {
-  if (typeof window === 'undefined') {
-    return { sidebarCollapsed: false, rightPanelVisible: false, rightPanelWidth: 280 }
+  if (typeof window === "undefined") {
+    return {
+      sidebarCollapsed: false,
+      rightPanelVisible: false,
+      rightPanelWidth: 280,
+    };
   }
   try {
-    const saved = localStorage.getItem('echoes_layout')
+    const saved = localStorage.getItem("echoes_layout");
     if (saved) {
-      const parsed = JSON.parse(saved)
+      const parsed = JSON.parse(saved);
       return {
         sidebarCollapsed: parsed.sidebarCollapsed ?? false,
-        rightPanelVisible: parsed.rightPanelVisible ?? true,
-        rightPanelWidth: Math.min(400, Math.max(200, parsed.rightPanelWidth ?? 280)),
-      }
+        rightPanelVisible: parsed.rightPanelVisible ?? false,
+        rightPanelWidth: Math.min(
+          400,
+          Math.max(200, parsed.rightPanelWidth ?? 280),
+        ),
+      };
     }
-  } catch { /* ignore parse errors */ }
-  return { sidebarCollapsed: false, rightPanelVisible: false, rightPanelWidth: 280 }
+  } catch {
+    /* ignore parse errors */
+  }
+  return {
+    sidebarCollapsed: false,
+    rightPanelVisible: false,
+    rightPanelWidth: 280,
+  };
 }
 
 function saveLayoutState(state: LayoutState) {
-  if (typeof window === 'undefined') return
+  if (typeof window === "undefined") return;
   try {
-    localStorage.setItem('echoes_layout', JSON.stringify(state))
-  } catch { /* ignore quota errors */ }
+    localStorage.setItem("echoes_layout", JSON.stringify(state));
+  } catch {
+    /* ignore quota errors */
+  }
 }
 
 export function LayoutProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<LayoutState>({ sidebarCollapsed: false, rightPanelVisible: false, rightPanelWidth: 280 })
-  const [mounted, setMounted] = useState(false)
+  const [state, setState] = useState<LayoutState>({
+    sidebarCollapsed: false,
+    rightPanelVisible: false,
+    rightPanelWidth: 280,
+  });
+  const [mounted, setMounted] = useState(false);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
-    setMounted(true)
-    const saved = loadLayoutState()
-    setState(saved)
-  }, [])
+    setMounted(true);
+    const saved = loadLayoutState();
+    setState(saved);
+  }, []);
 
   // Sync data attributes to :root for CSS consumption
   useEffect(() => {
-    if (!mounted) return
-    const root = document.documentElement
-    root.setAttribute('data-sidebar-collapsed', String(state.sidebarCollapsed))
-    root.setAttribute('data-panel-visible', String(state.rightPanelVisible))
-    saveLayoutState(state)
-  }, [state, mounted])
+    if (!mounted) return;
+    const root = document.documentElement;
+    root.setAttribute("data-sidebar-collapsed", String(state.sidebarCollapsed));
+    root.setAttribute("data-panel-visible", String(state.rightPanelVisible));
+    saveLayoutState(state);
+  }, [state, mounted]);
 
   const toggleSidebar = useCallback(() => {
-    setState(prev => ({ ...prev, sidebarCollapsed: !prev.sidebarCollapsed }))
-  }, [])
+    setState((prev) => ({ ...prev, sidebarCollapsed: !prev.sidebarCollapsed }));
+  }, []);
 
   const setSidebarCollapsed = useCallback((collapsed: boolean) => {
-    setState(prev => ({ ...prev, sidebarCollapsed: collapsed }))
-  }, [])
+    setState((prev) => ({ ...prev, sidebarCollapsed: collapsed }));
+  }, []);
 
   const toggleRightPanel = useCallback(() => {
-    setState(prev => ({ ...prev, rightPanelVisible: !prev.rightPanelVisible }))
-  }, [])
+    setState((prev) => ({
+      ...prev,
+      rightPanelVisible: !prev.rightPanelVisible,
+    }));
+  }, []);
 
   const setRightPanelVisible = useCallback((visible: boolean) => {
-    setState(prev => ({ ...prev, rightPanelVisible: visible }))
-  }, [])
+    setState((prev) => ({ ...prev, rightPanelVisible: visible }));
+  }, []);
 
   const setRightPanelWidth = useCallback((width: number) => {
-    setState(prev => ({ ...prev, rightPanelWidth: Math.min(400, Math.max(200, width)) }))
-  }, [])
+    setState((prev) => ({
+      ...prev,
+      rightPanelWidth: Math.min(400, Math.max(200, width)),
+    }));
+  }, []);
 
   return (
     <LayoutContext.Provider
@@ -96,11 +128,11 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     >
       {children}
     </LayoutContext.Provider>
-  )
+  );
 }
 
 export function useLayout() {
-  const ctx = useContext(LayoutContext)
-  if (!ctx) throw new Error('useLayout must be used within LayoutProvider')
-  return ctx
+  const ctx = useContext(LayoutContext);
+  if (!ctx) throw new Error("useLayout must be used within LayoutProvider");
+  return ctx;
 }

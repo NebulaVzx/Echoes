@@ -6,255 +6,263 @@
 /* Notion-like minimal design system */
 
 @layer base {
-  :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-  }
+    :root {
+        --background: oklch(1 0 0);
+        --foreground: oklch(0.145 0 0);
+        --card: oklch(1 0 0);
+        --card-foreground: oklch(0.145 0 0);
+        --popover: oklch(1 0 0);
+        --popover-foreground: oklch(0.145 0 0);
+        --primary: oklch(0.205 0 0);
+        --primary-foreground: oklch(0.985 0 0);
+        --secondary: oklch(0.97 0 0);
+        --secondary-foreground: oklch(0.205 0 0);
+        --muted: oklch(0.97 0 0);
+        --muted-foreground: oklch(0.556 0 0);
+        --accent: oklch(0.97 0 0);
+        --accent-foreground: oklch(0.205 0 0);
+        --destructive: oklch(0.577 0.245 27.325);
+        --border: oklch(0.922 0 0);
+        --input: oklch(0.922 0 0);
+        --ring: oklch(0.708 0 0);
+        --chart-1: oklch(0.87 0 0);
+        --chart-2: oklch(0.556 0 0);
+        --chart-3: oklch(0.439 0 0);
+        --chart-4: oklch(0.371 0 0);
+        --chart-5: oklch(0.269 0 0);
+        --radius: 0.625rem;
+        --sidebar: oklch(0.985 0 0);
+        --sidebar-foreground: oklch(0.145 0 0);
+        --sidebar-primary: oklch(0.205 0 0);
+        --sidebar-primary-foreground: oklch(0.985 0 0);
+        --sidebar-accent: oklch(0.97 0 0);
+        --sidebar-accent-foreground: oklch(0.205 0 0);
+        --sidebar-border: oklch(0.922 0 0);
+        --sidebar-ring: oklch(0.708 0 0);
+    }
 
-  .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-  }
+    .dark {
+        --background: oklch(0.145 0 0);
+        --foreground: oklch(0.985 0 0);
+        --card: oklch(0.205 0 0);
+        --card-foreground: oklch(0.985 0 0);
+        --popover: oklch(0.205 0 0);
+        --popover-foreground: oklch(0.985 0 0);
+        --primary: oklch(0.922 0 0);
+        --primary-foreground: oklch(0.205 0 0);
+        --secondary: oklch(0.269 0 0);
+        --secondary-foreground: oklch(0.985 0 0);
+        --muted: oklch(0.269 0 0);
+        --muted-foreground: oklch(0.708 0 0);
+        --accent: oklch(0.269 0 0);
+        --accent-foreground: oklch(0.985 0 0);
+        --destructive: oklch(0.704 0.191 22.216);
+        --border: oklch(1 0 0 / 10%);
+        --input: oklch(1 0 0 / 15%);
+        --ring: oklch(0.556 0 0);
+        --chart-1: oklch(0.87 0 0);
+        --chart-2: oklch(0.556 0 0);
+        --chart-3: oklch(0.439 0 0);
+        --chart-4: oklch(0.371 0 0);
+        --chart-5: oklch(0.269 0 0);
+        --sidebar: oklch(0.205 0 0);
+        --sidebar-foreground: oklch(0.985 0 0);
+        --sidebar-primary: oklch(0.488 0.243 264.376);
+        --sidebar-primary-foreground: oklch(0.985 0 0);
+        --sidebar-accent: oklch(0.269 0 0);
+        --sidebar-accent-foreground: oklch(0.985 0 0);
+        --sidebar-border: oklch(1 0 0 / 10%);
+        --sidebar-ring: oklch(0.556 0 0);
+    }
 
-  body {
-    background-color: var(--background);
-    color: var(--foreground);
-    font-feature-settings: "rlig" 1, "calt" 1;
-    @apply bg-background text-foreground;
-  }
-  .theme {
-    --font-heading: var(--font-sans);
-    --font-sans: var(--font-sans);
-  }
-  * {
-    @apply border-border;
-  }
-  html {
-    @apply font-sans;
-  }
+    body {
+        background-color: var(--background);
+        color: var(--foreground);
+        font-feature-settings:
+            "rlig" 1,
+            "calt" 1;
+        @apply bg-background text-foreground;
+    }
+    .theme {
+        --font-heading: var(--font-sans);
+        --font-sans: var(--font-sans);
+    }
+    * {
+        @apply border-border;
+    }
+    html {
+        @apply font-sans;
+    }
 }
 
 @layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 0.3s ease-out;
-  }
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-out;
+    }
 
-  .animate-slide-up {
-    animation: slideUp 0.3s ease-out;
-  }
+    .animate-slide-up {
+        animation: slideUp 0.3s ease-out;
+    }
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Button scale feedback — per D-05 */
 .btn-scale {
-  transition: transform 100ms ease-out;
+    transition: transform 100ms ease-out;
 }
 
 .btn-scale:active {
-  transform: scale(0.97);
+    transform: scale(0.97);
 }
 
 /* ===== Phase 11: Three-Column Layout Shell ===== */
 
 /* Layout CSS custom properties — defaults for desktop */
 :root {
-  --sidebar-width: 200px;
-  --panel-width: 0px;
-  --header-height: 48px;
+    --sidebar-width: 200px;
+    --panel-width: 0px;
+    --header-height: 48px;
 
-  /* Density (comfortable is default) */
-  --card-padding: 16px;
-  --element-spacing: 16px;
+    /* Density (comfortable is default) */
+    --card-padding: 16px;
+    --element-spacing: 16px;
 }
 
 /* Right panel visible state */
 :root[data-panel-visible="true"] {
-  --panel-width: 280px;
+    --panel-width: 280px;
 }
 
 /* Sidebar collapsed state — 56px gives room for icon + active indicator */
 :root[data-sidebar-collapsed="true"] {
-  --sidebar-width: 56px;
+    --sidebar-width: 56px;
 }
 
 /* Density: compact */
 :root[data-density="compact"] {
-  --card-padding: 12px;
-  --element-spacing: 8px;
+    --card-padding: 12px;
+    --element-spacing: 8px;
 }
 
 /* Density: loose */
 :root[data-density="loose"] {
-  --card-padding: 24px;
-  --element-spacing: 24px;
+    --card-padding: 24px;
+    --element-spacing: 24px;
 }
 
 /* ===== AppShell Grid Container ===== */
 
 .app-shell {
-  display: grid;
-  grid-template-rows: var(--header-height) 1fr;
-  grid-template-columns: var(--sidebar-width) 1fr var(--panel-width);
-  min-height: 100dvh;
-  transition: grid-template-columns 200ms ease-out;
+    display: grid;
+    grid-template-rows: var(--header-height) 1fr;
+    grid-template-columns: var(--sidebar-width) 1fr var(--panel-width);
+    min-height: 100dvh;
+    transition: grid-template-columns 200ms ease-out;
 }
 
 .app-shell-header {
-  position: sticky;
-  top: 0;
-  grid-column: 1 / -1;
-  grid-row: 1;
-  overflow: hidden;
-  z-index: 10;
+    position: sticky;
+    top: 0;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    overflow: hidden;
+    z-index: 10;
 }
 
 .app-shell-sidebar {
-  grid-row: 2;
-  position: sticky;
-  top: var(--header-height);
-  height: calc(100dvh - var(--header-height));
-  overflow: hidden;
-  min-width: 0;
-  border-right: 1px solid hsl(var(--border));
-  background-color: hsl(var(--sidebar) / 0.5);
-  align-self: start;
+    grid-row: 2;
+    position: sticky;
+    top: var(--header-height);
+    height: calc(100dvh - var(--header-height));
+    overflow: hidden;
+    min-width: 0;
+    border-right: 1px solid hsl(var(--border));
+    background-color: hsl(var(--sidebar) / 0.5);
+    align-self: start;
 }
 
 .app-shell-main {
-  grid-row: 2;
-  min-width: 0;
-  overflow-y: auto;
+    grid-row: 2;
+    min-width: 0;
+    overflow-y: auto;
 }
 
 /* When right panel is hidden, add right padding equal to sidebar width
    so content appears visually centered in the viewport */
 :root[data-panel-visible="false"] .app-shell-main {
-  padding-right: var(--sidebar-width);
+    padding-right: 200px;
+}
+
+/* Also apply when sidebar is collapsed (56px) */
+:root[data-panel-visible="false"][data-sidebar-collapsed="true"]
+    .app-shell-main {
+    padding-right: 56px;
 }
 
 .app-shell-panel {
-  grid-row: 2;
-  overflow: hidden;
-  min-width: 0;
+    grid-row: 2;
+    overflow: hidden;
+    min-width: 0;
 }
 
 /* When right panel is hidden (0px track), hide content to prevent overflow */
 .app-shell-panel[data-visible="false"] {
-  visibility: hidden;
-  pointer-events: none;
+    visibility: hidden;
+    pointer-events: none;
 }
 
 /* ===== Mobile Dock ===== */
 
 .mobile-dock {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: calc(56px + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  background-color: hsl(var(--background));
-  border-top: 1px solid hsl(var(--border));
-  z-index: 50;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background-color: hsl(var(--background));
+    border-top: 1px solid hsl(var(--border));
+    z-index: 50;
 }
 
 /* Safe-area fallback for older browsers */
 @supports not (padding-bottom: env(safe-area-inset-bottom, 0px)) {
-  .mobile-dock {
-    padding-bottom: 8px;
-  }
+    .mobile-dock {
+        padding-bottom: 8px;
+    }
 }
 
 /* ===== Right Panel ===== */
 
 .right-panel {
-  overflow: hidden;
-  min-width: 0;
-  border-left: 1px solid hsl(var(--border));
-  background-color: hsl(var(--background));
+    overflow: hidden;
+    min-width: 0;
+    border-left: 1px solid hsl(var(--border));
+    background-color: hsl(var(--background));
 }
 
 .right-panel[data-visible="false"] {
-  visibility: hidden;
-  pointer-events: none;
+    visibility: hidden;
+    pointer-events: none;
 }
 
 /* ===== Theme Transition ===== */
@@ -266,11 +274,13 @@
 
 /* Apply smooth color transitions to common themed surfaces */
 html {
-  transition: color 300ms ease-out;
+    transition: color 300ms ease-out;
 }
 
 body {
-  transition: background-color 300ms ease-out, color 300ms ease-out;
+    transition:
+        background-color 300ms ease-out,
+        color 300ms ease-out;
 }
 
 /* Cards, panels, nav — themed blocks that need smooth dark/light switching */
@@ -283,7 +293,7 @@ body {
 .bg-primary\/10,
 [class*="bg-card"],
 [class*="bg-background"] {
-  transition: background-color 300ms ease-out;
+    transition: background-color 300ms ease-out;
 }
 
 .text-foreground,
@@ -292,59 +302,59 @@ body {
 .text-card-foreground,
 [class*="text-foreground"],
 [class*="text-muted-foreground"] {
-  transition: color 300ms ease-out;
+    transition: color 300ms ease-out;
 }
 
 .border-border,
 [class*="border-border"] {
-  transition: border-color 300ms ease-out;
+    transition: border-color 300ms ease-out;
 }
 
 /* Instant transitions for layout changes (no theme animation) */
 .app-shell {
-  transition: grid-template-columns 200ms ease-out;
+    transition: grid-template-columns 200ms ease-out;
 }
 
 /* ===== Responsive Breakpoints ===== */
 
 /* Tablet: two columns, no right panel */
 @media (max-width: 1279px) {
-  :root {
-    --panel-width: 0px;
-  }
+    :root {
+        --panel-width: 0px;
+    }
 
-  .app-shell {
-    grid-template-columns: var(--sidebar-width) 1fr 0px;
-  }
+    .app-shell {
+        grid-template-columns: var(--sidebar-width) 1fr 0px;
+    }
 }
 
 /* Tablet narrow: sidebar as overlay drawer when collapsed */
 @media (max-width: 1023px) {
-  :root {
-    --sidebar-width: 0px;
-  }
+    :root {
+        --sidebar-width: 0px;
+    }
 
-  .app-shell {
-    grid-template-columns: 0px 1fr 0px;
-  }
+    .app-shell {
+        grid-template-columns: 0px 1fr 0px;
+    }
 }
 
 /* Mobile: single column, dock at bottom */
 @media (max-width: 767px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
-  }
+    .app-shell {
+        grid-template-columns: 1fr;
+        padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    }
 
-  .app-shell-sidebar,
-  .app-shell-panel {
-    display: none;
-  }
+    .app-shell-sidebar,
+    .app-shell-panel {
+        display: none;
+    }
 }
 
 /* Prevent transition on initial page load (flash prevention) */
 .preload * {
-  transition: none !important;
+    transition: none !important;
 }
 
 /* ===== shadcn v4 → Tailwind v3 shims ===== */
@@ -356,15 +366,15 @@ body {
 [data-slot="dropdown-menu-content"]:focus,
 [data-slot="dropdown-menu-content"]:focus-visible,
 [data-slot="dropdown-menu-item"]:focus-visible {
-  outline: none !important;
-  box-shadow: none !important;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 /* Firefox specific: suppress default focus ring on Base UI items */
 [data-slot="dropdown-menu-item"]:-moz-focusring {
-  outline: none !important;
+    outline: none !important;
 }
 
 .outline-hidden {
-  outline: none;
+    outline: none;
 }
