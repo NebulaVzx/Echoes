@@ -37,7 +37,7 @@ export function SidebarItem({ href, label, icon: Icon, collapsed = false, isNew 
       {/* Icon wrapper — in collapsed mode, active gets a subtle ring */}
       <span className={cn(
         'flex items-center justify-center rounded-md transition-all duration-200',
-        collapsed && isActive && 'bg-primary/15 ring-1 ring-primary/30 p-1.5 -m-1',
+        collapsed && isActive && 'bg-primary/15 p-1.5 -m-1',
         collapsed && !isActive && 'p-1'
       )}>
         <Icon className={cn(
