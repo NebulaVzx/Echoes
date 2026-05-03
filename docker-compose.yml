@@ -298,8 +298,10 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8088
       - API_URL=http://gateway:8080
+      - TZ=Asia/Shanghai
     ports:
       - "3000:3000"
+    command: ["sh", "-c", "TZ=Asia/Shanghai npm run dev 2>&1 | while IFS= read -r line; do printf '[%s] %s\\n' \"$$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')\" \"$$line\"; done"]
     volumes:
       - ./web:/app
       - /app/node_modules

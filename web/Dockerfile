@@ -12,6 +12,8 @@ RUN npm install
 # Development stage
 FROM node:20-alpine AS development
 
+RUN apk add --no-cache tzdata
+
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules

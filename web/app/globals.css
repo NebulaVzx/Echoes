@@ -338,3 +338,12 @@ body {
 .preload * {
   transition: none !important;
 }
+
+/* ===== shadcn v4 → Tailwind v3 shims ===== */
+
+/* outline-hidden is a Tailwind v4 utility; shadcn v4 components use it.
+   In Tailwind v3 this class doesn't exist, so Chrome's default blue
+   focus-visible outline leaks through. */
+.outline-hidden {
+  outline: none;
+}

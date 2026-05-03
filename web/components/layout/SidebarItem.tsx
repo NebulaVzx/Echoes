@@ -27,6 +27,7 @@ export function SidebarItem({ href, label, icon: Icon, collapsed = false, isNew 
       className={cn(
         'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 ease-out',
         'hover:bg-muted hover:text-foreground',
+        'focus-visible:outline-none',
         isActive && 'bg-primary/10 text-primary font-medium',
         collapsed
           ? 'flex-col justify-center gap-0.5 px-0 w-10 h-12 mx-auto'

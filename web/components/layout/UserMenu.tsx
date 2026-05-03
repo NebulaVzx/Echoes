@@ -48,7 +48,7 @@ export function UserMenu() {
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger>
           <button
-            className="flex items-center gap-2 rounded-full hover:bg-muted transition-all duration-200 ease-out p-1 hover:scale-105 active:scale-95"
+            className="flex items-center gap-2 rounded-full hover:bg-muted transition-all duration-200 ease-out p-1 hover:scale-105 active:scale-95 focus-visible:outline-none"
             aria-label="用户菜单"
           >
             <Avatar className="h-8 w-8">
