@@ -174,12 +174,15 @@
   grid-template-rows: var(--header-height) 1fr;
   grid-template-columns: var(--sidebar-width) 1fr var(--panel-width);
   min-height: 100dvh;
+  overflow: hidden;
   transition: grid-template-columns 200ms ease-out;
 }
 
 .app-shell-header {
   grid-column: 1 / -1;
   grid-row: 1;
+  overflow: hidden;
+  z-index: 10;
 }
 
 .app-shell-sidebar {
@@ -245,20 +248,50 @@
 
 /* ===== Theme Transition ===== */
 
-/* Per D-09 and UI-SPEC: 300ms ease-out cross-fade on all color properties */
-*,
-*::before,
-*::after {
-  transition-property: background-color, color, border-color, box-shadow;
-  transition-duration: 300ms;
-  transition-timing-function: ease-out;
+/* 300ms ease-out cross-fade on color properties when theme changes.
+   Only applies to elements that consume CSS custom properties (--background, --foreground, etc.)
+   via Tailwind's bg-background / text-foreground utilities. Scoped to avoid breaking component
+   hover effects and shadcn animations. */
+
+/* Apply smooth color transitions to common themed surfaces */
+html {
+  transition: color 300ms ease-out;
 }
 
-/* Instant transitions for elements that should NOT animate */
-.app-shell,
-.app-shell *[data-no-transition],
-.no-theme-transition {
-  transition-duration: 0ms !important;
+body {
+  transition: background-color 300ms ease-out, color 300ms ease-out;
+}
+
+/* Cards, panels, nav — themed blocks that need smooth dark/light switching */
+.bg-background,
+.bg-card,
+.bg-sidebar\/50,
+.bg-muted,
+.bg-secondary,
+.bg-accent,
+.bg-primary\/10,
+[class*="bg-card"],
+[class*="bg-background"] {
+  transition: background-color 300ms ease-out;
+}
+
+.text-foreground,
+.text-muted-foreground,
+.text-primary,
+.text-card-foreground,
+[class*="text-foreground"],
+[class*="text-muted-foreground"] {
+  transition: color 300ms ease-out;
+}
+
+.border-border,
+[class*="border-border"] {
+  transition: border-color 300ms ease-out;
+}
+
+/* Instant transitions for layout changes (no theme animation) */
+.app-shell {
+  transition: grid-template-columns 200ms ease-out;
 }
 
 /* ===== Responsive Breakpoints ===== */

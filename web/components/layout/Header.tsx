@@ -13,7 +13,7 @@ export function Header() {
     <div className="flex items-center justify-between h-12 px-4 border-b border-border bg-background">
       {/* Left: Logo */}
       <Link href="/" className="flex items-center gap-2 flex-shrink-0" aria-label="拾忆 - 首页">
-        <Logo />
+        <Logo size={24} className="text-foreground" />
       </Link>
 
       {/* Center: Global Search — grows to fill space */}

@@ -25,8 +25,8 @@ export function SidebarItem({ href, label, icon: Icon, collapsed = false, isNew 
     <Link
       href={href}
       className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-        'hover:bg-muted hover:text-foreground',
+        'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 ease-out',
+        'hover:bg-muted hover:text-foreground hover:scale-[1.02]',
         isActive && 'bg-primary/10 text-primary font-medium',
         collapsed ? 'justify-center px-0 w-12 h-10 mx-auto' : 'w-full'
       )}
