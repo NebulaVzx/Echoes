@@ -204,6 +204,12 @@
   overflow-y: auto;
 }
 
+/* When right panel is hidden, add right padding equal to sidebar width
+   so content appears visually centered in the viewport */
+:root[data-panel-visible="false"] .app-shell-main {
+  padding-right: var(--sidebar-width);
+}
+
 .app-shell-panel {
   grid-row: 2;
   overflow: hidden;
@@ -352,6 +358,11 @@ body {
 [data-slot="dropdown-menu-item"]:focus-visible {
   outline: none !important;
   box-shadow: none !important;
+}
+
+/* Firefox specific: suppress default focus ring on Base UI items */
+[data-slot="dropdown-menu-item"]:-moz-focusring {
+  outline: none !important;
 }
 
 .outline-hidden {
