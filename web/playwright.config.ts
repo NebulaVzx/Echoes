@@ -32,6 +32,12 @@ export default defineConfig({
       },
       dependencies: ['setup'],
     },
+    {
+      name: 'unauthenticated',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+    },
   ],
   /* webServer disabled for manual testing — services already running
   webServer: {
