@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('Authentication', () => {
+  // Auth pages must be tested without existing session
+  test.use({ storageState: { cookies: [], origins: [] } })
+
   test('login page loads with all required fields', async ({ page }) => {
     await page.goto('/login')
 

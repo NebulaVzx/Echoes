@@ -59,20 +59,32 @@ export function UserMenu() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onClick={() => { setMenuOpen(false); router.push('/profile') }}>
+          <DropdownMenuItem
+            onClick={() => { setMenuOpen(false); router.push('/profile') }}
+            className="hover:!bg-accent hover:!text-accent-foreground cursor-pointer"
+          >
             <User className="mr-2 h-4 w-4" />
             我的画像
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => { setMenuOpen(false); router.push('/settings') }}>
+          <DropdownMenuItem
+            onClick={() => { setMenuOpen(false); router.push('/settings') }}
+            className="hover:!bg-accent hover:!text-accent-foreground cursor-pointer"
+          >
             <Settings className="mr-2 h-4 w-4" />
             设置
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => { setMenuOpen(false); toggleTheme() }}>
+          <DropdownMenuItem
+            onClick={() => { setMenuOpen(false); toggleTheme() }}
+            className="hover:!bg-accent hover:!text-accent-foreground cursor-pointer"
+          >
             {isDark ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
             切换主题
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+          <DropdownMenuItem
+            onClick={handleLogout}
+            className="text-destructive focus:text-destructive hover:!bg-destructive/10 cursor-pointer"
+          >
             <LogOut className="mr-2 h-4 w-4" />
             退出登录
           </DropdownMenuItem>
