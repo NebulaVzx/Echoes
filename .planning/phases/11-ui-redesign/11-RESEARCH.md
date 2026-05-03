@@ -812,7 +812,7 @@ useEffect(() => {
 | A5 | Tauri WebView on Windows supports modern CSS (Grid, custom properties, env()) | Tauri | Windows WebView2 (Edge Chromium) is evergreen and supports all modern CSS; this is a safe assumption |
 | A6 | The `apps/desktop/` Tauri build can point to `localhost:3000` in dev without CORS issues | Tauri | Tauri's WebView loads `localhost` directly; same-origin so no CORS. Production build needs `output: 'export'` — separate concern |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Tauri production build strategy**
    - What we know: Current `next.config` uses `output: 'standalone'` for Docker. Tauri production needs `output: 'export'` for static files.
