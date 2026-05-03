@@ -65,7 +65,26 @@ description: 拾忆产品开发路线图
 
 | Phase | 名称 | 目标 | 计划数 | 状态 |
 |-------|------|------|--------|------|
-| 11 | UI 架构重设计 | 三栏自适应工作台、Command Palette、AI 时代交互特征 | 待定 | 📋 规划中 |
+| 11 | UI 架构重设计 | 三栏自适应工作台、Command Palette、AI 时代交互特征 | 12 | 📋 规划中 |
+
+**Plans:**
+| Plan | 目标 | Wave |
+|------|------|------|
+| 11-01 | 安装 shadcn 组件 + 提取 design-tokens 到 shared/ | 1 |
+| 11-02 | CSS Grid 布局基础 + 主题过渡动画 + Tailwind preset 集成 | 1 |
+| 11-03 | 创建 LayoutProvider、DensityProvider、ThemeColorProvider | 1 |
+| 11-04 | Provider tree 接入 + AppShell 三栏 Grid 容器 + (main)/layout.tsx | 2 |
+| 11-05 | 精简 Header (Logo + Search + Avatar) + UserMenu 下拉菜单 | 2 |
+| 11-06 | Sidebar 导航 (4 分类 9 项) + SidebarItem (active 指示器/badge) | 2 |
+| 11-07 | RightPanel (上下文面板) + RightPanelWidget + MobileDock (底部导航) | 2 |
+| 11-08 | Command Palette (Cmd+K, fuzzy search, /prefix, >prefix) | 3 |
+| 11-09 | ConfettiLite + StreakFlame + ThemeColorPicker | 2 |
+| 11-10 | PWA 基础 (manifest + icons + Serwist service worker) | 3 |
+| 11-11 | Tauri 2.0 桌面端最小封装 (config + Rust ~50 行) | 1 |
+| 11-12 | 现有页面迁移 (去 inline header) + 6 新路由占位页 | 4 |
+
+| Phase | 名称 | 目标 | 计划数 | 状态 |
+|-------|------|------|--------|------|
 | 12 | 记忆捕获扩展 | 文件上传(txt/md/docx)、记忆匣命名、快速模板、星标、来源标注 | 待定 | 📋 规划中 |
 | 13 | 记忆星图与探索 | 向量关联可视化、无限钻取探索模式、AI 关联说明 | 待定 | 📋 规划中 |
 | 14 | 记忆封面与编织 | AI 生成封面图、多条记忆编织成文章 | 待定 | 📋 规划中 |
@@ -82,7 +101,7 @@ description: 拾忆产品开发路线图
 
 ---
 
-*Roadmap updated: 2026-04-26 — v1.2 shipped, v1.3 phases 11-17 planned*
+*Roadmap updated: 2026-05-03 — Phase 11 planned (12 plans, 4 waves)*
 
 ## 待规划
 
