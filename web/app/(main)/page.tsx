@@ -250,35 +250,27 @@ function HomePage() {
 
       {/* Content — Header, nav, theme provided by AppShell */}
       <div className="mx-auto max-w-content-timeline px-4 py-6">
-        {/* Chat toggle — floating button */}
+        {/* AI Chat — mobile floating button (desktop: use Cmd+K or sidebar) */}
         {user && (
           <button
             onClick={toggleChat}
-            className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 btn-scale md:hidden"
+            className="fixed bottom-6 right-6 z-40 md:hidden flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 btn-scale"
             aria-label="AI 助手"
           >
             <Sparkles className="w-5 h-5" />
             <span className="text-sm font-medium">AI</span>
           </button>
         )}
-        {user && (
-          <button
-            onClick={toggleChat}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 mb-4 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-            aria-label="AI 助手"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>AI 助手</span>
-          </button>
-        )}
 
-        {/* Warmth cards */}
-        <UnlockCeremony />
-        <SerendipityCard />
-        <DailyReviewCard />
+        {/* Warmth cards — compact row */}
+        <div className="space-y-3 mb-8">
+          <UnlockCeremony />
+          <SerendipityCard />
+          <DailyReviewCard />
+        </div>
 
         {/* Create form */}
-        <div className="mb-10">
+        <div className="mb-6">
           <CreateMemoryForm onSuccess={() => loadMemories(1, false)} />
         </div>
 
@@ -294,7 +286,7 @@ function HomePage() {
 
         {/* Timeline */}
         <div>
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">
               {selectedTags.length > 0 ? `已筛选: ${selectedTags.join(', ')}` : '时间轴'}
             </h2>
