@@ -26,12 +26,25 @@ export function SidebarItem({ href, label, icon: Icon, collapsed = false, isNew 
       href={href}
       className={cn(
         'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 ease-out',
-        'hover:bg-muted hover:text-foreground hover:scale-[1.02]',
+        'hover:bg-muted hover:text-foreground',
         isActive && 'bg-primary/10 text-primary font-medium',
-        collapsed ? 'justify-center px-0 w-12 h-10 mx-auto' : 'w-full'
+        collapsed
+          ? 'flex-col justify-center gap-0.5 px-0 w-10 h-12 mx-auto'
+          : 'w-full'
       )}
     >
-      <Icon className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground')} />
+      {/* Icon wrapper — in collapsed mode, active gets a subtle ring */}
+      <span className={cn(
+        'flex items-center justify-center rounded-md transition-all duration-200',
+        collapsed && isActive && 'bg-primary/15 ring-1 ring-primary/30 p-1.5 -m-1',
+        collapsed && !isActive && 'p-1'
+      )}>
+        <Icon className={cn(
+          'flex-shrink-0',
+          collapsed ? 'h-5 w-5' : 'h-4 w-4',
+          isActive ? 'text-primary' : 'text-muted-foreground'
+        )} />
+      </span>
       {!collapsed && (
         <span className="flex-1 truncate">{label}</span>
       )}
@@ -40,9 +53,13 @@ export function SidebarItem({ href, label, icon: Icon, collapsed = false, isNew 
           ✨
         </Badge>
       )}
-      {/* Left accent bar for active state */}
-      {isActive && (
+      {/* Left accent bar for active state (expanded only) */}
+      {isActive && !collapsed && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r-full" />
+      )}
+      {/* Collapsed active: dot indicator below icon */}
+      {isActive && collapsed && (
+        <span className="w-1 h-1 rounded-full bg-primary mt-0.5" />
       )}
     </Link>
   )

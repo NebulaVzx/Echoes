@@ -16,6 +16,8 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -64,19 +66,45 @@ export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useLayout()
 
   return (
-    <nav
-      className={cn(
-        'flex flex-col h-full w-full bg-sidebar/50 border-r border-border'
-      )}
-    >
-      {/* Nav items with scroll area */}
+    <nav className="flex flex-col h-full w-full bg-sidebar/50 border-r border-border">
+      {/* Collapse toggle — TOP, always visible */}
+      <div className={cn(
+        'flex items-center border-b border-border',
+        sidebarCollapsed ? 'justify-center py-3' : 'justify-between px-3 py-2.5'
+      )}>
+        {!sidebarCollapsed && (
+          <span className="text-xs font-medium text-muted-foreground truncate">
+            导航
+          </span>
+        )}
+        <button
+          onClick={toggleSidebar}
+          className={cn(
+            'flex items-center justify-center rounded-md text-muted-foreground',
+            'hover:bg-muted hover:text-foreground transition-colors',
+            sidebarCollapsed ? 'h-8 w-8' : 'h-7 px-2 gap-1.5'
+          )}
+          aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+        >
+          {sidebarCollapsed ? (
+            <PanelLeftOpen className="h-4 w-4" />
+          ) : (
+            <>
+              <PanelLeftClose className="h-3.5 w-3.5" />
+              <span className="text-xs">收起</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Nav items — scrollable */}
       <ScrollArea className="flex-1">
-        <div className="flex flex-col gap-1 px-2 py-3">
+        <div className="flex flex-col gap-1 px-2 py-2">
           {NAV_SECTIONS.map((section, sectionIdx) => (
             <div key={section.id}>
               {/* Section label (hidden when collapsed) */}
               {!sidebarCollapsed && (
-                <div className="px-3 py-2 text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
+                <div className="px-3 pt-3 pb-1.5 text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
                   {section.label}
                 </div>
               )}
@@ -99,28 +127,6 @@ export function Sidebar() {
           ))}
         </div>
       </ScrollArea>
-
-      {/* Collapse toggle at bottom */}
-      <div className="border-t border-border p-2">
-        <button
-          onClick={toggleSidebar}
-          className={cn(
-            'flex items-center justify-center w-full h-8 rounded-md text-muted-foreground',
-            'hover:bg-muted hover:text-foreground transition-colors',
-            sidebarCollapsed ? 'w-8 mx-auto' : 'gap-2'
-          )}
-          aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <>
-              <ChevronLeft className="h-4 w-4" />
-              <span className="text-xs">收起</span>
-            </>
-          )}
-        </button>
-      </div>
     </nav>
   )
 }

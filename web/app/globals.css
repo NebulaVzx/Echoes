@@ -152,9 +152,9 @@
   --panel-width: 280px;
 }
 
-/* Sidebar collapsed state */
+/* Sidebar collapsed state — 56px gives room for icon + active indicator */
 :root[data-sidebar-collapsed="true"] {
-  --sidebar-width: 48px;
+  --sidebar-width: 56px;
 }
 
 /* Density: compact */
