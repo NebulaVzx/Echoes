@@ -50,8 +50,8 @@ export function SidebarItem({ href, label, icon: Icon, collapsed = false, isNew 
   // When collapsed, wrap in tooltip
   if (collapsed) {
     return (
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger asChild>
+      <Tooltip>
+        <TooltipTrigger>
           <div className="relative">{linkContent}</div>
         </TooltipTrigger>
         <TooltipContent side="right" className="text-xs">

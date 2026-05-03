@@ -1,14 +1,11 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Geist } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from './providers/auth-provider'
 import { ThemeProvider } from './providers/theme-provider'
 import { LayoutProvider } from './providers/layout-provider'
 import { DensityProvider } from './providers/density-provider'
 import { ThemeColorProvider } from './providers/theme-color-provider'
-import { cn } from "@/lib/utils"
-
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' })
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
@@ -35,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
+    <html lang="zh-CN" suppressHydrationWarning className="font-sans">
       <head>
         <script
           dangerouslySetInnerHTML={{

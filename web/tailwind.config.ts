@@ -1,19 +1,90 @@
 import type { Config } from 'tailwindcss'
-import echoesPreset from '../../shared/design-tokens/tailwind-preset'
 
 const config: Config = {
-  presets: [echoesPreset],
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
-    '../../shared/design-tokens/**/*.{js,ts,jsx,tsx,mdx,json}',
   ],
   darkMode: 'class',
   theme: {
     extend: {
+      // ===== Design token preset (inlined from shared/design-tokens) =====
+      screens: {
+        mobile: { max: '767px' },
+        tablet: { min: '768px', max: '1279px' },
+        desktop: { min: '1280px' },
+      },
+      spacing: {
+        'layout-sidebar': '200px',
+        'layout-sidebar-collapsed': '48px',
+        'layout-panel': '280px',
+        'layout-header': '48px',
+        'layout-dock': '56px',
+        'content-timeline': '640px',
+        'content-detail': '720px',
+      },
+      maxWidth: {
+        'content-timeline': '640px',
+        'content-detail': '720px',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['Geist', 'sans-serif'],
+      },
+      fontSize: {
+        body: ['14px', { lineHeight: '1.5', fontWeight: '400' }],
+        label: ['12px', { lineHeight: '1.25', fontWeight: '400' }],
+        heading: ['20px', { lineHeight: '1.2', fontWeight: '600' }],
+        display: ['28px', { lineHeight: '1.1', fontWeight: '600' }],
+      },
+      // ===== Existing Echoes theme =====
       colors: {
-        // Echoes design system - Notion-like gray scale
+        // shadcn color tokens — map CSS variables to Tailwind utilities
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
+        primary: {
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
+        },
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        sidebar: {
+          DEFAULT: 'hsl(var(--sidebar))',
+          foreground: 'hsl(var(--sidebar-foreground))',
+          primary: 'hsl(var(--sidebar-primary))',
+          'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+          accent: 'hsl(var(--sidebar-accent))',
+          'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+          border: 'hsl(var(--sidebar-border))',
+          ring: 'hsl(var(--sidebar-ring))',
+        },
+        // Echoes design system - Notion-like gray scale (preserved)
         gray: {
           50: '#F7F7F7',
           100: '#EFEFEF',
@@ -26,9 +97,6 @@ const config: Config = {
           800: '#2D2D2D',
           900: '#1A1A1A',
         },
-      },
-      fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',

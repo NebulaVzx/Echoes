@@ -1,7 +1,7 @@
 'use client'
 
 import Logo from '@/components/logo'
-import { SearchInput } from '@/components/search/search-input'
+import SearchInput from '@/components/search/search-input'
 import { UserMenu } from '@/components/layout/UserMenu'
 import { useAuth } from '@/app/providers/auth-provider'
 import Link from 'next/link'

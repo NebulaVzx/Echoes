@@ -1,6 +1,8 @@
 'use client'
 
-import { useThemeColor, type AccentPreset } from '@/app/providers/theme-color-provider'
+import { useThemeColor } from '@/app/providers/theme-color-provider'
+
+type AccentPreset = 'neutral' | 'blue' | 'green' | 'orange' | 'violet'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 

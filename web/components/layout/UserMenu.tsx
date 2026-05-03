@@ -30,7 +30,7 @@ export function UserMenu() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const userInitial = user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?'
+  const userInitial = user?.username?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?'
   const isDark = resolvedTheme === 'dark'
 
   const handleLogout = () => {
@@ -46,7 +46,7 @@ export function UserMenu() {
   return (
     <>
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger asChild>
+        <DropdownMenuTrigger>
           <button
             className="flex items-center gap-2 rounded-full hover:bg-muted transition-colors p-1"
             aria-label="用户菜单"
