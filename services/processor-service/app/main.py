@@ -11,7 +11,11 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 import redis.asyncio as redis
 from app.config import settings
 from app.clients.memory_client import MemoryServiceClient
@@ -27,6 +31,16 @@ from opentelemetry import trace
 async def lifespan(app: FastAPI):
     """Application lifespan manager - handles startup and shutdown."""
     print(f"{settings.service_name} v{settings.service_version} starting up...")
+
+    # Configure uvicorn loggers to use unified local-time format
+    formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    for uv_name in ['uvicorn', 'uvicorn.access', 'uvicorn.error']:
+        uv_logger = logging.getLogger(uv_name)
+        for handler in uv_logger.handlers:
+            handler.setFormatter(formatter)
 
     # Connect to Redis
     redis_client = redis.Redis.from_url(
