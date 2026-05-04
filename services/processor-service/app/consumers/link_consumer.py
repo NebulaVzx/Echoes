@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def _create_llm(fields: dict):
     """Create LLM provider with per-message overrides, decrypting API key if present."""
-    protocol = fields.get("llm_protocol") or fields.get("llm_provider") or settings.llm_provider
+    protocol = fields.get("llm_protocol") or fields.get("llm_provider") or settings.llm_protocol or settings.llm_provider
     model = fields.get("llm_model") or settings.llm_model
     temp_raw = fields.get("llm_temperature")
     temperature = float(temp_raw) if temp_raw is not None else settings.llm_temperature

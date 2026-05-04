@@ -95,7 +95,7 @@ class FileConsumer(RedisStreamConsumer):
                 "content": extracted_text,
             }
             # Propagate LLM config if present
-            for key in ["llm_protocol", "llm_provider", "llm_model", "llm_temperature", "api_key", "base_url"]:
+            for key in ["llm_protocol", "llm_provider", "llm_model", "llm_temperature", "api_key", "base_url", "include_note_in_analysis"]:
                 if key in fields:
                     vectorize_fields[key] = fields[key]
 
@@ -107,7 +107,7 @@ class FileConsumer(RedisStreamConsumer):
             }
             if "note" in fields:
                 tag_fields["note"] = fields["note"]
-            for key in ["llm_protocol", "llm_provider", "llm_model", "llm_temperature", "api_key", "base_url"]:
+            for key in ["llm_protocol", "llm_provider", "llm_model", "llm_temperature", "api_key", "base_url", "include_note_in_analysis"]:
                 if key in fields:
                     tag_fields[key] = fields[key]
 
@@ -124,7 +124,7 @@ class FileConsumer(RedisStreamConsumer):
             }
             if "note" in fields:
                 suggestion_fields["note"] = fields["note"]
-            for key in ["llm_protocol", "llm_provider", "llm_model", "llm_temperature", "api_key", "base_url"]:
+            for key in ["llm_protocol", "llm_provider", "llm_model", "llm_temperature", "api_key", "base_url", "include_note_in_analysis"]:
                 if key in fields:
                     suggestion_fields[key] = fields[key]
 

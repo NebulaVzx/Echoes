@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     memory_service_url: str = "http://memory-service:8002"
     internal_api_token: str = ""
+    llm_protocol: str = "openai"
     llm_provider: str = "openai"
     llm_model: str = "gpt-4o-mini"
     llm_temperature: float = 0.7
