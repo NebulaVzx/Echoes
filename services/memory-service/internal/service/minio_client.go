@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -76,7 +77,7 @@ func (m *MinIOClient) UploadFile(ctx context.Context, objectName string, filePat
 
 // GetPresignedGetURL generates a presigned URL for downloading a file.
 func (m *MinIOClient) GetPresignedGetURL(ctx context.Context, objectName string) (string, error) {
-	url, err := m.client.PresignedGetObject(ctx, m.bucket, objectName, 300, nil)
+	url, err := m.client.PresignedGetObject(ctx, m.bucket, objectName, 300*time.Second, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
