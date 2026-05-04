@@ -34,10 +34,17 @@ class RedisStreamConsumer(ABC):
         self._pending_recovered = False
 
     async def start(self):
+        # Trim stream to prevent unbounded growth (keep last ~5000 messages)
         try:
+            await self.redis.xtrim(self.stream, maxlen=5000, approximate=True)
+        except Exception:
+            pass
+        try:
+            # Use "$" to only consume NEW messages, not replay all history
+            # Pending recovery (Phase 1 in _run) handles un-acked messages
             await self.redis.xgroup_create(
                 name=self.stream, groupname=self.group,
-                id="0", mkstream=True
+                id="$", mkstream=True
             )
         except redis.ResponseError as e:
             if "BUSYGROUP" not in str(e):
@@ -128,7 +135,14 @@ class RedisStreamConsumer(ABC):
                     tid = _get_trace_id()
                     logger.error(f"[{tid}] Error processing {self.stream} for memory {memory_id} (attempt {attempt + 1}/{msg_max_retries}): {e}")
                     if attempt == msg_max_retries - 1:
-                        # Report failure -- do NOT ack, keep in pending for manual retry
+                        # ALWAYS ack the message -- failure state is persisted in DB, not Redis
+                        try:
+                            await self.redis.xack(self.stream, self.group, msg_id)
+                        except Exception as ack_err:
+                            tid = _get_trace_id()
+                            logger.error(f"[{tid}] Failed to ack message {msg_id}: {ack_err}")
+
+                        # Report failure best-effort (don't block ack if memory-service is down)
                         try:
                             await self.memory_client.update_task_status(
                                 memory_id, self.stream, "failed", error=str(e)

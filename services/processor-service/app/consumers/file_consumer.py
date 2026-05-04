@@ -99,7 +99,7 @@ class FileConsumer(RedisStreamConsumer):
                 if key in fields:
                     vectorize_fields[key] = fields[key]
 
-            await self._redis.xadd("text:vectorize", vectorize_fields)
+            await self._redis.xadd("text:vectorize", vectorize_fields, maxlen=5000, approximate=True)
 
             tag_fields = {
                 "memory_id": memory_id,
@@ -111,7 +111,7 @@ class FileConsumer(RedisStreamConsumer):
                 if key in fields:
                     tag_fields[key] = fields[key]
 
-            await self._redis.xadd("tag:generate", tag_fields)
+            await self._redis.xadd("tag:generate", tag_fields, maxlen=5000, approximate=True)
 
             # Publish suggestion:generate with file content treated as text
             suggestion_fields = {
@@ -128,7 +128,7 @@ class FileConsumer(RedisStreamConsumer):
                 if key in fields:
                     suggestion_fields[key] = fields[key]
 
-            await self._redis.xadd("suggestion:generate", suggestion_fields)
+            await self._redis.xadd("suggestion:generate", suggestion_fields, maxlen=5000, approximate=True)
 
         finally:
             # Clean up temp file

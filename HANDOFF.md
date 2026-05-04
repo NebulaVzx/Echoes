@@ -43,6 +43,11 @@
 4. **suggestion_consumer 不支持 content_type=file** — 添加 file 作为 text 别名
 5. **file_consumer MinIO 403** — 新增 MinIO 客户端直接下载（带认证），不再依赖 presigned URL
 6. **前端轮询间隔优化** — 按记忆类型区分刷新间隔（text 3s / link 5s / file 10s）
+7. **Redis Stream 积压死循环** — 核心修复：
+   - processor `base.py`：失败后**强制 ack**（原代码不 ack 导致消息永久 pending）
+   - 消费者组创建从 `id="0"` 改为 `id="$"`（避免重启后重播所有历史）
+   - Stream 自动 trim（maxlen=5000）防止无限增长
+   - memory-service + processor 派生任务发布时均添加 maxlen=5000
 
 **核心方向**:
 1. **三栏自适应布局** — CSS Grid 桌面三栏 + 移动端底部导航（MobileDock）

@@ -135,8 +135,10 @@ func (q *RedisTaskQueue) PublishTask(ctx context.Context, stream string, fields 
 	}
 
 	_, err := q.client.XAdd(ctx, &redis.XAddArgs{
-		Stream: stream,
-		Values: fields,
+		Stream:     stream,
+		Values:     fields,
+		MaxLen:     5000,
+		Approx:     true,
 	}).Result()
 	if err != nil {
 		return fmt.Errorf("failed to publish to stream %s: %w", stream, err)

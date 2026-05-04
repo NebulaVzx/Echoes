@@ -93,7 +93,7 @@ class LinkConsumer(RedisStreamConsumer):
             }
             # Propagate LLM config to derived task
             vectorize_fields.update(_extract_llm_fields(fields))
-            await self._redis.xadd("text:vectorize", vectorize_fields)
+            await self._redis.xadd("text:vectorize", vectorize_fields, maxlen=5000, approximate=True)
 
     async def stop(self):
         await self.scraper.close()
