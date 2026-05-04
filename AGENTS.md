@@ -71,6 +71,7 @@
 | 05-03 | localStorage 默认值 | 默认值必须与产品默认值一致 |
 | 05-03 | Playwright 局限性 | 真实浏览器验证，Playwright 仅辅助 |
 | 05-03 | 未更新 ROADMAP.md | 阶段完成 checklist 必须执行 |
+| 05-03 | **核心改动缺少测试** | 修改消费者 ack 逻辑、Stream maxlen、MinIO 下载等核心代码后**未写任何测试**即 commit | 回归风险极高，无法验证修复是否有效 | **任何 CRUD 或核心逻辑改动必须伴随测试**：1) 改动前确认现有测试 2) 改动后补写/更新测试 3) 测试通过后再 commit |
 | 05-03 | 未 push develop 分支 | 阶段完成后必须 `git push origin develop` |
 
 ---

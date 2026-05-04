@@ -38,7 +38,7 @@ func (m *mockMemoryRepository) GetVectorByID(ctx context.Context, id uuid.UUID) 
 	return "", nil
 }
 
-func (m *mockMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool) ([]domain.Memory, int64, error) {
+func (m *mockMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool, starredOnly bool) ([]domain.Memory, int64, error) {
 	var results []domain.Memory
 	for _, mem := range m.memories {
 		if mem.UserID != userID {
@@ -290,6 +290,15 @@ func (m *mockTaskQueue) PublishSuggestionGenerate(ctx context.Context, memoryID 
 	return nil
 }
 
+func (m *mockTaskQueue) PublishFileExtract(ctx context.Context, memoryID uuid.UUID, fileName string, mediaURL string, llmConfig map[string]interface{}) error {
+	m.published = append(m.published, map[string]interface{}{
+		"type":      "file:extract",
+		"memory":    memoryID,
+		"file_name": fileName,
+	})
+	return nil
+}
+
 func (m *mockTaskQueue) PublishTask(ctx context.Context, stream string, data map[string]interface{}) error {
 	m.published = append(m.published, data)
 	return nil
@@ -532,7 +541,7 @@ func TestMemoryService_List_Pagination(t *testing.T) {
 	}
 
 	// List page 1 with limit 10
-	resp, err := svc.List(ctx, userID, 1, 10, nil)
+	resp, err := svc.List(ctx, userID, 1, 10, nil, false)
 	if err != nil {
 		t.Fatalf("List() unexpected error: %v", err)
 	}
@@ -558,7 +567,7 @@ func TestMemoryService_List_Pagination(t *testing.T) {
 	}
 
 	// List page 3 with limit 10 (should return last 5 items)
-	resp2, err := svc.List(ctx, userID, 3, 10, nil)
+	resp2, err := svc.List(ctx, userID, 3, 10, nil, false)
 	if err != nil {
 		t.Fatalf("List() page 3 unexpected error: %v", err)
 	}
