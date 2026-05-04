@@ -255,6 +255,13 @@ func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) 
 	}
 	if settings.LLMProtocol != "" {
 		config["llm_protocol"] = settings.LLMProtocol
+	} else if settings.LLMProvider != "" {
+		// Fallback: infer protocol from provider (defense against legacy data)
+		if settings.LLMProvider == "anthropic" {
+			config["llm_protocol"] = "anthropic"
+		} else {
+			config["llm_protocol"] = "openai"
+		}
 	}
 	if settings.LLMModel != "" {
 		config["llm_model"] = settings.LLMModel

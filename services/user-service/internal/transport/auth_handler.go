@@ -391,6 +391,12 @@ func (h *AuthHandler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
+	// Validate llm_protocol is present when LLM settings are provided
+	if req.LLM != nil && req.LLM.Protocol == "" {
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "llm_protocol is required")
+		return
+	}
+
 	settings, err := h.authService.UpdateUserSettings(c.Request.Context(), userIDUUID, req)
 	if err != nil {
 		switch err {
