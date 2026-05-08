@@ -49,6 +49,46 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
   const tagInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const DRAFT_KEY = 'echoes:create-memory:draft'
+
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    try {
+      const draft = localStorage.getItem(DRAFT_KEY)
+      if (draft) {
+        const parsed = JSON.parse(draft)
+        if (parsed.contentType) setContentType(parsed.contentType)
+        if (parsed.textContent) setTextContent(parsed.textContent)
+        if (parsed.linkUrl) setLinkUrl(parsed.linkUrl)
+        if (parsed.tagList) setTagList(parsed.tagList)
+        if (parsed.note) setNote(parsed.note)
+        if (parsed.source) setSource(parsed.source)
+        if (typeof parsed.isStarred === 'boolean') setIsStarred(parsed.isStarred)
+        if (parsed.selectedTemplate) setSelectedTemplate(parsed.selectedTemplate)
+      }
+    } catch {
+      // Silently fail — corrupted draft
+    }
+  }, [])
+
+  // Auto-save draft on change (debounce 2s)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const draft = {
+        contentType,
+        textContent,
+        linkUrl,
+        tagList,
+        note,
+        source,
+        isStarred,
+        selectedTemplate,
+      }
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [contentType, textContent, linkUrl, tagList, note, source, isStarred, selectedTemplate])
+
   // Load global AI suggestion preference on mount
   useEffect(() => {
     api.getSettings().then((response) => {
@@ -175,6 +215,11 @@ export default function CreateMemoryForm({ onSuccess }: CreateMemoryFormProps) {
     setUploadedFile(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
+    }
+    try {
+      localStorage.removeItem(DRAFT_KEY)
+    } catch {
+      // Ignore
     }
   }
 

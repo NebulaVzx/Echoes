@@ -6,16 +6,17 @@ type: state
 
 # 项目状态
 
-**最后更新：** 2026-05-03
-**当前分支：** develop
-**当前里程碑：** v1.3 "记忆的回响"（Phase 11 UI 架构重设计已完成，Phase 12 文件上传开发中）
+**最后更新：** 2026-05-08
+**当前分支：** develop（领先 origin/develop 23+ commits，未推送）
+**当前里程碑：** v1.3 "记忆的回响"（Phase 11 已完成，Phase 12 核心功能已完成但存在缺口）
 
 ---
 
 ## 当前位置
 
-**状态：** v1.2 里程碑已完成并归档，v1.3 Phase 11 已完成（12/12 plans），Phase 12 文件记忆上传功能开发中
-**最近活动：** 2026-05-03 — Phase 12 文件记忆上传 + AI 处理链路开发完成，修复 4 个线上 bug（PublishFileTasks 静默失败、presigned URL 过期、processor 漏发 suggestion、file_consumer 403 下载）
+**状态：** v1.2 里程碑已完成并归档，v1.3 Phase 11 已完成（12/12 plans），Phase 12 已完成（P0 + P1 全部完成）
+**最近活动：** 2026-05-08 — Phase 12 缺口补齐：星标筛选 UI + 草稿自动保存 + 端到端验证。新增 2 文件修改（page.tsx + create-memory-form.tsx），所有核心服务容器已启动并运行。
+**端到端验证结果：** 文字记忆创建 ✅ | 文件上传 + 文本提取 ✅ | 语义搜索找到文件内容 ✅ | 星标筛选返回 2 条 ✅ | 草稿自动保存代码已部署（需人工验证浏览器行为）
 
 ---
 
@@ -84,6 +85,29 @@ type: state
 - **D-08-02-02:** getUserSuggestionStyle 默认 inspiring
 - **D-08-02-03:** 建议生成失败不阻塞保存流程
 
+## 当前 Phase 详细状态
+
+### Phase 12 — 记忆捕获扩展（2026-05-03 至 05-08）
+
+**实事求是评估：**
+
+| 类别 | 状态 | 说明 |
+|------|------|------|
+| 文件上传核心链路 | ✅ 完成 | 上传 → MinIO → file:extract → 文本提取 → 向量化/标签/建议 |
+| 数据库迁移 | ✅ 完成 | 004_file_upload.sql，5 个新字段 + 索引 |
+| 前端表单 | ✅ 完成 | "记忆匣"品牌、拖拽上传、5 模板、来源、星标、草稿自动保存 |
+| 记忆卡片展示 | ✅ 完成 | 文件图标、星标、来源标注 |
+| 星标筛选 API | ✅ 完成 | `?starred=true` 支持 |
+| 星标筛选 UI | ✅ 完成 | page.tsx 添加 "只看星标" Switch toggle + URL 同步 |
+| 草稿自动保存 | ✅ 完成 | localStorage debounce 2s + 页面加载恢复 + 提交清除 |
+| 批量导入 | ❌ 未完成 | P2 需求，无实现 |
+| 端到端验证 | ✅ 完成 | 2026-05-08：文字/文件记忆创建、文本提取、语义搜索、星标筛选全部验证通过 |
+| 测试覆盖 | ⚠️ 部分 | file_consumer/base/link_consumer/redis_queue 有测试，handler/service 层缺少文件上传专项测试 |
+
+**质量门禁：**
+- [x] Phase 12 端到端验证通过（2026-05-08）
+- [x] 所有核心服务容器健康运行（2026-05-08 已启动）
+
 ---
 
-*State tracking for Echoes project. Updated: 2026-04-26 — v1.2 milestone shipped and archived*
+*State tracking for Echoes project. Updated: 2026-05-08 — Phase 12 核心功能已完成，存在明确缺口*

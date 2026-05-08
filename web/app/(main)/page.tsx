@@ -14,7 +14,8 @@ import ChatSidebar from '@/components/chat/chat-sidebar'
 import Pagination from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
-import { Sparkles, Clock } from 'lucide-react'
+import { Sparkles, Star } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import UnlockCeremony from '@/components/warmth/unlock-ceremony'
 import SerendipityCard from '@/components/warmth/serendipity-card'
 import DailyReviewCard from '@/components/warmth/daily-review-card'
@@ -84,6 +85,9 @@ function HomePage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [tagColors, setTagColors] = useState<Record<string, string>>({})
 
+  // Starred filter state
+  const [starredOnly, setStarredOnly] = useState(false)
+
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const showToast = (message: string, type: 'success' | 'error') => setToast({ message, type })
@@ -98,6 +102,7 @@ function HomePage() {
         page: targetPage,
         limit,
         tags: selectedTags.length > 0 ? selectedTags : undefined,
+        starred: starredOnly ? true : undefined,
       })
       if (response.success && response.data) {
         const data = response.data
@@ -116,7 +121,7 @@ function HomePage() {
       setIsLoading(false)
       setIsLoadingMore(false)
     }
-  }, [limit, selectedTags])
+  }, [limit, selectedTags, starredOnly])
 
   // Load tags and tag colors
   const loadTags = useCallback(async () => {
@@ -141,10 +146,11 @@ function HomePage() {
     }
   }, [])
 
-  // Update URL to reflect current tag selection
-  const updateTagURL = useCallback((tags: string[]) => {
+  // Update URL to reflect current tag selection and starred filter
+  const updateURL = useCallback((tags: string[], starred: boolean) => {
     const params = new URLSearchParams()
     tags.forEach(t => params.append('tags', t))
+    if (starred) params.set('starred', 'true')
     const query = params.toString()
     router.replace(query ? `/?${query}` : '/', { scroll: false })
   }, [router])
@@ -152,26 +158,34 @@ function HomePage() {
   const handleTagToggle = useCallback((tag: string) => {
     setSelectedTags(prev => {
       const next = prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-      updateTagURL(next)
+      updateURL(next, starredOnly)
       return next
     })
-  }, [updateTagURL])
+  }, [updateURL, starredOnly])
 
   const handleClearAllTags = useCallback(() => {
     setSelectedTags([])
-    router.replace('/', { scroll: false })
-  }, [router])
+    updateURL([], starredOnly)
+  }, [updateURL, starredOnly])
 
   const handleTagClickFromCard = useCallback((tag: string) => {
     setSelectedTags(prev => {
       if (prev.includes(tag)) return prev
       const next = [...prev, tag]
-      updateTagURL(next)
+      updateURL(next, starredOnly)
       return next
     })
-  }, [updateTagURL])
+  }, [updateURL, starredOnly])
 
-  // Sync selectedTags from URL query params on mount / external navigation
+  const handleStarredToggle = useCallback(() => {
+    setStarredOnly(prev => {
+      const next = !prev
+      updateURL(selectedTags, next)
+      return next
+    })
+  }, [updateURL, selectedTags])
+
+  // Sync selectedTags and starred from URL query params on mount / external navigation
   useEffect(() => {
     const tagsParam = searchParams.getAll('tags')
     if (tagsParam.length > 0) {
@@ -182,6 +196,8 @@ function HomePage() {
         setSelectedTags([singleTag])
       }
     }
+    const starredParam = searchParams.get('starred')
+    setStarredOnly(starredParam === 'true')
   }, [searchParams])
 
   const handleLoadMore = useCallback(() => {
@@ -278,21 +294,34 @@ function HomePage() {
           <CreateMemoryForm onSuccess={() => loadMemories(1, false)} />
         </div>
 
-        {/* Tag Filter */}
-        {allTags.length > 0 && (
-          <TagFilterBar
-            tags={allTags}
-            selectedTags={selectedTags}
-            onTagToggle={handleTagToggle}
-            onClearAll={handleClearAllTags}
-          />
-        )}
+        {/* Tag Filter + Starred Filter */}
+        <div className="space-y-3 mb-4">
+          {allTags.length > 0 && (
+            <TagFilterBar
+              tags={allTags}
+              selectedTags={selectedTags}
+              onTagToggle={handleTagToggle}
+              onClearAll={handleClearAllTags}
+            />
+          )}
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={starredOnly}
+              onCheckedChange={handleStarredToggle}
+              size="sm"
+            />
+            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">只看星标</span>
+          </div>
+        </div>
 
         {/* Timeline */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {selectedTags.length > 0 ? `已筛选: ${selectedTags.join(', ')}` : '时间轴'}
+              {starredOnly
+                ? (selectedTags.length > 0 ? `星标 + 标签: ${selectedTags.join(', ')}` : '星标记忆')
+                : (selectedTags.length > 0 ? `已筛选: ${selectedTags.join(', ')}` : '时间轴')}
             </h2>
             <span className="text-xs text-gray-400 dark:text-gray-500">
               {total > 0 ? `${total} 条记忆` : `${memories.length} 条记忆`}
@@ -308,7 +337,11 @@ function HomePage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               }
-              title={selectedTags.length > 0 ? '没有匹配该标签的记忆' : '还没有记忆，上方创建第一条吧'}
+              title={
+                starredOnly
+                  ? (selectedTags.length > 0 ? '没有匹配该标签的星标记忆' : '还没有星标记忆')
+                  : (selectedTags.length > 0 ? '没有匹配该标签的记忆' : '还没有记忆，上方创建第一条吧')
+              }
             />
           ) : (
             <MemoryList

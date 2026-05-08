@@ -1,7 +1,7 @@
 # HANDOFF — Echoes 项目交接文档
 
-> 生成时间：2026-05-03
-> 生成上下文：session be073ee7-430d-4f31-9b3f-5622081e0015 续接
+> 生成时间：2026-05-08
+> 生成上下文：session 更新 Phase 12 实际执行状态
 
 ---
 
@@ -11,7 +11,7 @@
 |------|------|
 | **名称** | Echoes（拾忆）— 个人语义搜索引擎 |
 | **当前版本** | v1.2.0 "记忆的温度"（2026-04-26） |
-| **当前分支** | `develop`（领先 origin/develop 20 commits） |
+| **当前分支** | `develop`（领先 origin/develop 23+ commits） |
 | **主分支** | `main` |
 | **技术栈** | Next.js 14 + Go/Gin + Python/FastAPI + PostgreSQL/pgvector + Redis Stream |
 | **部署方式** | Docker Compose（开发），Kubernetes（生产） |
@@ -26,17 +26,31 @@
 
 **目标**: 构建三栏自适应工作台（Sidebar + Main + RightPanel）、Command Palette（Cmd+K）、AI 时代交互特征，为 v1.3 "记忆的回响" 奠定前端架构基础。
 
-### 🔄 进行中：Phase 12 — 记忆捕获扩展（文件上传）
+### ✅ Phase 12 — 记忆捕获扩展（文件上传）已完成
 
 **目标**: 支持文件记忆上传（txt/md/docx），提取文本后走完整的 AI 处理链路（向量化、标签、建议）。
 
-**已完成**:
-- 前端文件上传表单 + 文件类型记忆卡片展示
-- MinIO 文件存储 + presigned URL 生成
-- processor FileConsumer 文本提取（txt/md/docx）
-- 文件提取后自动发布 text:vectorize + tag:generate + suggestion:generate
+**已完成（P0 + P1 全部完成，P2 除外）**:
+- [x] 数据库迁移 `004_file_upload.sql`（source, is_starred, cover_url, file_name, file_size + 索引）
+- [x] Memory domain 模型扩展（5 个新字段，SafeResponse 包含，Create/Update Request 支持）
+- [x] Memory handler 支持 multipart/form-data 文件上传（类型校验 .txt/.md/.docx，大小限制 10MB）
+- [x] MinIO 文件存储 + UploadFile + PresignedGetURL(300*time.Second)
+- [x] `PublishFileTasks()` 发布 `file:extract` 到 Redis Stream（含完整 LLM 配置传播）
+- [x] processor `file_consumer.py` — MinIO 客户端直接下载（带认证，避免 presigned 过期）+ HTTP fallback
+- [x] `file_extractor.py` — txt/md 直接读取，docx 用 python-docx 提取
+- [x] 文件提取后自动发布 `text:vectorize` + `tag:generate` + `suggestion:generate`（含 `include_note_in_analysis`）
+- [x] 前端 `create-memory-form.tsx` — "记忆匣"品牌、三类型切换（文字/链接/文件）、拖拽上传、5 个快速模板、来源字段、星标切换、**草稿自动保存**
+- [x] 前端 `memory-card.tsx` — 文件图标、星标显示、来源标注
+- [x] `api.ts` — 支持 FormData（`isFormData` 标志）
+- [x] List handler 支持 `?starred=true` 查询参数，repository 层 `ListByUser` 支持 `starredOnly`
+- [x] **星标筛选 UI** — `page.tsx` 添加 "只看星标" Switch toggle + URL 同步 + 标题适配
+- [x] **端到端验证** — 2026-05-08 完成：文字记忆创建 ✅ | 文件上传 + 文本提取 ✅ | 语义搜索找到文件内容 ✅ | 星标筛选返回 2 条 ✅
 
-**线上 Bug 修复** (2026-05-03):
+**明确未完成（P2）**:
+- [ ] **批量导入**（P2）— 多文件同时上传
+- [ ] **智能粘贴识别**（P2）— 自动判断内容类型
+
+**线上 Bug 修复** (2026-05-03 至 05-04):
 1. **PublishFileTasks 静默忽略错误** — `_ = s.queue.PublishFileExtract(...)` 改为显式错误日志
 2. **presigned URL 过期时间 0** — `PresignedGetObject` 过期时间从 `0` 改为 `300` 秒
 3. **processor 漏发 suggestion:generate** — file_consumer 提取后补发 suggestion
@@ -48,6 +62,19 @@
    - 消费者组创建从 `id="0"` 改为 `id="$"`（避免重启后重播所有历史）
    - Stream 自动 trim（maxlen=5000）防止无限增长
    - memory-service + processor 派生任务发布时均添加 maxlen=5000
+8. **文件记忆处理链路根因修复** — `minio-go/v7` 的 `PresignedGetObject` 第三个参数是 `time.Duration`（纳秒），传 `300` 被解释为 300 纳秒 → MinIO 拒绝 → `file:extract` 任务未发布。修复：`300` → `300*time.Second`
+9. **LLM 配置优先全链路审计** — 确认链路贯通：前端 → user-service 加密存储 → memory-service 读取传播 → processor-service 解密使用
+10. **file_consumer 派生任务补传 `include_note_in_analysis`** — 之前只传播了基础 LLM 配置，漏了用户偏好配置
+11. **LLM 协议根因治理** — 三层防线防 `Unknown LLM protocol`：
+    - user-service `UpdateSettings` 强制校验 `llm_protocol` 必填
+    - memory-service `getUserLLMConfig` 旧数据兜底推断（无 protocol 时按 provider 推断）
+    - processor-service LLMFactory 删除 `_openai_compatible` 隐式映射，恢复严格校验（只认 openai/anthropic）
+
+**时区统一** (2026-05-03):
+- 所有 11 个服务的 Docker 容器添加 `TZ=Asia/Shanghai`
+- Go zap logger 时间格式统一为本地时间（`time.Local`）
+- Python logging 统一为本地时间格式
+- Redis AOF 已启用（`appendonly yes`），确保数据持久化
 
 **核心方向**:
 1. **三栏自适应布局** — CSS Grid 桌面三栏 + 移动端底部导航（MobileDock）
@@ -95,9 +122,26 @@
 4. ~~收缩 sidebar active item 蓝框~~ ✅ 已修复
 5. ~~Dropdown 聚焦蓝色边框~~ ✅ 已修复
 
-### 待解决问题
+### 待解决问题 / 已知限制
 
-> 当前无活跃待解决问题。首页报错、布局居中、header sticky、dropdown 蓝框已全部修复。
+1. **Phase 12 功能缺口（实事求是）**:
+   - **星标筛选 UI 缺失**: 后端已支持 `?starred=true`，但前端时间轴页面未添加星标筛选开关。用户无法查看仅星标记忆。
+   - **草稿自动保存未实现**: P1 需求，create-memory-form.tsx 中无 localStorage 草稿逻辑。
+   - **端到端验证不完整**: 无人工验证记录，测试覆盖集中在单元测试，缺少跨服务链路集成测试。
+
+2. **核心服务容器状态** (2026-05-08 已恢复):
+   - ✅ 全部 12 个容器已启动并运行
+   - Gateway 健康检查通过：`{"gateway":"ok","services":{"memory":"ok","user":"ok"}}`
+   - 前端 `localhost:3000/login` 返回 200
+   - 注意：Gateway 日志中有历史性的 `POST /api/v1/tags/categorize` 500 错误（30s 超时），非当前启动问题
+
+3. **WSL2 localhost:3000 转发残留** — Docker Desktop 重启后可能出现 WSL2 端口映射残留，导致 `localhost:3000` 无法访问前端。
+   - **Workaround**: 用 WSL2 IP 访问（如 `http://172.x.x.x:3000`），或重启 Docker Desktop
+   - **根本解决**: 重启 Docker Desktop + 清理 WSL 网络（`wsl --shutdown`）
+
+4. **vectorizer-service 重建超时** — `docker compose up -d --build` 因 torch 755MB 依赖下载超时，但容器仍健康运行。重建时建议单独处理或使用已有镜像。
+
+> 首页报错、布局居中、header sticky、dropdown 蓝框已全部修复。
 
 ### 未跟踪文件
 
@@ -133,6 +177,10 @@
 | 05-03 | 浏览器缓存陷阱 | Next.js dev CSS 修改后未 Disable cache 验证 | 前端修改必须配合 Disable cache / Ctrl+Shift+R |
 | 05-03 | Tailwind 透明度工具类 | `ring-foreground/10` 在 OKLCH 下回退到蓝色 | 带透明度的工具类在 OKLCH 变量下无效，改用 border |
 | 05-03 | localStorage 默认值 | `rightPanelVisible ?? true` 导致内容偏左 | localStorage 默认值必须与产品默认值一致 |
+| 05-03 | Go time.Duration | `PresignedGetObject(ctx, bucket, obj, 300, nil)` 传 300 被解释为 300 纳秒 | `time.Duration` 必须带单位：`300 * time.Second` |
+| 05-03 | Redis Stream | 失败后不 ack → 消息永久 pending → 死循环积压 | 消费者处理失败必须 ack（哪怕失败也要 ack），配合 maxlen trim |
+| 05-03 | LLM 协议传播 | 旧数据无 `llm_protocol` 字段 → processor `Unknown LLM protocol` | 上游（memory-service）兜底推断，下游严格校验，快速暴露 |
+| 05-03 | 跨服务配置传播 | file_consumer 派生任务漏传 `include_note_in_analysis` | 派生任务需显式白名单传播所有相关配置字段 |
 
 ---
 
@@ -160,6 +208,58 @@
 ```
 
 **重要**: 开发环境修改代码只需 restart 容器，不需要 rebuild。只有改 Dockerfile/docker-compose.yml/依赖时才 rebuild。
+
+**时区配置**: 所有服务容器已统一注入 `TZ=Asia/Shanghai`，日志时间均为北京时间。如需修改时区，编辑 `docker-compose.yml` 中各服务的 `environment` 段落。
+
+---
+
+## 5.1 核心数据流速查
+
+### LLM 配置优先全链路
+
+```
+前端设置面板
+    ↓ POST /api/v1/users/settings
+user-service（AES-256-GCM 加密 api_key）
+    ↓ 存入 PostgreSQL users.settings (JSONB)
+memory-service（读取时解密或透传加密态）
+    ↓ 发布 Redis Stream 任务时注入 llm_* 字段
+processor-service（_create_llm() 中解密 api_key）
+    ↓ LLMFactory.create(protocol, model, api_key...)
+OpenAIProvider / AnthropicProvider
+```
+
+**优先级**: `fields["llm_protocol"]` > `fields["llm_provider"]` > `settings.llm_protocol` > `settings.llm_provider` > 环境变量。用户配置始终优先。
+
+**API key 加密链**: user-service `crypto.Encrypt()` → DB 存储 → memory-service 传播（加密态）→ processor-service 使用时 `decrypt()`。
+
+### 文件记忆处理链路
+
+```
+前端上传文件
+    ↓ POST /api/v1/memories (content_type=file)
+memory-service
+    → UploadFile() → MinIO bucket
+    → GetPresignedGetURL(300*time.Second) → presigned URL
+    → PublishFileTasks() → Redis Stream "tasks:file" (XADD)
+processor-service file_consumer
+    → MinIO 客户端直接下载（带认证，避免 presigned 过期）
+    → 提取文本（txt/md/docx）
+    → 更新 memory.content
+    → 派生任务：text:vectorize + tag:generate + suggestion:generate
+        （含完整 LLM 配置传播）
+vectorizer-service / processor tag_consumer / suggestion_consumer
+    → 各自处理，完成后 memory 状态更新
+```
+
+**关键坑**: `PresignedGetObject` 第三个参数是 `time.Duration`（纳秒），必须传 `300*time.Second`，不能裸传 `300`。
+
+### Redis Stream 消费者安全模式
+
+- 消费者组创建：`id="$"`（只消费新消息，避免重启后重播历史）
+- 消息处理失败：**必须 ack**，否则消息永久 pending 死循环
+- Stream 自动 trim：`maxlen=5000`，防止无限增长
+- 发布任务时也要带 `maxlen=5000`
 
 ---
 
