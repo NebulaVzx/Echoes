@@ -6,9 +6,9 @@ type: state
 
 # 项目状态
 
-**最后更新：** 2026-05-08
-**当前分支：** develop（领先 origin/develop 23+ commits，未推送）
-**当前里程碑：** v1.3 "记忆的回响"（Phase 11 已完成，Phase 12 核心功能已完成但存在缺口）
+**最后更新：** 2026-05-09
+**当前分支：** develop（领先 origin/develop 24+ commits，未推送）
+**当前里程碑：** v1.3 "记忆的回响"（Phase 11 ✅，Phase 12 ✅，Phase 13 上下文已收集）
 
 ---
 
@@ -109,6 +109,24 @@ type: state
 - [x] Phase 12 端到端验证通过（2026-05-08）
 - [x] 所有核心服务容器健康运行（2026-05-08 已启动）
 
+### Phase 13 — 记忆星图与探索（2026-05-09 上下文已收集）
+
+**状态：** 🔄 上下文已收集，待规划
+
+**已锁定决策：**
+- D-01: 图数据分层加载（首次 100 条 + 星标，按需扩展）
+- D-02: 关联说明混合模式（实时 LLM + `memory_relations` 表缓存）
+- D-03: 可视化库 P0 用 react-force-graph-2d，P1 评估 Sigma.js
+- D-04: 探索模式桌面端 RightPanel 展开，移动端新页面推入
+- D-05: 图着色按标签聚类 + 内容类型边框 + 星标光晕
+
+**已知条件：**
+- `/constellation` 和 `/explore` 占位页已存在（Phase 11）
+- Sidebar 导航已注册
+- 向量相似度查询 `SearchByVector` / `FindRelated` 已有
+- 无图可视化库，需新增
+- 需新增 `memory_relations` 表迁移
+
 ---
 
-*State tracking for Echoes project. Updated: 2026-05-09 — Phase 12 全部完成，无剩余缺口*
+*State tracking for Echoes project. Updated: 2026-05-09 — Phase 12 全部完成，Phase 13 上下文已收集*
