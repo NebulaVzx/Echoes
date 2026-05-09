@@ -6,6 +6,7 @@ import {
   ListConversationsResponse,
   ListMessagesResponse,
 } from '@/types/chat'
+import { ConstellationResponse, ExploreResponse } from '@/types/constellation'
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8088'
 
@@ -508,6 +509,15 @@ class ApiClient {
 
   async getMessages(conversationId: string): Promise<ApiResponse<ListMessagesResponse>> {
     return this.request<ListMessagesResponse>('GET', `/api/v1/chat/conversations/${conversationId}/messages`)
+  }
+
+  // Constellation endpoints
+  async getConstellation(offset: number = 0): Promise<ApiResponse<ConstellationResponse>> {
+    return this.request<ConstellationResponse>('GET', `/api/v1/constellation?offset=${offset}`)
+  }
+
+  async exploreMemory(id: string): Promise<ApiResponse<ExploreResponse>> {
+    return this.request<ExploreResponse>('GET', `/api/v1/memories/${id}/explore`)
   }
 }
 
