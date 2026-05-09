@@ -68,7 +68,7 @@ description: 拾忆产品开发路线图
 | 11 | UI 架构重设计 | 三栏自适应工作台、Command Palette、AI 时代交互特征 | 12 | ✅ 已完成 (2026-05-03) |
 | 12 | 记忆捕获扩展 | 文件上传(txt/md/docx)、记忆匣命名、快速模板、星标、来源标注、批量导入、智能粘贴识别 | 1 (12-01) | ✅ 已完成 (2026-05-09) |
 | 13 | 记忆星图与探索 | 向量关联可视化、无限钻取探索模式、AI 关联说明 | 6 | ✅ 已完成（技术实现，待人工 E2E）|
-| 14 | 记忆封面与编织 | AI 生成封面图、多条记忆编织成文章 | 7 | ✅ 已规划（Ready to execute）|
+| 14 | 记忆封面与编织 | AI 生成封面图、多条记忆编织成文章 | 7 | ✅ 已完成（2026-05-09）|
 | 15 | 情绪与回响 | 情绪分析日历、每日记忆回响推送 | 待定 | 📋 规划中 |
 | 16 | 用户管理中心 | 记忆 DNA、AI 助手人格、数据主权、学习路径、账户基础 | 待定 | 📋 规划中 |
 | 17 | 浏览器插件与桥梁 | Web Clipper、记忆间隐藏联系发现 | 待定 | 📋 规划中 |
@@ -107,15 +107,15 @@ description: 拾忆产品开发路线图
 **Phase 14 Plans:**
 | Plan | 目标 | Wave | 状态 |
 |------|------|------|------|
-| 14-01 | Cover Consumer（DALL-E 3 + Pollinations 降级，Pillow 裁剪，MinIO 上传） | 1 | 📋 已规划 |
-| 14-02 | Weave API + Domain 更新（content_type="weave"，编织端点，LLM prompt） | 1 | 📋 已规划 |
-| 14-03 | 时间轴封面展示（MemoryCard 缩略图，响应式尺寸，标签 hash 降级） | 2 | 📋 已规划 |
-| 14-04 | 多选状态（Ctrl/Shift 点击，长按，浮动操作栏） | 3 | 📋 已规划 |
-| 14-05 | 编织页面与编辑器（/weave，模式选择，编辑，Markdown 导出） | 3 | 📋 已规划 |
-| 14-06 | Command Palette + ExplorePanel 集成（/weave 命令，编织按钮） | 3 | 📋 已规划 |
-| 14-07 | 端到端集成（cover 队列发布，构建验证，E2E 测试） | 4 | 📋 已规划 |
+| 14-01 | Cover Consumer（DALL-E 3 + Pollinations 降级，Pillow 裁剪，MinIO 上传） | 1 | ✅ 已完成 |
+| 14-02 | Weave API + Domain 更新（content_type="weave"，编织端点，LLM prompt） | 1 | ✅ 已完成 |
+| 14-03 | 时间轴封面展示（MemoryCard 缩略图，响应式尺寸，标签 hash 降级） | 2 | ✅ 已完成 |
+| 14-04 | 多选状态（Ctrl/Shift 点击，长按，浮动操作栏） | 3 | ✅ 已完成 |
+| 14-05 | 编织页面与编辑器（/weave，模式选择，编辑，Markdown 导出） | 3 | ✅ 已完成 |
+| 14-06 | Command Palette + ExplorePanel 集成（/weave 命令，编织按钮） | 3 | ✅ 已完成 |
+| 14-07 | 端到端集成（cover 队列发布，构建验证，E2E 测试） | 4 | ✅ 已完成 |
 
-*Roadmap updated: 2026-05-09 — Phase 14 规划完成，7 个计划 Ready to execute*
+*Roadmap updated: 2026-05-09 — Phase 14 全部完成，构建+测试通过*
 
 ## 待规划
 
