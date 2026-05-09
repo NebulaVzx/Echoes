@@ -87,6 +87,10 @@ func (h *MemoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/memories", h.Create)
 	router.GET("/memories", h.List)
 
+	// Constellation and explore routes (must be BEFORE /memories/:id)
+	router.GET("/constellation", h.GetConstellation)
+	router.GET("/memories/:id/explore", h.Explore)
+
 	// Warmth routes (must be BEFORE /memories/:id to avoid parameter shadowing)
 	router.GET("/memories/streaks", h.GetStreak)
 	router.GET("/memories/serendipity", h.GetSerendipity)
@@ -695,6 +699,127 @@ func (h *MemoryHandler) UpdateSuggestionFeedback(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// GetConstellation handles GET /api/v1/constellation
+// Query params: offset (default 0) — for "探索 farther" pagination.
+func (h *MemoryHandler) GetConstellation(c *gin.Context) {
+	tracer := otel.Tracer("memory-service")
+	ctx, span := tracer.Start(c.Request.Context(), "GetConstellation")
+	defer span.End()
+
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+	span.SetAttributes(attribute.String("user_id", userID.String()))
+
+	// Parse offset from query (default 0)
+	offset := 0
+	if offsetStr := c.Query("offset"); offsetStr != "" {
+		if parsed, err := strconv.Atoi(offsetStr); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+	span.SetAttributes(attribute.Int("offset", offset))
+
+	resp, err := h.memoryService.GetConstellation(ctx, userID, offset)
+	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
+		zap.L().Error("failed to get constellation", zap.Error(err), zap.String("user_id", userID.String()))
+		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		return
+	}
+
+	span.SetAttributes(attribute.Int("node_count", len(resp.Nodes)), attribute.Int("edge_count", len(resp.Edges)))
+
+	// Convert nodes to safe response format
+	nodeItems := make([]map[string]interface{}, len(resp.Nodes))
+	for i, n := range resp.Nodes {
+		nodeItems[i] = map[string]interface{}{
+			"id":           n.ID,
+			"content_type": n.ContentType,
+			"text_content": n.TextContent,
+			"link_title":   n.LinkTitle,
+			"tags":         n.Tags,
+			"is_starred":   n.IsStarred,
+			"created_at":   n.CreatedAt,
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"nodes":    nodeItems,
+			"edges":    resp.Edges,
+			"has_more": resp.HasMore,
+			"total":    resp.Total,
+		},
+	})
+}
+
+// Explore handles GET /api/v1/memories/:id/explore
+func (h *MemoryHandler) Explore(c *gin.Context) {
+	tracer := otel.Tracer("memory-service")
+	ctx, span := tracer.Start(c.Request.Context(), "ExploreMemory")
+	defer span.End()
+
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	memoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid memory ID")
+		return
+	}
+	span.SetAttributes(attribute.String("memory_id", memoryID.String()))
+
+	resp, err := h.memoryService.Explore(ctx, memoryID, userID)
+	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
+		switch err {
+		case service.ErrMemoryNotFound:
+			respondWithError(c, http.StatusNotFound, "NOT_FOUND", "Memory not found")
+		case service.ErrUnauthorized:
+			respondWithError(c, http.StatusForbidden, "FORBIDDEN", "Access denied")
+		default:
+			zap.L().Error("explore failed", zap.Error(err), zap.String("memory_id", memoryID.String()))
+			respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		}
+		return
+	}
+
+	span.SetAttributes(attribute.Int("result_count", len(resp.Results)))
+
+	// Convert results to safe response — flat structure per backend contract
+	resultItems := make([]map[string]interface{}, len(resp.Results))
+	for i, r := range resp.Results {
+		item := r.Memory.SafeResponse()
+		item["similarity"] = r.Similarity
+		item["reason"] = r.Reason
+		resultItems[i] = item
+	}
+
+	breadcrumbItems := make([]map[string]interface{}, len(resp.Breadcrumb))
+	for i, b := range resp.Breadcrumb {
+		breadcrumbItems[i] = map[string]interface{}{
+			"id":    b.ID,
+			"label": b.Label,
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"memory_id":  resp.MemoryID,
+			"results":    resultItems,
+			"breadcrumb": breadcrumbItems,
+		},
+	})
 }
 
 // GetStreak handles GET /api/v1/memories/streaks

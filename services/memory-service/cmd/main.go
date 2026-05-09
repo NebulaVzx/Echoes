@@ -48,6 +48,7 @@ func main() {
 	userRepo := repository.NewGormUserRepository(db)
 	suggestionRepo := repository.NewGormSuggestionRepository(db)
 	tagRepo := repository.NewGormTagRepository(db)
+	relationRepo := repository.NewGormRelationRepository(db)
 
 	// Initialize Redis task queue
 	taskQueue := service.NewRedisTaskQueue()
@@ -65,7 +66,7 @@ func main() {
 	}
 
 	// Initialize services
-	memoryService := service.NewMemoryService(memoryRepo, userRepo, taskQueue, vectorizerClient, suggestionRepo, minioClient)
+	memoryService := service.NewMemoryService(memoryRepo, userRepo, relationRepo, taskQueue, vectorizerClient, suggestionRepo, minioClient)
 	tagService := service.NewTagService(tagRepo, userRepo)
 
 	// Initialize handlers

@@ -340,7 +340,7 @@ func newTestMemoryService() (*MemoryService, *mockMemoryRepository, *mockTaskQue
 	}
 	queue := newMockTaskQueue()
 	suggestionRepo := &mockSuggestionRepository{}
-	svc := NewMemoryService(repo, userRepo, queue, nil, suggestionRepo, nil)
+	svc := NewMemoryService(repo, userRepo, nil, queue, nil, suggestionRepo, nil)
 	return svc, repo, queue
 }
 

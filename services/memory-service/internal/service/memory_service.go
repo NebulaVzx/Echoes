@@ -2,12 +2,15 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
+	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -76,6 +79,7 @@ func validateLinkURL(rawURL string) error {
 type MemoryService struct {
 	repo           repository.MemoryRepository
 	userRepo       repository.UserRepository
+	relationRepo   repository.RelationRepository
 	queue          TaskQueue
 	vectorizer     *VectorizerClient
 	suggestionRepo repository.SuggestionRepository
@@ -93,10 +97,11 @@ type TaskQueue interface {
 }
 
 // NewMemoryService creates a new memory service.
-func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue, vectorizer *VectorizerClient, suggestionRepo repository.SuggestionRepository, minioClient *MinIOClient) *MemoryService {
+func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, relationRepo repository.RelationRepository, queue TaskQueue, vectorizer *VectorizerClient, suggestionRepo repository.SuggestionRepository, minioClient *MinIOClient) *MemoryService {
 	return &MemoryService{
 		repo:           repo,
 		userRepo:       userRepo,
+		relationRepo:   relationRepo,
 		queue:          queue,
 		vectorizer:     vectorizer,
 		suggestionRepo: suggestionRepo,
@@ -345,6 +350,379 @@ func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit 
 		Limit:    limit,
 		HasMore:  hasMore,
 	}, nil
+}
+
+// GetConstellation returns graph nodes and edges for the constellation view.
+// Per D-01: returns recent 100 memories + all starred memories.
+// Supports pagination via offset parameter for "探索更远" load-more.
+func (s *MemoryService) GetConstellation(ctx context.Context, userID uuid.UUID, offset int) (*domain.ConstellationResponse, error) {
+	// Fetch recent 100 memories (with offset for pagination)
+	recentNodes, total, err := s.repo.GetConstellationNodes(ctx, userID, 100, offset, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch constellation nodes: %w", err)
+	}
+
+	// Fetch all starred memories
+	starredNodes, err := s.repo.GetStarredMemories(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch starred memories: %w", err)
+	}
+
+	// Merge: recent first, then add starred that aren't already included
+	nodeMap := make(map[uuid.UUID]domain.ConstellationNode)
+	for _, n := range recentNodes {
+		nodeMap[n.ID] = n
+	}
+	for _, n := range starredNodes {
+		if _, exists := nodeMap[n.ID]; !exists {
+			nodeMap[n.ID] = n
+		}
+	}
+
+	nodes := make([]domain.ConstellationNode, 0, len(nodeMap))
+	for _, n := range nodeMap {
+		nodes = append(nodes, n)
+	}
+
+	// Build edges: for each node, find top-3 related memories above threshold 0.75
+	// Limit to avoid O(n^2) explosion — only connect within the returned node set
+	threshold := 0.75
+	nodeIDs := make(map[string]bool)
+	for _, n := range nodes {
+		nodeIDs[n.ID.String()] = true
+	}
+
+	var edges []domain.ConstellationEdge
+	for _, node := range nodes {
+		vector, err := s.repo.GetVectorByID(ctx, node.ID)
+		if err != nil || vector == "" {
+			continue
+		}
+		related, err := s.repo.FindRelated(ctx, userID, node.ID, vector, 3, threshold)
+		if err != nil {
+			continue
+		}
+		for _, r := range related {
+			// Only create edge if target is also in our node set
+			if nodeIDs[r.Memory.ID.String()] {
+				// Avoid duplicate edges: only add when source < target (string compare)
+				s1, s2 := node.ID.String(), r.Memory.ID.String()
+				if s1 < s2 {
+					edges = append(edges, domain.ConstellationEdge{
+						Source:     s1,
+						Target:     s2,
+						Similarity: r.Similarity,
+					})
+				}
+			}
+		}
+	}
+
+	// hasMore: total eligible memories > current offset + fetched recent nodes
+	hasMore := total > int64(offset+len(recentNodes))
+
+	return &domain.ConstellationResponse{
+		Nodes:   nodes,
+		Edges:   edges,
+		HasMore: hasMore,
+		Total:   total,
+	}, nil
+}
+
+// Explore returns related memories for a given memory with AI-generated connection reasons.
+// Per D-02: checks cache first, calls LLM on miss, saves result to cache.
+func (s *MemoryService) Explore(ctx context.Context, memoryID, userID uuid.UUID) (*domain.ExploreResponse, error) {
+	// Verify ownership
+	memory, err := s.Get(ctx, memoryID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch related memories (limit 8, threshold 0.75 per RESEARCH.md)
+	vector, err := s.repo.GetVectorByID(ctx, memoryID)
+	if err != nil || vector == "" {
+		return nil, fmt.Errorf("memory has no vector")
+	}
+	relatedResults, err := s.repo.FindRelated(ctx, userID, memoryID, vector, 8, 0.75)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find related memories: %w", err)
+	}
+
+	// Build explore results with reasons
+	results := make([]domain.ExploreResult, 0, len(relatedResults))
+	for _, r := range relatedResults {
+		reason, err := s.getRelationReason(ctx, memoryID, r.Memory.ID, memory, &r.Memory)
+		if err != nil {
+			// LLM failure is non-blocking — use default reason
+			reason = "这两段记忆在语义上有关联"
+		}
+		results = append(results, domain.ExploreResult{
+			Memory:     r.Memory,
+			Similarity: r.Similarity,
+			Reason:     reason,
+		})
+	}
+
+	return &domain.ExploreResponse{
+		MemoryID: memoryID,
+		Results:  results,
+		Breadcrumb: []domain.BreadcrumbItem{
+			{ID: memoryID, Label: s.extractLabel(memory)},
+		},
+	}, nil
+}
+
+// getRelationReason retrieves a cached reason or generates one via LLM.
+func (s *MemoryService) getRelationReason(ctx context.Context, sourceID, targetID uuid.UUID, sourceMemory, targetMemory *domain.Memory) (string, error) {
+	// 1. Check cache
+	reason, err := s.relationRepo.GetReason(ctx, sourceID, targetID)
+	if err == nil && reason != "" {
+		return reason, nil
+	}
+
+	// 2. Generate via LLM
+	reason, err = s.generateAssociationReason(ctx, sourceMemory, targetMemory)
+	if err != nil {
+		return "", err
+	}
+
+	// 3. Save to cache (best effort)
+	_ = s.relationRepo.Save(ctx, sourceID, targetID, 0.0, reason)
+
+	return reason, nil
+}
+
+// generateAssociationReason calls LLM to explain why two memories are related.
+func (s *MemoryService) generateAssociationReason(ctx context.Context, sourceMemory, targetMemory *domain.Memory) (string, error) {
+	llmConfig, err := s.getUserLLMConfig(ctx, sourceMemory.UserID)
+	if err != nil || len(llmConfig) == 0 {
+		return "", fmt.Errorf("LLM not configured")
+	}
+
+	sourceContent := s.extractContentForReason(sourceMemory)
+	targetContent := s.extractContentForReason(targetMemory)
+
+	prompt := fmt.Sprintf(`分析以下两段记忆内容的语义关联，用 1-2 句话解释它们为什么相关。
+
+记忆 A：
+%s
+
+记忆 B：
+%s
+
+请从主题、概念、情感或时间线等维度分析关联。只输出关联说明，不要额外解释。`,
+		truncateForPrompt(sourceContent, 500),
+		truncateForPrompt(targetContent, 500))
+
+	protocol := ""
+	if p, ok := llmConfig["llm_protocol"].(string); ok && p != "" {
+		protocol = p
+	} else if p, ok := llmConfig["llm_provider"].(string); ok && p != "" {
+		protocol = p
+	}
+	if protocol == "" {
+		protocol = "openai"
+	}
+
+	model := "gpt-4o-mini"
+	if m, ok := llmConfig["llm_model"].(string); ok && m != "" {
+		model = m
+	}
+
+	temperature := 0.5
+	if t, ok := llmConfig["llm_temperature"].(float64); ok && t != 0 {
+		temperature = t
+	}
+
+	apiKey := ""
+	if k, ok := llmConfig["api_key"].(string); ok {
+		apiKey = k
+	}
+
+	baseURL := ""
+	if u, ok := llmConfig["base_url"].(string); ok {
+		baseURL = u
+	}
+
+	switch protocol {
+	case "openai", "deepseek", "moonshot", "qwen":
+		return s.callOpenAIForReason(ctx, baseURL, apiKey, model, temperature, prompt)
+	case "anthropic":
+		return s.callAnthropicForReason(ctx, baseURL, apiKey, model, temperature, prompt)
+	default:
+		return s.callOpenAIForReason(ctx, baseURL, apiKey, model, temperature, prompt)
+	}
+}
+
+// extractContentForReason extracts the best content for LLM analysis.
+func (s *MemoryService) extractContentForReason(memory *domain.Memory) string {
+	if memory.ContentType == "text" {
+		return memory.TextContent
+	}
+	if memory.ContentType == "link" {
+		if memory.LinkTitle != "" {
+			return memory.LinkTitle + "\n" + memory.LinkSummary
+		}
+		return memory.LinkURL
+	}
+	if memory.ContentType == "file" {
+		if memory.TextContent != "" {
+			return memory.TextContent
+		}
+		return memory.FileName
+	}
+	return ""
+}
+
+// extractLabel creates a short label for breadcrumb display.
+func (s *MemoryService) extractLabel(memory *domain.Memory) string {
+	if memory.LinkTitle != "" {
+		return memory.LinkTitle
+	}
+	if memory.TextContent != "" {
+		if len(memory.TextContent) > 30 {
+			return memory.TextContent[:30] + "..."
+		}
+		return memory.TextContent
+	}
+	if memory.FileName != "" {
+		return memory.FileName
+	}
+	return "未命名记忆"
+}
+
+// truncateForPrompt truncates text to maxLen characters for LLM prompt.
+func truncateForPrompt(text string, maxLen int) string {
+	if len(text) <= maxLen {
+		return text
+	}
+	return text[:maxLen] + "..."
+}
+
+// callOpenAIForReason calls OpenAI-compatible API for association reason.
+func (s *MemoryService) callOpenAIForReason(ctx context.Context, baseURL, apiKey, model string, temperature float64, prompt string) (string, error) {
+	if apiKey == "" {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+	if apiKey == "" {
+		return "", fmt.Errorf("API Key not configured")
+	}
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"model":       model,
+		"temperature": temperature,
+		"max_tokens":  256,
+		"messages": []map[string]string{
+			{"role": "system", "content": "你是一个语义分析助手，擅长发现内容之间的隐藏联系。只输出关联说明，不要额外解释。"},
+			{"role": "user", "content": prompt},
+		},
+	})
+
+	base := strings.TrimSuffix(baseURL, "/")
+	if !strings.HasSuffix(base, "/v1") {
+		base = base + "/v1"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", base+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("LLM API returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("no response from LLM")
+	}
+
+	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+}
+
+// callAnthropicForReason calls Anthropic API for association reason.
+func (s *MemoryService) callAnthropicForReason(ctx context.Context, baseURL, apiKey, model string, temperature float64, prompt string) (string, error) {
+	if apiKey == "" {
+		apiKey = os.Getenv("ANTHROPIC_API_KEY")
+	}
+	if apiKey == "" {
+		return "", fmt.Errorf("API Key not configured")
+	}
+	if baseURL == "" {
+		baseURL = "https://api.anthropic.com/v1"
+	}
+	if model == "" {
+		model = "claude-sonnet-4-20250514"
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"model":       model,
+		"temperature": temperature,
+		"max_tokens":  256,
+		"system":      "你是一个语义分析助手，擅长发现内容之间的隐藏联系。只输出关联说明，不要额外解释。",
+		"messages": []map[string]string{
+			{"role": "user", "content": prompt},
+		},
+	})
+
+	base := strings.TrimSuffix(baseURL, "/")
+	if !strings.HasSuffix(base, "/v1") {
+		base = base + "/v1"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", base+"/messages", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("LLM API returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if len(result.Content) == 0 {
+		return "", fmt.Errorf("no response from LLM")
+	}
+
+	return strings.TrimSpace(result.Content[0].Text), nil
 }
 
 // GetStreak calculates the user's current and longest recording streaks.
