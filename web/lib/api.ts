@@ -403,7 +403,7 @@ class ApiClient {
     return this.request<Memory>('GET', `/api/v1/memories/${id}`)
   }
 
-  async updateMemory(id: string, data: { tags?: string[]; note?: string; source?: string; is_starred?: boolean }): Promise<ApiResponse<Memory>> {
+  async updateMemory(id: string, data: { tags?: string[]; note?: string; source?: string; is_starred?: boolean; text_content?: string }): Promise<ApiResponse<Memory>> {
     return this.request<Memory>('PUT', `/api/v1/memories/${id}`, data)
   }
 
@@ -509,6 +509,11 @@ class ApiClient {
 
   async getMessages(conversationId: string): Promise<ApiResponse<ListMessagesResponse>> {
     return this.request<ListMessagesResponse>('GET', `/api/v1/chat/conversations/${conversationId}/messages`)
+  }
+
+  // Weave endpoint
+  async weaveMemories(params: { source_ids: string[]; mode: string }): Promise<ApiResponse<CreateMemoryResponse>> {
+    return this.request<CreateMemoryResponse>('POST', '/api/v1/memories/weave', params)
   }
 
   // Constellation endpoints

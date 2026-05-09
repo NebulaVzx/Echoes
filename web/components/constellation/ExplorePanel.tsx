@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, PenLine } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { BreadcrumbTrail } from './BreadcrumbTrail'
 import { RelatedMemoryCard } from './RelatedMemoryCard'
 import { api } from '@/lib/api'
@@ -24,9 +25,11 @@ export function ExplorePanel({
   onNavigateBreadcrumb,
   onClearBreadcrumb,
 }: ExplorePanelProps) {
+  const router = useRouter()
   const [data, setData] = useState<ExploreResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [weaving, setWeaving] = useState(false)
 
   const fetchExplore = useCallback(async () => {
     try {
@@ -52,6 +55,27 @@ export function ExplorePanel({
   const handleRelatedClick = (relatedId: string, label: string) => {
     onDrillDown?.(relatedId, label)
   }
+
+  const handleWeaveRelated = useCallback(async () => {
+    if (!data || data.results.length === 0) return
+    const sourceIds = [memoryId, ...data.results.map(r => r.id)]
+    setWeaving(true)
+    try {
+      const response = await api.weaveMemories({
+        source_ids: sourceIds,
+        mode: 'article',
+      })
+      if (response.success && response.data) {
+        router.push(`/weave/${response.data.memory.id}`)
+      } else {
+        setError(response.error?.message || '编织失败')
+      }
+    } catch {
+      setError('编织请求失败')
+    } finally {
+      setWeaving(false)
+    }
+  }, [data, memoryId, router])
 
   // Build breadcrumb items from prop
   const breadcrumbItems = breadcrumb.map((b) => ({
@@ -97,6 +121,16 @@ export function ExplorePanel({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <h3 className="text-sm font-semibold">上下文</h3>
+        {data && data.results.length > 0 && (
+          <button
+            onClick={handleWeaveRelated}
+            disabled={weaving}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors disabled:opacity-50"
+          >
+            <PenLine className="w-3 h-3" />
+            {weaving ? '编织中...' : '编织'}
+          </button>
+        )}
       </div>
 
       {/* Breadcrumb */}

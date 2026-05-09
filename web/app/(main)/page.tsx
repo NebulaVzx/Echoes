@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers/auth-provider'
 import { ChatProvider, useChat } from '@/app/providers/chat-provider'
@@ -19,6 +19,8 @@ import { Switch } from '@/components/ui/switch'
 import UnlockCeremony from '@/components/warmth/unlock-ceremony'
 import SerendipityCard from '@/components/warmth/serendipity-card'
 import DailyReviewCard from '@/components/warmth/daily-review-card'
+import SelectionBar from '@/components/memory/selection-bar'
+import WeaveModal from '@/components/weave/weave-modal'
 
 function TimelineSkeleton() {
   return (
@@ -87,6 +89,12 @@ function HomePage() {
 
   // Starred filter state
   const [starredOnly, setStarredOnly] = useState(false)
+
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [weaveModalOpen, setWeaveModalOpen] = useState(false)
+  const lastSelectedIndexRef = useRef<number | null>(null)
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
@@ -184,6 +192,51 @@ function HomePage() {
       return next
     })
   }, [updateURL, selectedTags])
+
+  // Multi-select handlers
+  const handleSelectToggle = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+    setSelectionMode(true)
+  }, [])
+
+  const handleSelectRange = useCallback((startId: string, endId: string) => {
+    const startIdx = memories.findIndex(m => m.id === startId)
+    const endIdx = memories.findIndex(m => m.id === endId)
+    if (startIdx === -1 || endIdx === -1) return
+    const [min, max] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      for (let i = min; i <= max; i++) {
+        next.add(memories[i].id)
+      }
+      return next
+    })
+    setSelectionMode(true)
+  }, [memories])
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds(new Set())
+    setSelectionMode(false)
+    lastSelectedIndexRef.current = null
+  }, [])
+
+  const handleWeaveClick = useCallback(() => {
+    setWeaveModalOpen(true)
+  }, [])
+
+  const handleWeaveSuccess = useCallback(() => {
+    handleClearSelection()
+    showToast('编织完成', 'success')
+    loadMemories(1, false)
+  }, [handleClearSelection, loadMemories])
 
   // Sync selectedTags and starred from URL query params on mount / external navigation
   useEffect(() => {
@@ -315,6 +368,13 @@ function HomePage() {
           </div>
         </div>
 
+        {/* Selection bar */}
+        <SelectionBar
+          selectedCount={selectedIds.size}
+          onClear={handleClearSelection}
+          onWeave={handleWeaveClick}
+        />
+
         {/* Timeline */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -351,6 +411,10 @@ function HomePage() {
               isLoadingMore={isLoadingMore}
               tagColors={tagColors}
               onTagClick={handleTagClickFromCard}
+              selectable={true}
+              selectedIds={selectedIds}
+              onSelectToggle={handleSelectToggle}
+              selectionMode={selectionMode}
             />
           )}
 
@@ -366,6 +430,15 @@ function HomePage() {
           )}
         </div>
       </div>
+
+      {/* Weave Modal */}
+      <WeaveModal
+        open={weaveModalOpen}
+        onClose={() => setWeaveModalOpen(false)}
+        selectedIds={Array.from(selectedIds)}
+        memories={memories.filter(m => selectedIds.has(m.id))}
+        onSuccess={handleWeaveSuccess}
+      />
 
       {user && (
         <ChatSidebar
