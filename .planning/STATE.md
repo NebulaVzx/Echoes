@@ -15,7 +15,7 @@ type: state
 ## 当前位置
 
 **状态：** v1.2 里程碑已完成并归档，v1.3 Phase 11 已完成（12/12 plans），Phase 12 已完成（P0 + P1 全部完成），Phase 13 技术实现已完成（5/6 plans），Phase 14 上下文已收集完成
-**最近活动：** 2026-05-09 — Phase 14 讨论完成：封面生成（DALL-E 3 + 异步队列）、时间轴布局（单列+缩略图）、多选交互（Ctrl+点击/长按）、编织持久化（content_type=weave）。
+**最近活动：** 2026-05-09 — Phase 14 规划完成：7 个计划 / 4 个 Wave，研究+计划+验证全部通过
 **端到端验证结果：** 前端构建 ✅ | TypeScript 类型检查 ✅ | Go 后端编译 ✅ | 路由注册 ✅ | 文件完整性 ✅ | 人工 E2E 验证 ⏳ 待执行（Phase 13）
 
 ---
@@ -159,6 +159,39 @@ type: state
 - 13-VALIDATION.md（测试策略）
 - 13-DISCUSSION-LOG.md（讨论记录）
 
+### Phase 14 — 记忆封面与编织（2026-05-09 规划完成）
+
+**状态：** ✅ 已规划（7 个计划 / 4 个 Wave），Ready to execute
+
+**实事求是评估：**
+
+| 类别 | 状态 | 说明 |
+|------|------|------|
+| 研究阶段 | ✅ 完成 | 14-RESEARCH.md（733 行），DALL-E 3 API、Pillow、MinIO、多选交互模式已调研 |
+| 讨论阶段 | ✅ 完成 | 14-CONTEXT.md（5 个决策组：D-01~D-05），14-DISCUSSION-LOG.md |
+| 计划阶段 | ✅ 完成 | 7 个 PLAN.md 文件，4 个 Wave，10 个需求 ID 全部覆盖 |
+| 验证阶段 | ✅ 通过 | Plan-checker 12 维度检查，2 个文档 blocker 已修复 |
+| 需求覆盖 | ✅ 完整 | COV-01~COV-05, WEA-01~WEA-05 全部有对应计划 |
+| 决策覆盖 | ✅ 完整 | D-01~D-05 全部有实现任务，无 scope reduction |
+
+**计划清单：**
+| Plan | 目标 | Wave | 状态 |
+|------|------|------|------|
+| 14-01 | Cover Consumer（DALL-E 3 + Pollinations 降级，Pillow 裁剪，MinIO 上传） | 1 | 📋 已规划 |
+| 14-02 | Weave API + Domain 更新（content_type="weave"，编织端点，LLM prompt） | 1 | 📋 已规划 |
+| 14-03 | 时间轴封面展示（MemoryCard 缩略图，响应式尺寸，标签 hash 降级） | 2 | 📋 已规划 |
+| 14-04 | 多选状态（Ctrl/Shift 点击，长按，浮动操作栏） | 3 | 📋 已规划 |
+| 14-05 | 编织页面与编辑器（/weave，模式选择，编辑，Markdown 导出） | 3 | 📋 已规划 |
+| 14-06 | Command Palette + ExplorePanel 集成（/weave 命令，编织按钮） | 3 | 📋 已规划 |
+| 14-07 | 端到端集成（cover 队列发布，构建验证，E2E 测试） | 4 | 📋 已规划 |
+
+**文档产出：**
+- 14-CONTEXT.md（已更新，含 5 个决策组）
+- 14-DISCUSSION-LOG.md（讨论记录）
+- 14-RESEARCH.md（733 行，技术调研，Open Questions 已标记 RESOLVED）
+- 14-VALIDATION.md（验证策略）
+- 14-01~14-07-PLAN.md（7 个执行计划）
+
 ---
 
-*State tracking for Echoes project. Updated: 2026-05-09 — Phase 12 全部完成，Phase 13 上下文已收集*
+*State tracking for Echoes project. Updated: 2026-05-09 — Phase 14 规划完成，Ready to execute*

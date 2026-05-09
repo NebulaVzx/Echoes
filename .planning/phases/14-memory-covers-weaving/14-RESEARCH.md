@@ -597,22 +597,22 @@ function downloadMarkdown(content: string, filename: string) {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Weave streaming response?**
+1. **Weave streaming response?** — RESOLVED: Block until complete for v1.3; streaming can be added in v1.4 if UX demands it.
    - What we know: Existing LLM provider has `chat()` method, no streaming support currently.
    - What's unclear: Should weaving show real-time generation (like ChatGPT) or block until complete?
-   - Recommendation: Block until complete for v1.3; streaming can be added in v1.4 if UX demands it.
+   - Decision: Block until complete for v1.3.
 
-2. **Cover regeneration on memory update?**
+2. **Cover regeneration on memory update?** — RESOLVED: Manual regenerate only (via memory detail page) to avoid API cost surprises.
    - What we know: If user edits memory title/content, the cover may become irrelevant.
    - What's unclear: Should cover regenerate automatically on update, or provide manual "regenerate" button?
-   - Recommendation: Manual regenerate only (via memory detail page) to avoid API cost surprises.
+   - Decision: Manual regenerate only.
 
-3. **Weave memory cover generation?**
+3. **Weave memory cover generation?** — RESOLVED: Generate cover same as text type (extract title + first 200 chars).
    - What we know: Weave memories have `content_type="weave"` and contain long text.
    - What's unclear: Should weave memories also get AI-generated covers, or use a special weave icon?
-   - Recommendation: Generate cover same as text type (extract title + first 200 chars).
+   - Decision: Generate cover same as text type.
 
 ---
 
