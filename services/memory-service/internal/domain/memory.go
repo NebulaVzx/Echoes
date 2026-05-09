@@ -69,7 +69,7 @@ func (m Memory) SafeResponse() map[string]interface{} {
 
 // CreateMemoryRequest represents a request to create a new memory.
 type CreateMemoryRequest struct {
-	ContentType        string     `json:"content_type" binding:"required,oneof=text link file"`
+	ContentType        string     `json:"content_type" binding:"required,oneof=text link file weave"`
 	TextContent        string     `json:"text_content" binding:"omitempty,max=10000"`
 	LinkURL            string     `json:"link_url" binding:"omitempty,url,max=2048"`
 	Tags               []string   `json:"tags" binding:"omitempty,dive,max=50"`
@@ -193,7 +193,7 @@ type SuggestionResponse struct {
 
 // TaskStatusUpdate is the request body for the internal task status API.
 type TaskStatusUpdate struct {
-	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate suggestion:generate file:extract"`
+	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate suggestion:generate file:extract cover:generate"`
 	Status   string                 `json:"status" binding:"required,oneof=pending processing completed failed"`
 	Error    string                 `json:"error,omitempty"`
 	Result   map[string]interface{} `json:"result,omitempty"` // e.g., {"tags": [...]}, {"vector": [...]}, {"title": "...", "summary": "..."}
@@ -244,6 +244,23 @@ type ExploreResponse struct {
 type BreadcrumbItem struct {
 	ID    uuid.UUID `json:"id"`
 	Label string    `json:"label"`
+}
+
+// WeaveMode defines the available AI weaving modes.
+type WeaveMode string
+
+const (
+	WeaveModeArticle WeaveMode = "article"
+	WeaveModeStory   WeaveMode = "story"
+	WeaveModeSummary WeaveMode = "summary"
+	WeaveModeTodo    WeaveMode = "todo"
+)
+
+// WeaveRequest represents a request to weave multiple memories into a coherent piece.
+type WeaveRequest struct {
+	SourceIDs []string  `json:"source_ids" binding:"required,min=2,max=20"`
+	Mode      WeaveMode `json:"mode" binding:"required,oneof=article story summary todo"`
+	Title     string    `json:"title" binding:"omitempty,max=200"`
 }
 
 // Relation represents a cached association between two memories.
