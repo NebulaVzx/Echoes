@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { Sparkles, Star, FileText } from 'lucide-react'
 import { api, Memory } from '@/lib/api'
 import { getTagStyle } from './tag-filter-bar'
+import { getFallbackCoverStyle } from '@/lib/tag-color'
 
 interface MemoryCardProps {
   memory: Memory
@@ -43,6 +44,48 @@ function StatusDot({ status }: { status: string }) {
   }
   return (
     <div className={`w-1.5 h-1.5 rounded-full ${configs[status] || configs.pending}`} />
+  )
+}
+
+function CoverThumbnail({ memory }: { memory: Memory }) {
+  const firstTag = memory.tags?.[0] || ''
+
+  if (memory.cover_url) {
+    return (
+      <div className="relative flex-shrink-0 w-[80px] h-[60px] sm:w-[100px] sm:h-[75px] md:w-[120px] md:h-[90px] rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={memory.cover_url}
+          alt=""
+          className="w-full h-full object-cover"
+          loading="lazy"
+          onError={(e) => {
+            // On error, hide the img and show fallback
+            const target = e.currentTarget
+            target.style.display = 'none'
+          }}
+        />
+      </div>
+    )
+  }
+
+  // Fallback: gradient + first letter
+  const fallback = getFallbackCoverStyle(firstTag)
+  const content = memory.content_type === 'weave' ? '织' :
+    memory.content_type === 'link' ? '链' :
+    memory.content_type === 'file' ? '档' :
+    memory.text_content?.charAt(0).toUpperCase() || fallback.letter
+
+  return (
+    <div
+      className="flex-shrink-0 w-[80px] h-[60px] sm:w-[100px] sm:h-[75px] md:w-[120px] md:h-[90px] rounded-lg flex items-center justify-center text-lg sm:text-xl md:text-2xl font-bold"
+      style={{
+        background: fallback.background,
+        color: fallback.color,
+      }}
+    >
+      {content}
+    </div>
   )
 }
 
@@ -93,8 +136,13 @@ export default function MemoryCard({ memory, tagColors, onTagClick }: MemoryCard
       transition={{ duration: 0.1 }}
     >
       <Link href={`/memory/${memory.id}`}>
-        <article className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-5 hover:shadow-lg dark:hover:shadow-gray-900/30 hover:border-gray-200 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer">
-          {/* Header: type + date + status */}
+        <article className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5 hover:shadow-lg dark:hover:shadow-gray-900/30 hover:border-gray-200 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer flex gap-3 sm:gap-4">
+          {/* Cover thumbnail */}
+          <CoverThumbnail memory={memory} />
+
+          {/* Content area */}
+          <div className="flex-1 min-w-0">
+            {/* Header: type + date + status */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="flex items-center justify-center w-6 h-6 rounded-md bg-gray-50 dark:bg-gray-700">
@@ -202,6 +250,7 @@ export default function MemoryCard({ memory, tagColors, onTagClick }: MemoryCard
               正在分析...
             </div>
           )}
+          </div>
         </article>
       </Link>
     </motion.div>

@@ -95,7 +95,7 @@ export interface AuthResponse {
 export interface Memory {
   id: string
   user_id: string
-  content_type: 'text' | 'link' | 'file'
+  content_type: 'text' | 'link' | 'file' | 'weave'
   text_content?: string
   link_url?: string
   link_title?: string
@@ -373,7 +373,7 @@ class ApiClient {
 
   // Memory endpoints
   async createMemory(data: FormData | {
-    content_type: 'text' | 'link' | 'file'
+    content_type: 'text' | 'link' | 'file' | 'weave'
     text_content?: string
     link_url?: string
     tags?: string[]
