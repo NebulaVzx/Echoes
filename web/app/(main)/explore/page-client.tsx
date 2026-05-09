@@ -44,23 +44,28 @@ export function ExplorePageClient() {
   }, [currentId, fetchExplore])
 
   const handleDrillDown = useCallback((memoryId: string, label: string) => {
-    setPath((prev) => [...prev, { memoryId: currentId!, label: prev.length === 0 ? label : prev[prev.length - 1].label }])
+    // Record current node in path before navigating to new node
+    if (currentId) {
+      const currentLabel = data?.breadcrumb[data.breadcrumb.length - 1]?.label || '记忆'
+      setPath((prev) => [...prev, { memoryId: currentId, label: currentLabel }])
+    }
     setCurrentId(memoryId)
     // Update URL for deep-linking
     router.push(`/explore?id=${memoryId}`)
-  }, [currentId, router])
+  }, [currentId, router, data])
 
   const handleNavigateBreadcrumb = useCallback((index: number) => {
-    if (index === 0) {
-      // Back to start
-      setPath([])
-      const firstId = searchParams.get('id')
-      if (firstId) {
-        setCurrentId(firstId)
-        router.push(`/explore?id=${firstId}`)
-      }
+    // Breadcrumb items = path (history) + data.breadcrumb (current)
+    const pathItems = path.map((p) => ({ id: p.memoryId, label: p.label }))
+    if (index < pathItems.length) {
+      // Clicked a historical node: truncate path and navigate back
+      const target = pathItems[index]
+      setPath((prev) => prev.slice(0, index))
+      setCurrentId(target.id)
+      router.push(`/explore?id=${target.id}`)
     }
-  }, [searchParams, router])
+    // Clicking current node (index >= pathItems.length) is a no-op
+  }, [path, router])
 
   const handleClear = useCallback(() => {
     setPath([])

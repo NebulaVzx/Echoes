@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useCallback, useRef, useState, useMemo, forwardRef, useImperativeHandle } from 'react'
+import { useCallback, useRef, useState, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react'
 import type { GraphData, GraphNode, GraphEdge } from '@/types/constellation'
 
 const ForceGraph2D = dynamic(
@@ -63,14 +63,14 @@ export const ConstellationGraph = forwardRef<ConstellationGraphRef, Constellatio
   })
 
   // Listen for dark mode changes
-  useState(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return
     const observer = new MutationObserver(() => {
       setIsDark(document.documentElement.classList.contains('dark'))
     })
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
-  })
+  }, [])
 
   // Limit nodes if specified (mobile degradation)
   const displayData = useMemo(() => {
@@ -226,10 +226,24 @@ export const ConstellationGraph = forwardRef<ConstellationGraphRef, Constellatio
         nodeCanvasObjectMode={() => 'replace'}
         nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
           const size = (node.val || 5) + 2
+          const x = node.x || 0
+          const y = node.y || 0
+          const contentType = node.contentType as string
           ctx.fillStyle = color
-          ctx.beginPath()
-          ctx.arc(node.x, node.y, size, 0, 2 * Math.PI)
-          ctx.fill()
+          // Match actual node shapes for accurate pointer detection
+          if (contentType === 'link') {
+            ctx.save()
+            ctx.translate(x, y)
+            ctx.rotate(Math.PI / 4)
+            ctx.fillRect(-size, -size, size * 2, size * 2)
+            ctx.restore()
+          } else if (contentType === 'file') {
+            ctx.fillRect(x - size, y - size, size * 2, size * 2)
+          } else {
+            ctx.beginPath()
+            ctx.arc(x, y, size, 0, 2 * Math.PI)
+            ctx.fill()
+          }
         }}
         onNodeHover={handleNodeHover}
         onNodeClick={handleNodeClick}
