@@ -67,28 +67,7 @@ description: 拾忆产品开发路线图
 |-------|------|------|--------|------|
 | 11 | UI 架构重设计 | 三栏自适应工作台、Command Palette、AI 时代交互特征 | 12 | ✅ 已完成 (2026-05-03) |
 | 12 | 记忆捕获扩展 | 文件上传(txt/md/docx)、记忆匣命名、快速模板、星标、来源标注、批量导入、智能粘贴识别 | 1 (12-01) | ✅ 已完成 (2026-05-09) |
-
-**Plans:**
-| Plan | 目标 | Wave |
-|------|------|------|
-| 11-01 | 安装 shadcn 组件 + 提取 design-tokens 到 shared/ | 1 |
-| 11-02 | CSS Grid 布局基础 + 主题过渡动画 + Tailwind preset 集成 | 1 |
-| 11-03 | 创建 LayoutProvider、DensityProvider、ThemeColorProvider | 1 |
-| 11-04 | Provider tree 接入 + AppShell 三栏 Grid 容器 + (main)/layout.tsx | 2 |
-| 11-05 | 精简 Header (Logo + Search + Avatar) + UserMenu 下拉菜单 | 2 |
-| 11-06 | Sidebar 导航 (4 分类 9 项) + SidebarItem (active 指示器/badge) | 2 |
-| 11-07 | RightPanel (上下文面板) + RightPanelWidget + MobileDock (底部导航) | 2 |
-| 11-08 | Command Palette (Cmd+K, fuzzy search, /prefix, >prefix) | 3 |
-| 11-09 | ConfettiLite + StreakFlame + ThemeColorPicker | 2 |
-| 11-10 | PWA 基础 (manifest + icons + Serwist service worker) | 3 |
-| 11-11 | Tauri 2.0 桌面端最小封装 (config + Rust ~50 行) | 1 |
-| 11-12 | 现有页面迁移 (去 inline header) + 6 新路由占位页 | 4 |
-
-| Phase | 名称 | 目标 | 计划数 | 状态 |
-|-------|------|------|--------|------|
-| 12 | 记忆捕获扩展 | 文件上传(txt/md/docx)、记忆匣命名、快速模板、星标、来源标注、草稿自动保存、批量导入、智能粘贴识别 | 1 (12-01) | ✅ 已完成 (2026-05-09) |
-| 13 | 记忆星图与探索 | 向量关联可视化、无限钻取探索模式、AI 关联说明 | 待定 | 📋 规划中 |
-| 13 | 记忆星图与探索 | 向量关联可视化、无限钻取探索模式、AI 关联说明 | 待定 | 📋 规划中 |
+| 13 | 记忆星图与探索 | 向量关联可视化、无限钻取探索模式、AI 关联说明 | 5 | 📋 规划中 |
 | 14 | 记忆封面与编织 | AI 生成封面图、多条记忆编织成文章 | 待定 | 📋 规划中 |
 | 15 | 情绪与回响 | 情绪分析日历、每日记忆回响推送 | 待定 | 📋 规划中 |
 | 16 | 用户管理中心 | 记忆 DNA、AI 助手人格、数据主权、学习路径、账户基础 | 待定 | 📋 规划中 |
@@ -113,7 +92,16 @@ description: 拾忆产品开发路线图
 - 2026-05-09 端到端验证：批量导入 3 文件全部成功 ✅ | 智能粘贴识别（代码/链接/待办/读书笔记检测）✅
 - tag:generate 和 suggestion:generate 因测试环境 API key 无效返回 401，非代码问题
 
-*Roadmap updated: 2026-05-09 — Phase 12 全部完成（含 P2）*
+**Phase 13 Plans:**
+| Plan | 目标 | Wave | 状态 |
+|------|------|------|------|
+| 13-01 | 数据库迁移 + Domain 类型 + RelationRepository + Constellation 查询方法 | 1 | 📋 待执行 |
+| 13-02 | MemoryService 扩展 + Constellation/Explore Handler + LLM 关联说明 + 依赖注入 | 1 | 📋 待执行 |
+| 13-03 | 安装依赖 + 类型定义 + ConstellationGraph + GraphControls + 星座页面 | 2 | 📋 待执行 |
+| 13-04 | ExplorePanel + BreadcrumbTrail + RelatedMemoryCard + ConnectionReason + /explore 页面 | 3 | 📋 待执行 |
+| 13-05 | Hooks + 页面集成 + RightPanel 联动 + 键盘快捷键 + 端到端验证 | 3 | 📋 待执行 |
+
+*Roadmap updated: 2026-05-09 — Phase 13 计划完成*
 
 ## 待规划
 
