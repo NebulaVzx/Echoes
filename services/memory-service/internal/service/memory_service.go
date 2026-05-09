@@ -93,6 +93,7 @@ type TaskQueue interface {
 	PublishTagGenerate(ctx context.Context, memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error
 	PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, timeout int, maxRetries int, llmConfig map[string]interface{}) error
 	PublishFileExtract(ctx context.Context, memoryID uuid.UUID, fileName string, mediaURL string, llmConfig map[string]interface{}) error
+	PublishCoverGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, linkURL string, linkTitle string, tags []string, userID uuid.UUID, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
@@ -306,6 +307,14 @@ func (s *MemoryService) publishTasks(ctx context.Context, memory *domain.Memory,
 		_ = s.queue.PublishTextVectorize(ctx, memory.ID, content, llmConfig)
 		_ = s.queue.PublishTagGenerate(ctx, memory.ID, content, memory.Note, llmConfig)
 	}
+
+	// Publish cover generation task for all content types
+	// Cover generation is non-blocking; failure is handled gracefully by frontend fallback
+	coverContent := content
+	if memory.ContentType == "file" {
+		coverContent = memory.TextContent // file text may be empty initially (extracted async)
+	}
+	_ = s.queue.PublishCoverGenerate(ctx, memory.ID, memory.ContentType, coverContent, memory.LinkURL, memory.LinkTitle, []string(memory.Tags), memory.UserID, llmConfig)
 }
 
 // extractContent extracts the primary content for vectorization/tagging.
