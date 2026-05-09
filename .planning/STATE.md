@@ -100,8 +100,9 @@ type: state
 | 星标筛选 API | ✅ 完成 | `?starred=true` 支持 |
 | 星标筛选 UI | ✅ 完成 | page.tsx 添加 "只看星标" Switch toggle + URL 同步 |
 | 草稿自动保存 | ✅ 完成 | localStorage debounce 2s + 页面加载恢复 + 提交清除 |
-| 批量导入 | ❌ 未完成 | P2 需求，无实现 |
-| 端到端验证 | ✅ 完成 | 2026-05-08：文字/文件记忆创建、文本提取、语义搜索、星标筛选全部验证通过 |
+| 批量导入 | ✅ 完成 | 多文件选择、逐个上传、总大小 50MB 限制、独立错误处理 |
+| 智能粘贴识别 | ✅ 完成 | URL/代码/待办列表/读书笔记 自动检测并切换模式或模板 |
+| 端到端验证 | ✅ 完成 | 2026-05-09：批量导入 3 文件验证通过、智能粘贴编译通过 |
 | 测试覆盖 | ⚠️ 部分 | file_consumer/base/link_consumer/redis_queue 有测试，handler/service 层缺少文件上传专项测试 |
 
 **质量门禁：**
@@ -110,4 +111,4 @@ type: state
 
 ---
 
-*State tracking for Echoes project. Updated: 2026-05-08 — Phase 12 核心功能已完成，存在明确缺口*
+*State tracking for Echoes project. Updated: 2026-05-09 — Phase 12 全部完成，无剩余缺口*
