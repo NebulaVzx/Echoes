@@ -1190,7 +1190,7 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 	}
 
 	// Validate task type
-	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true}
+	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true, "file:extract": true, "cover:generate": true}
 	if !validTypes[taskType] {
 		return fmt.Errorf("invalid task_type: %s", taskType)
 	}
@@ -1258,6 +1258,13 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 				data["link_summary"] = memory.LinkSummary
 			}
 		}
+	case "cover:generate":
+		content := s.extractContent(memory)
+		if memory.ContentType == "file" {
+			content = memory.TextContent
+		}
+		_ = s.queue.PublishCoverGenerate(ctx, memory.ID, memory.ContentType, content, memory.LinkURL, memory.LinkTitle, []string(memory.Tags), memory.UserID, llmConfig)
+		return nil // PublishCoverGenerate handles its own error; we return nil for retry flow
 	}
 
 	// Publish to Redis Stream
