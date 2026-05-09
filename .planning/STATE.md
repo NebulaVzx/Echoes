@@ -8,7 +8,7 @@ type: state
 
 **最后更新：** 2026-05-09
 **当前分支：** develop（领先 origin/develop 24+ commits，未推送）
-**当前里程碑：** v1.3 "记忆的回响"（Phase 11 ✅，Phase 12 ✅，Phase 13 上下文已收集）
+**当前里程碑：** v1.3 "记忆的回响"（Phase 11 ✅，Phase 12 ✅，Phase 13 ✅ 规划完成，待执行）
 
 ---
 
@@ -109,9 +109,9 @@ type: state
 - [x] Phase 12 端到端验证通过（2026-05-08）
 - [x] 所有核心服务容器健康运行（2026-05-08 已启动）
 
-### Phase 13 — 记忆星图与探索（2026-05-09 上下文已收集）
+### Phase 13 — 记忆星图与探索（2026-05-09 规划完成）
 
-**状态：** 🔄 上下文已收集，待规划
+**状态：** ✅ 规划完成，6 个计划已验证通过，待执行
 
 **已锁定决策：**
 - D-01: 图数据分层加载（首次 100 条 + 星标，按需扩展）
@@ -120,12 +120,22 @@ type: state
 - D-04: 探索模式桌面端 RightPanel 展开，移动端新页面推入
 - D-05: 图着色按标签聚类 + 内容类型边框 + 星标光晕
 
-**已知条件：**
-- `/constellation` 和 `/explore` 占位页已存在（Phase 11）
-- Sidebar 导航已注册
-- 向量相似度查询 `SearchByVector` / `FindRelated` 已有
-- 无图可视化库，需新增
-- 需新增 `memory_relations` 表迁移
+**计划清单：**
+| Plan | 目标 | Wave | 状态 |
+|------|------|------|------|
+| 13-01 | 数据库迁移 + Domain 类型 + RelationRepository + Constellation 查询 | 1 | 📋 待执行 |
+| 13-02 | MemoryService 扩展 + Constellation/Explore Handler + LLM 关联说明 | 1 | 📋 待执行 |
+| 13-03 | 安装依赖 + 类型定义 + ConstellationGraph + GraphControls + 星座页面 | 2 | 📋 待执行 |
+| 13-04 | ExplorePanel + BreadcrumbTrail + RelatedMemoryCard + /explore 页面 | 3 | 📋 待执行 |
+| 13-05 | Hooks + 页面集成 + RightPanel 联动 + 键盘快捷键 | 3 | 📋 待执行 |
+| 13-06 | 端到端验证（人工检查点） | 4 | 📋 待执行 |
+
+**文档产出：**
+- 13-CONTEXT.md（已更新，含 5 个决策）
+- 13-RESEARCH.md（732 行，技术调研）
+- 13-UI-SPEC.md（532 行，6/6 维度通过）
+- 13-VALIDATION.md（测试策略）
+- 13-DISCUSSION-LOG.md（讨论记录）
 
 ---
 
