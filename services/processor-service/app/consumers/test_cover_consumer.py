@@ -201,7 +201,8 @@ class TestProcessMessageText:
         }
 
         with patch("app.consumers.cover_consumer.generate_cover_image") as mock_dalle, \
-             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload:
+             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload, \
+             patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}, clear=False):
             mock_dalle.return_value = _make_pil_image()
             mock_upload.return_value = "http://minio/covers/user-456/mem-123.jpg"
 
@@ -260,7 +261,8 @@ class TestProcessMessageLink:
 
         with patch("app.consumers.cover_consumer.fetch_og_image") as mock_fetch, \
              patch("app.consumers.cover_consumer.generate_cover_image") as mock_dalle, \
-             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload:
+             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload, \
+             patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}, clear=False):
             mock_fetch.return_value = None  # No og:image
             mock_dalle.return_value = _make_pil_image()
             mock_upload.return_value = "http://minio/covers/user-456/mem-123.jpg"
@@ -285,7 +287,8 @@ class TestProcessMessageFallback:
 
         with patch("app.consumers.cover_consumer.generate_cover_image") as mock_dalle, \
              patch("app.consumers.cover_consumer.generate_cover_pollinations") as mock_poll, \
-             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload:
+             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload, \
+             patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}, clear=False):
             mock_dalle.side_effect = Exception("DALL-E failed")
             mock_poll.side_effect = Exception("Pollinations failed")
             mock_upload.return_value = "http://minio/covers/user-456/mem-123.jpg"
@@ -335,7 +338,8 @@ class TestProcessMessageFile:
         }
 
         with patch("app.consumers.cover_consumer.generate_cover_image") as mock_dalle, \
-             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload:
+             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload, \
+             patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}, clear=False):
             mock_dalle.return_value = _make_pil_image()
             mock_upload.return_value = "http://minio/covers/user-456/mem-123.jpg"
 
@@ -359,7 +363,8 @@ class TestCoverConsumerFailure:
         }
 
         with patch("app.consumers.cover_consumer.generate_cover_image") as mock_dalle, \
-             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload:
+             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload, \
+             patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}, clear=False):
             mock_dalle.return_value = _make_pil_image()
             mock_upload.side_effect = Exception("MinIO connection failed")
 
@@ -379,11 +384,11 @@ class TestProcessMessageNoUserId:
         }
 
         with patch("app.consumers.cover_consumer.generate_cover_image") as mock_dalle, \
-             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload:
+             patch("app.consumers.cover_consumer.upload_cover_to_minio") as mock_upload, \
+             patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}, clear=False):
             mock_dalle.return_value = _make_pil_image()
             mock_upload.return_value = "http://minio/covers/user-456/mem-123.jpg"
 
-            # Should still work - upload path uses user_id from fields
-            # If user_id is empty, the path will be "covers//mem-123.jpg"
-            await cover_consumer.process_message("msg-1", fields)
-            mock_upload.assert_called_once()
+            # Empty user_id blocks upload (security: no user-controlled path segments)
+            with pytest.raises(RuntimeError, match="Failed to generate or upload"):
+                await cover_consumer.process_message("msg-1", fields)

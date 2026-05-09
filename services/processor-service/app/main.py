@@ -82,6 +82,13 @@ async def lifespan(app: FastAPI):
         consumers.append(file_consumer)
         print("File consumer started")
 
+    if settings.enable_cover_consumer:
+        from app.consumers.cover_consumer import CoverConsumer
+        cover_consumer = CoverConsumer(redis_client, memory_client)
+        await cover_consumer.start()
+        consumers.append(cover_consumer)
+        print("Cover consumer started")
+
     app.state.redis = redis_client
     app.state.memory_client = memory_client
     app.state.consumers = consumers
