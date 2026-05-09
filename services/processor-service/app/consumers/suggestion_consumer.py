@@ -24,7 +24,11 @@ def _create_llm(fields: dict):
     api_key = None
     encrypted_key = fields.get("api_key")
     if encrypted_key:
-        api_key = decrypt(encrypted_key)
+        try:
+            api_key = decrypt(encrypted_key)
+        except Exception:
+            # Memory-service now decrypts before publishing; use as-is
+            api_key = encrypted_key
     base_url = fields.get("base_url")
     return LLMFactory.create(protocol=protocol, model=model, temperature=temperature, api_key=api_key, base_url=base_url)
 

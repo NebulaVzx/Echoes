@@ -49,7 +49,7 @@ const NAV_SECTIONS: {
     id: 'create',
     label: '创作',
     items: [
-      { href: '/weave',                label: '记忆编织', icon: PenLine,   isNew: true },
+      { href: '/weave',                label: '记忆编织', icon: PenLine,   isNew: false },
       { href: '/capsules',             label: '时间胶囊', icon: Package2,  isNew: false },
     ],
   },

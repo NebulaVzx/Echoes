@@ -19,4 +19,5 @@ opentelemetry-api==1.35.0
 opentelemetry-sdk==1.35.0
 opentelemetry-instrumentation-fastapi==0.56b0
 opentelemetry-exporter-otlp==1.35.0
+Pillow>=10.0.0
 minio

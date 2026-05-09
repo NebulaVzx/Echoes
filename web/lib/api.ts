@@ -275,7 +275,24 @@ class ApiClient {
     }
 
     const response = await fetch(url, options)
-    const data = await response.json() as ApiResponse<T>
+
+    // DEBUG: Log raw response for weave endpoint
+    if (path.includes('/weave')) {
+      const rawText = await response.clone().text()
+      console.log('[DEBUG weave] status:', response.status, 'url:', url)
+      console.log('[DEBUG weave] raw response (first 500 chars):', rawText.slice(0, 500))
+    }
+
+    let data: ApiResponse<T>
+    try {
+      data = await response.json() as ApiResponse<T>
+    } catch (parseErr) {
+      const rawText = await response.clone().text()
+      console.error('[DEBUG weave] JSON parse failed! status:', response.status, 'url:', url)
+      console.error('[DEBUG weave] Raw response body:', rawText)
+      console.error('[DEBUG weave] Response headers:', Object.fromEntries(response.headers.entries()))
+      throw new Error(`API returned non-JSON (status ${response.status}): ${rawText.slice(0, 100)}`)
+    }
 
     if (!response.ok && !data.success) {
       throw new Error(data.error?.message || 'Request failed')

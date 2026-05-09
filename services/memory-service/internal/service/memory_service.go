@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NebulaVzx/Echoes/services/memory-service/internal/crypto"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/middleware"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
@@ -276,7 +277,14 @@ func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) 
 		config["llm_temperature"] = settings.LLMTemperature
 	}
 	if settings.APIKey != "" {
-		config["api_key"] = settings.APIKey
+		// Try to decrypt the API key (user-service encrypts it before storage)
+		decrypted, err := crypto.Decrypt(settings.APIKey)
+		if err == nil && decrypted != "" {
+			config["api_key"] = decrypted
+		} else {
+			// Fallback: use as-is if decryption fails (plain text or legacy data)
+			config["api_key"] = settings.APIKey
+		}
 	}
 	if settings.BaseURL != "" {
 		config["base_url"] = settings.BaseURL

@@ -30,6 +30,9 @@ function formatDate(dateStr: string): string {
 }
 
 function getPreviewContent(memory: Memory): string {
+  if (memory.content_type === 'weave') {
+    return memory.text_content || ''
+  }
   if (memory.content_type === 'text') {
     return memory.text_content || ''
   }
