@@ -111,6 +111,30 @@ func (q *RedisTaskQueue) PublishFileExtract(ctx context.Context, memoryID uuid.U
 	return q.PublishTask(ctx, "file:extract", fields)
 }
 
+// PublishCoverGenerate publishes a cover image generation task to Redis Stream.
+// The processor-service CoverConsumer will generate a cover via DALL-E 3
+// (or Pollinations.AI fallback), crop to 400x300, upload to MinIO, and
+// write the cover_url back via the internal API.
+func (q *RedisTaskQueue) PublishCoverGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, linkURL string, linkTitle string, tags []string, userID uuid.UUID, llmConfig map[string]interface{}) error {
+	fields := map[string]interface{}{
+		"memory_id":    memoryID.String(),
+		"content_type": contentType,
+		"content":      content,
+		"user_id":      userID.String(),
+	}
+	if linkURL != "" {
+		fields["link_url"] = linkURL
+	}
+	if linkTitle != "" {
+		fields["link_title"] = linkTitle
+	}
+	if len(tags) > 0 {
+		fields["tags"] = strings.Join(tags, ",")
+	}
+	mergeLLMConfig(fields, llmConfig)
+	return q.PublishTask(ctx, "cover:generate", fields)
+}
+
 // mergeLLMConfig merges LLM settings into the message fields if present.
 func mergeLLMConfig(fields map[string]interface{}, llmConfig map[string]interface{}) {
 	if llmConfig == nil {

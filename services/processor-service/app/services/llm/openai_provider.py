@@ -1,7 +1,10 @@
+import base64
+import io
 import os
 from typing import List
 import asyncio
 from openai import AsyncOpenAI, RateLimitError
+from PIL import Image
 from .base import LLMProvider, LLMMessage
 
 
@@ -77,3 +80,29 @@ Content: {content[:2000]}"""
         # Suggestions should be warm and slightly creative; use temperature 0.8 default
         temp = temperature if temperature is not None else 0.8
         return await self.generate(prompt, temperature=temp, max_tokens=max_tokens, timeout=timeout)
+
+    async def generate_image(self, prompt: str, size: str = "1024x1024", quality: str = "standard") -> Image.Image:
+        """Generate image using DALL-E 3. Returns PIL Image.
+
+        Args:
+            prompt: English prompt for image generation.
+            size: Image size (1024x1024, 1024x1536, 1536x1024). Default 1024x1024.
+            quality: "standard" or "hd". Default "standard".
+
+        Returns:
+            PIL Image object decoded from b64_json response.
+
+        Raises:
+            RuntimeError: If image generation fails.
+        """
+        resp = await self.client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size=size,
+            quality=quality,
+            response_format="b64_json",
+            n=1,
+        )
+        b64_data = resp.data[0].b64_json
+        image_bytes = base64.b64decode(b64_data)
+        return Image.open(io.BytesIO(image_bytes))

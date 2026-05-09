@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     enable_tag_consumer: bool = True
     enable_suggestion_consumer: bool = True
     enable_file_consumer: bool = True
+    enable_cover_consumer: bool = True
+    use_pollinations_fallback: bool = True
 
     class Config:
         env_file = ".env"

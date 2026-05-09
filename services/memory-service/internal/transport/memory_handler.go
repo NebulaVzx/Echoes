@@ -114,6 +114,9 @@ func (h *MemoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/memories/:id/suggestion", h.GetSuggestion)
 	router.PATCH("/memories/:id/suggestion/feedback", h.UpdateSuggestionFeedback)
 
+	// Weave route
+	router.POST("/memories/weave", h.Weave)
+
 	// Internal API for service-to-service communication
 	internal := router.Group("/internal")
 	internal.Use(internalAuthMiddleware())
@@ -472,7 +475,7 @@ func (h *MemoryHandler) RetryTask(c *gin.Context) {
 	}
 
 	taskType := c.Param("task_type")
-	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true, "file:extract": true}
+	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true, "file:extract": true, "cover:generate": true}
 	if !validTypes[taskType] {
 		respondWithError(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid task_type")
 		return
@@ -964,6 +967,35 @@ func (h *MemoryHandler) CreateSuggestion(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": suggestion})
+}
+
+// Weave handles POST /api/v1/memories/weave
+func (h *MemoryHandler) Weave(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		respondWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated")
+		return
+	}
+
+	var req domain.WeaveRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithValidationError(c, err)
+		return
+	}
+
+	memory, err := h.memoryService.WeaveMemories(c.Request.Context(), userID, req)
+	if err != nil {
+		zap.L().Error("weave failed", zap.Error(err), zap.String("user_id", userID.String()))
+		respondWithError(c, http.StatusInternalServerError, "WEAVE_ERROR", err.Error())
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"data": gin.H{
+			"memory": memory.SafeResponse(),
+		},
+	})
 }
 
 // SealMemory handles POST /api/v1/memories/:id/seal
