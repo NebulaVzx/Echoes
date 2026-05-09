@@ -3,12 +3,14 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 // mockMemoryRepository implements MemoryRepository with in-memory maps.
@@ -303,6 +305,15 @@ func (m *mockTaskQueue) PublishFileExtract(ctx context.Context, memoryID uuid.UU
 		"type":      "file:extract",
 		"memory":    memoryID,
 		"file_name": fileName,
+	})
+	return nil
+}
+
+func (m *mockTaskQueue) PublishCoverGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, linkURL string, linkTitle string, tags []string, userID uuid.UUID, llmConfig map[string]interface{}) error {
+	m.published = append(m.published, map[string]interface{}{
+		"type":         "cover:generate",
+		"memory":       memoryID,
+		"content_type": contentType,
 	})
 	return nil
 }
@@ -715,6 +726,171 @@ func TestMemoryService_AggregateStatus(t *testing.T) {
 				t.Errorf("AggregateStatus() = %q, want %q (tasks: %v)", got, tt.expected, tt.tasks)
 			}
 		})
+	}
+}
+
+func TestMemoryService_WeaveMemories(t *testing.T) {
+	svc, repo, _ := newTestMemoryService()
+	ctx := context.Background()
+	userID := uuid.New()
+
+	// Create two source memories
+	mem1 := &domain.Memory{
+		ID:          uuid.New(),
+		UserID:      userID,
+		ContentType: "text",
+		TextContent: "This is the first memory about Go programming.",
+		Tags:        pq.StringArray{"go", "programming"},
+	}
+	mem2 := &domain.Memory{
+		ID:          uuid.New(),
+		UserID:      userID,
+		ContentType: "text",
+		TextContent: "This is the second memory about Python programming.",
+		Tags:        pq.StringArray{"python", "programming"},
+	}
+	repo.Create(ctx, mem1)
+	repo.Create(ctx, mem2)
+
+	// Weave without LLM (empty config = error, but we test domain validation)
+	req := domain.WeaveRequest{
+		SourceIDs: []string{mem1.ID.String(), mem2.ID.String()},
+		Mode:      domain.WeaveModeArticle,
+	}
+
+	// Expect failure due to no LLM config
+	_, err := svc.WeaveMemories(ctx, userID, req)
+	if err == nil {
+		t.Fatal("WeaveMemories() expected error due to no LLM config")
+	}
+}
+
+func TestMemoryService_buildWeavePrompt(t *testing.T) {
+	svc, _, _ := newTestMemoryService()
+
+	memories := []*domain.Memory{
+		{ContentType: "text", TextContent: "Go is great for concurrency."},
+		{ContentType: "link", LinkTitle: "Python Tips", LinkSummary: "Python is easy to learn.", LinkURL: "https://example.com/python"},
+	}
+
+	prompt := svc.buildWeavePrompt(memories, domain.WeaveModeArticle, "Programming Languages")
+
+	if !strings.Contains(prompt, "[^1]") {
+		t.Error("prompt missing [^1] citation")
+	}
+	if !strings.Contains(prompt, "[^2]") {
+		t.Error("prompt missing [^2] citation")
+	}
+	if !strings.Contains(prompt, "Programming Languages") {
+		t.Error("prompt missing title")
+	}
+}
+
+func TestMemoryService_extractWeaveContent(t *testing.T) {
+	svc, _, _ := newTestMemoryService()
+
+	tests := []struct {
+		name     string
+		memory   *domain.Memory
+		expected string
+	}{
+		{
+			name:     "text memory",
+			memory:   &domain.Memory{ContentType: "text", TextContent: "Hello world"},
+			expected: "Hello world",
+		},
+		{
+			name:     "link memory with title",
+			memory:   &domain.Memory{ContentType: "link", LinkTitle: "Title", LinkSummary: "Summary"},
+			expected: "Title\nSummary",
+		},
+		{
+			name:     "link memory fallback to URL",
+			memory:   &domain.Memory{ContentType: "link", LinkURL: "https://example.com"},
+			expected: "https://example.com",
+		},
+		{
+			name:     "file memory with content",
+			memory:   &domain.Memory{ContentType: "file", TextContent: "File content", FileName: "test.txt"},
+			expected: "File content",
+		},
+		{
+			name:     "file memory fallback to filename",
+			memory:   &domain.Memory{ContentType: "file", FileName: "test.txt"},
+			expected: "test.txt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := svc.extractWeaveContent(tt.memory)
+			if got != tt.expected {
+				t.Errorf("extractWeaveContent() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMemoryService_appendSourceList(t *testing.T) {
+	svc, _, _ := newTestMemoryService()
+
+	memories := []*domain.Memory{
+		{ContentType: "text", TextContent: "First memory"},
+		{ContentType: "text", TextContent: "Second memory"},
+	}
+
+	content := "Woven article content."
+	result := svc.appendSourceList(content, memories)
+
+	if !strings.Contains(result, "来源：") {
+		t.Error("appendSourceList() missing source list header")
+	}
+	if !strings.Contains(result, "[^1]") {
+		t.Error("appendSourceList() missing [^1] citation")
+	}
+	if !strings.Contains(result, "[^2]") {
+		t.Error("appendSourceList() missing [^2] citation")
+	}
+}
+
+func TestMemoryService_WeaveMemories_InvalidSourceID(t *testing.T) {
+	svc, _, _ := newTestMemoryService()
+	ctx := context.Background()
+	userID := uuid.New()
+
+	req := domain.WeaveRequest{
+		SourceIDs: []string{"invalid-uuid"},
+		Mode:      domain.WeaveModeArticle,
+	}
+
+	_, err := svc.WeaveMemories(ctx, userID, req)
+	if err == nil {
+		t.Fatal("WeaveMemories() expected error for invalid source ID")
+	}
+}
+
+func TestMemoryService_WeaveMemories_UnauthorizedSource(t *testing.T) {
+	svc, repo, _ := newTestMemoryService()
+	ctx := context.Background()
+	userID := uuid.New()
+	otherUserID := uuid.New()
+
+	mem := &domain.Memory{
+		ID:          uuid.New(),
+		UserID:      otherUserID,
+		ContentType: "text",
+		TextContent: "Other user's memory.",
+	}
+	repo.Create(ctx, mem)
+
+	req := domain.WeaveRequest{
+		SourceIDs: []string{mem.ID.String()},
+		Mode:      domain.WeaveModeArticle,
+	}
+
+	_, err := svc.WeaveMemories(ctx, userID, req)
+	if err == nil {
+		t.Fatal("WeaveMemories() expected error for unauthorized source memory")
 	}
 }
 
