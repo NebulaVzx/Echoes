@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { ConstellationGraph } from '@/components/constellation/ConstellationGraph'
 import { GraphControls } from '@/components/constellation/GraphControls'
 import { GraphSkeleton } from '@/components/constellation/GraphSkeleton'
+import { ExplorePanel } from '@/components/constellation/ExplorePanel'
+import { useExplorePath } from '@/components/constellation/hooks/useExplorePath'
 import { Button } from '@/components/ui/button'
 import { Sparkles } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -42,6 +45,9 @@ function transformToGraphData(response: ConstellationResponse): GraphData {
 }
 
 export function ConstellationPageClient() {
+  const router = useRouter()
+  const explorePath = useExplorePath()
+
   // Keep original data separate from filtered view
   const [allGraphData, setAllGraphData] = useState<GraphData>({ nodes: [], links: [] })
   const [filteredNodes, setFilteredNodes] = useState<GraphNode[] | null>(null)
@@ -51,7 +57,16 @@ export function ConstellationPageClient() {
   const [total, setTotal] = useState(0)
   const [filterQuery, setFilterQuery] = useState('')
   const [offset, setOffset] = useState(0)
+  const [isMobile, setIsMobile] = useState(false)
   const fgRef = useRef<any>(null)
+
+  // Detect mobile breakpoint
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const fetchConstellation = useCallback(async (currentOffset: number = 0) => {
     try {
@@ -89,6 +104,7 @@ export function ConstellationPageClient() {
     fetchConstellation(0)
   }, [fetchConstellation])
 
+  // Zoom callbacks
   const handleZoomIn = useCallback(() => {
     if (fgRef.current) {
       const currentZoom = fgRef.current.zoom()
@@ -109,9 +125,14 @@ export function ConstellationPageClient() {
     }
   }, [])
 
+  // Node click: desktop opens RightPanel, mobile navigates to /explore
   const handleNodeClick = useCallback((node: GraphNode) => {
-    console.log('Node clicked:', node.id)
-  }, [])
+    if (isMobile) {
+      router.push(`/explore?id=${node.id}`)
+    } else {
+      explorePath.push(node.id, node.label)
+    }
+  }, [isMobile, router, explorePath])
 
   // Filter: apply to derived view only, NEVER mutate original allGraphData
   const handleFilter = useCallback((query: string) => {
@@ -153,6 +174,37 @@ export function ConstellationPageClient() {
     return allGraphData
   }, [allGraphData, filteredNodes])
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return
+      switch (e.key) {
+        case 'Escape':
+          explorePath.clear()
+          break
+        case '+':
+        case '=':
+          e.preventDefault()
+          handleZoomIn()
+          break
+        case '-':
+          e.preventDefault()
+          handleZoomOut()
+          break
+        case '0':
+          e.preventDefault()
+          handleReset()
+          break
+        case 'f':
+          e.preventDefault()
+          if (fgRef.current) fgRef.current.zoomToFit(300)
+          break
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleZoomIn, handleZoomOut, handleReset, explorePath])
+
   if (!loading && allGraphData.nodes.length === 0 && !error) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -162,7 +214,7 @@ export function ConstellationPageClient() {
           <p className="text-muted-foreground mb-6">
             保存记忆后，它们之间的关联会自动在这里显现。试着保存第一条记忆吧。
           </p>
-          <Button onClick={() => (window.location.href = '/capture')}>
+          <Button onClick={() => router.push('/capture')}>
             保存第一条记忆
           </Button>
         </div>
@@ -191,6 +243,7 @@ export function ConstellationPageClient() {
             ref={fgRef}
             data={displayData}
             onNodeClick={handleNodeClick}
+            maxNodes={isMobile ? 50 : undefined}
           />
           <GraphControls
             onZoomIn={handleZoomIn}
@@ -212,6 +265,19 @@ export function ConstellationPageClient() {
             </div>
           )}
         </>
+      )}
+
+      {/* Desktop: RightPanel explore overlay */}
+      {!isMobile && explorePath.current && (
+        <div className="absolute top-0 right-0 h-full w-[280px] bg-background border-l z-30 shadow-lg">
+          <ExplorePanel
+            memoryId={explorePath.current.memoryId}
+            onDrillDown={(id, label) => explorePath.push(id, label)}
+            breadcrumb={explorePath.path}
+            onNavigateBreadcrumb={(index) => explorePath.navigateTo(index)}
+            onClearBreadcrumb={() => { explorePath.clear() }}
+          />
+        </div>
       )}
     </div>
   )
