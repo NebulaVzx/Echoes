@@ -98,6 +98,25 @@ Claude Code（自动验证）+ 人工待确认
    - 基于 `window.innerWidth < 768`，首次加载和窗口 resize 时检测
    - 移动端限制最大节点数 50（性能降级）
 
+## 代码审查修复记录（2026-05-09 自动审查）
+
+### 已修复问题
+
+| # | 问题 | 影响 | 修复 |
+|---|------|------|------|
+| 1 | ConstellationGraph `useState` 误用于 MutationObserver | 黑暗模式监听不工作，内存泄漏 | 改为 `useEffect` |
+| 2 | `nodePointerAreaPaint` 始终绘制圆形检测区 | 菱形/方形节点点击不准 | 根据 `contentType` 绘制匹配形状 |
+| 3 | explore 页面面包屑导航仅处理 `index === 0` | 点击非首个面包屑项无响应 | 支持任意历史节点回退 |
+| 4 | explore 页面 `handleDrillDown` 标签逻辑错误 | 面包屑显示错误标签 | 使用当前记忆的 API breadcrumb 标签 |
+
+### 已确认非问题
+
+- `SafeResponse()` 返回字段与前端类型匹配 ✅
+- `GetConstellation` offset 分页逻辑正确 ✅
+- `RelationRepository` 缓存读写逻辑正确 ✅
+- 双击时先触发单击行为再缩放（已知 UX 权衡，300ms 内检测）
+- `useConstellationData` / `useGraphInteractions` hooks 未使用（死代码，不影响功能）
+
 ---
 
 ## 结论
