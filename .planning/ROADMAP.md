@@ -67,7 +67,7 @@ description: 拾忆产品开发路线图
 |-------|------|------|--------|------|
 | 11 | UI 架构重设计 | 三栏自适应工作台、Command Palette、AI 时代交互特征 | 12 | ✅ 已完成 (2026-05-03) |
 | 12 | 记忆捕获扩展 | 文件上传(txt/md/docx)、记忆匣命名、快速模板、星标、来源标注、批量导入、智能粘贴识别 | 1 (12-01) | ✅ 已完成 (2026-05-09) |
-| 13 | 记忆星图与探索 | 向量关联可视化、无限钻取探索模式、AI 关联说明 | 5 | 📋 规划中 |
+| 13 | 记忆星图与探索 | 向量关联可视化、无限钻取探索模式、AI 关联说明 | 6 | 📋 规划中 |
 | 14 | 记忆封面与编织 | AI 生成封面图、多条记忆编织成文章 | 待定 | 📋 规划中 |
 | 15 | 情绪与回响 | 情绪分析日历、每日记忆回响推送 | 待定 | 📋 规划中 |
 | 16 | 用户管理中心 | 记忆 DNA、AI 助手人格、数据主权、学习路径、账户基础 | 待定 | 📋 规划中 |
@@ -95,13 +95,14 @@ description: 拾忆产品开发路线图
 **Phase 13 Plans:**
 | Plan | 目标 | Wave | 状态 |
 |------|------|------|------|
-| 13-01 | 数据库迁移 + Domain 类型 + RelationRepository + Constellation 查询方法 | 1 | 📋 待执行 |
-| 13-02 | MemoryService 扩展 + Constellation/Explore Handler + LLM 关联说明 + 依赖注入 | 1 | 📋 待执行 |
-| 13-03 | 安装依赖 + 类型定义 + ConstellationGraph + GraphControls + 星座页面 | 2 | 📋 待执行 |
+| 13-01 | 数据库迁移 + Domain 类型 + RelationRepository + Constellation 查询方法（含 offset 分页） | 1 | 📋 待执行 |
+| 13-02 | MemoryService 扩展 + Constellation/Explore Handler（含 offset 查询参数）+ LLM 关联说明 + 依赖注入 | 1 | 📋 待执行 |
+| 13-03 | 安装依赖 + 类型定义（flat ExploreResponse）+ ConstellationGraph（读取 node.color）+ GraphControls + 星座页面（过滤不破坏原数据） | 2 | 📋 待执行 |
 | 13-04 | ExplorePanel + BreadcrumbTrail + RelatedMemoryCard + ConnectionReason + /explore 页面 | 3 | 📋 待执行 |
-| 13-05 | Hooks + 页面集成 + RightPanel 联动 + 键盘快捷键 + 端到端验证 | 3 | 📋 待执行 |
+| 13-05 | Hooks（无颜色重计算）+ 页面集成 + RightPanel 联动 + 键盘快捷键（callback ref 模式） | 3 | 📋 待执行 |
+| 13-06 | 端到端验证（人工检查点） | 4 | 📋 待执行 |
 
-*Roadmap updated: 2026-05-09 — Phase 13 计划完成*
+*Roadmap updated: 2026-05-09 — Phase 13 计划修订完成（6 plans, 4 waves）*
 
 ## 待规划
 
