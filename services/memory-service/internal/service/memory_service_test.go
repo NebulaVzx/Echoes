@@ -116,6 +116,14 @@ func (m *mockMemoryRepository) FindRelated(ctx context.Context, userID uuid.UUID
 	return nil, nil
 }
 
+func (m *mockMemoryRepository) GetConstellationNodes(ctx context.Context, userID uuid.UUID, limit int, offset int, includeStarred bool) ([]domain.ConstellationNode, int64, error) {
+	return nil, 0, nil
+}
+
+func (m *mockMemoryRepository) GetStarredMemories(ctx context.Context, userID uuid.UUID) ([]domain.ConstellationNode, error) {
+	return nil, nil
+}
+
 func (m *mockMemoryRepository) GetMemoriesByDateRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]domain.Memory, error) {
 	var results []domain.Memory
 	for _, mem := range m.memories {

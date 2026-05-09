@@ -199,6 +199,69 @@ type TaskStatusUpdate struct {
 	Result   map[string]interface{} `json:"result,omitempty"` // e.g., {"tags": [...]}, {"vector": [...]}, {"title": "...", "summary": "..."}
 }
 
+// ConstellationNode represents a single memory node in the graph.
+type ConstellationNode struct {
+	ID          uuid.UUID      `json:"id"`
+	UserID      uuid.UUID      `json:"user_id"`
+	ContentType string         `json:"content_type"`
+	TextContent string         `json:"text_content,omitempty"`
+	LinkTitle   string         `json:"link_title,omitempty"`
+	Tags        pq.StringArray `json:"tags"`
+	IsStarred   bool           `json:"is_starred"`
+	CreatedAt   time.Time      `json:"created_at"`
+}
+
+// ConstellationEdge represents a similarity connection between two memories.
+type ConstellationEdge struct {
+	Source     string  `json:"source"`
+	Target     string  `json:"target"`
+	Similarity float64 `json:"similarity"`
+}
+
+// ConstellationResponse is the response for GET /constellation.
+type ConstellationResponse struct {
+	Nodes   []ConstellationNode `json:"nodes"`
+	Edges   []ConstellationEdge `json:"edges"`
+	HasMore bool                `json:"has_more"`
+	Total   int64               `json:"total"`
+}
+
+// ExploreResult is a single related memory with its connection reason.
+type ExploreResult struct {
+	Memory     Memory  `json:"memory"`
+	Similarity float64 `json:"similarity"`
+	Reason     string  `json:"reason"`
+}
+
+// ExploreResponse is the response for GET /explore/:id.
+type ExploreResponse struct {
+	MemoryID   uuid.UUID        `json:"memory_id"`
+	Results    []ExploreResult  `json:"results"`
+	Breadcrumb []BreadcrumbItem `json:"breadcrumb"`
+}
+
+// BreadcrumbItem represents one step in the exploration path.
+type BreadcrumbItem struct {
+	ID    uuid.UUID `json:"id"`
+	Label string    `json:"label"`
+}
+
+// Relation represents a cached association between two memories.
+type Relation struct {
+	ID         uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	SourceID   uuid.UUID `gorm:"type:uuid;not null" json:"source_id"`
+	TargetID   uuid.UUID `gorm:"type:uuid;not null" json:"target_id"`
+	Similarity float64   `gorm:"type:float;not null" json:"similarity"`
+	Reason     string    `gorm:"type:text;not null;default:''" json:"reason"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// TableName specifies the table name for Relation.
+func (Relation) TableName() string {
+	return "memory_relations"
+}
+
 // AggregateStatus computes overall processing_status from sub-task states.
 // Rules per D-14:
 //   - Any processing -> "processing"
