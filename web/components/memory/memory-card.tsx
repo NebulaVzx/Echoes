@@ -52,8 +52,22 @@ export default function MemoryCard({ memory, tagColors, onTagClick }: MemoryCard
   const isFile = memory.content_type === 'file'
   const isProcessing = memory.processing_status === 'pending' || memory.processing_status === 'processing'
 
+  const [isStarred, setIsStarred] = useState(memory.is_starred)
   const [hasSuggestion, setHasSuggestion] = useState(false)
   const [suggestionPreview, setSuggestionPreview] = useState('')
+
+  const handleStarToggle = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const next = !isStarred
+    setIsStarred(next)
+    try {
+      await api.updateMemory(memory.id, { is_starred: next })
+    } catch {
+      // Revert on error
+      setIsStarred(!next)
+    }
+  }, [isStarred, memory.id])
 
   useEffect(() => {
     let cancelled = false
@@ -99,9 +113,19 @@ export default function MemoryCard({ memory, tagColors, onTagClick }: MemoryCard
               <span className="text-xs text-gray-400 dark:text-gray-500">
                 {isLink ? '链接' : isFile ? '文件' : '文字'}
               </span>
-              {memory.is_starred && (
-                <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-              )}
+              <button
+                onClick={handleStarToggle}
+                className="p-0.5 rounded transition-colors hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                title={isStarred ? '取消星标' : '标记星标'}
+              >
+                <Star
+                  className={`w-3 h-3 transition-colors ${
+                    isStarred
+                      ? 'text-amber-400 fill-amber-400'
+                      : 'text-gray-300 dark:text-gray-600 hover:text-amber-400'
+                  }`}
+                />
+              </button>
             </div>
             <div className="flex items-center gap-2">
               {isProcessing && <StatusDot status={memory.processing_status} />}

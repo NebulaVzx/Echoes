@@ -86,7 +86,7 @@ export function ExplorePageClient() {
           <p className="text-muted-foreground mb-6">
             在时间轴或星图中点击任意记忆，即可开启探索之旅
           </p>
-          <Button onClick={() => router.push('/timeline')}>去时间轴</Button>
+          <Button onClick={() => router.push('/')}>去时间轴</Button>
         </div>
       </div>
     )

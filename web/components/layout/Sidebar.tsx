@@ -32,8 +32,8 @@ const NAV_SECTIONS: {
     label: '拾忆',
     items: [
       { href: '/',                     label: '时间轴',   icon: Clock,     isNew: false, exact: true },
-      { href: '/constellation',        label: '记忆星图', icon: Sparkles,  isNew: true },
-      { href: '/explore',              label: '探索模式', icon: Compass,   isNew: true },
+      { href: '/constellation',        label: '记忆星图', icon: Sparkles,  isNew: false },
+      { href: '/explore',              label: '探索模式', icon: Compass,   isNew: false },
     ],
   },
   {
