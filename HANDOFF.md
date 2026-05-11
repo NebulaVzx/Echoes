@@ -1,7 +1,7 @@
 # HANDOFF — Echoes 项目交接文档
 
-> 生成时间：2026-05-08
-> 生成上下文：session 更新 Phase 12 实际执行状态
+> 生成时间：2026-05-11
+> 生成上下文：Phase 13 技术完成 + Phase 14 全部完成 + 关键线上 Bug 修复
 
 ---
 
@@ -10,8 +10,8 @@
 | 项目 | 说明 |
 |------|------|
 | **名称** | Echoes（拾忆）— 个人语义搜索引擎 |
-| **当前版本** | v1.2.0 "记忆的温度"（2026-04-26） |
-| **当前分支** | `develop`（领先 origin/develop 23+ commits） |
+| **当前版本** | v1.2.0 "记忆的温度" → v1.3 Phase 14 ✅ 全部完成（2026-05-09） |
+| **当前分支** | `develop`（已推送 origin/develop） |
 | **主分支** | `main` |
 | **技术栈** | Next.js 14 + Go/Gin + Python/FastAPI + PostgreSQL/pgvector + Redis Stream |
 | **部署方式** | Docker Compose（开发），Kubernetes（生产） |
@@ -20,150 +20,106 @@
 
 ## 2. 当前工作状态
 
-### ✅ 已完成：Phase 11 — UI 架构重设计（12/12 plans）
+### ✅ Phase 11 — UI 架构重设计（12/12 plans，2026-05-03 完成）
 
-**计划目录**: `.planning/phases/11-ui-redesign/`
+三栏自适应工作台、Command Palette、AI 时代交互特征。详见 `.planning/phases/11-ui-redesign/`。
 
-**目标**: 构建三栏自适应工作台（Sidebar + Main + RightPanel）、Command Palette（Cmd+K）、AI 时代交互特征，为 v1.3 "记忆的回响" 奠定前端架构基础。
+### ✅ Phase 12 — 记忆捕获扩展（2026-05-08 完成）
 
-### ✅ Phase 12 — 记忆捕获扩展（文件上传）已完成
+文件上传（txt/md/docx）、记忆匣命名、快速模板、星标、来源标注、批量导入、智能粘贴识别。
 
-**目标**: 支持文件记忆上传（txt/md/docx），提取文本后走完整的 AI 处理链路（向量化、标签、建议）。
+### ✅ Phase 13 — 记忆星图与探索（2026-05-09 技术完成，待人工 E2E）
 
-**已完成（P0 + P1 全部完成，P2 除外）**:
-- [x] 数据库迁移 `004_file_upload.sql`（source, is_starred, cover_url, file_name, file_size + 索引）
-- [x] Memory domain 模型扩展（5 个新字段，SafeResponse 包含，Create/Update Request 支持）
-- [x] Memory handler 支持 multipart/form-data 文件上传（类型校验 .txt/.md/.docx，大小限制 10MB）
-- [x] MinIO 文件存储 + UploadFile + PresignedGetURL(300*time.Second)
-- [x] `PublishFileTasks()` 发布 `file:extract` 到 Redis Stream（含完整 LLM 配置传播）
-- [x] processor `file_consumer.py` — MinIO 客户端直接下载（带认证，避免 presigned 过期）+ HTTP fallback
-- [x] `file_extractor.py` — txt/md 直接读取，docx 用 python-docx 提取
-- [x] 文件提取后自动发布 `text:vectorize` + `tag:generate` + `suggestion:generate`（含 `include_note_in_analysis`）
-- [x] 前端 `create-memory-form.tsx` — "记忆匣"品牌、三类型切换（文字/链接/文件）、拖拽上传、5 个快速模板、来源字段、星标切换、**草稿自动保存**
-- [x] 前端 `memory-card.tsx` — 文件图标、星标显示、来源标注
-- [x] `api.ts` — 支持 FormData（`isFormData` 标志）
-- [x] List handler 支持 `?starred=true` 查询参数，repository 层 `ListByUser` 支持 `starredOnly`
-- [x] **星标筛选 UI** — `page.tsx` 添加 "只看星标" Switch toggle + URL 同步 + 标题适配
-- [x] **端到端验证** — 2026-05-08 完成：文字记忆创建 ✅ | 文件上传 + 文本提取 ✅ | 语义搜索找到文件内容 ✅ | 星标筛选返回 2 条 ✅
+向量关联可视化（react-force-graph-2d）、无限钻取探索模式、AI 关联说明、键盘快捷键。
 
-**明确未完成（P2）**:
-- [x] **批量导入**（P2）— 多文件同时上传（2026-05-09 完成）
-- [x] **智能粘贴识别**（P2）— 自动判断内容类型（2026-05-09 完成）
+- 构建/类型/编译验证全部通过
+- 人工端到端验证（16 项检查点）待执行
 
-**线上 Bug 修复** (2026-05-03 至 05-04):
-1. **PublishFileTasks 静默忽略错误** — `_ = s.queue.PublishFileExtract(...)` 改为显式错误日志
-2. **presigned URL 过期时间 0** — `PresignedGetObject` 过期时间从 `0` 改为 `300` 秒
-3. **processor 漏发 suggestion:generate** — file_consumer 提取后补发 suggestion
-4. **suggestion_consumer 不支持 content_type=file** — 添加 file 作为 text 别名
-5. **file_consumer MinIO 403** — 新增 MinIO 客户端直接下载（带认证），不再依赖 presigned URL
-6. **前端轮询间隔优化** — 按记忆类型区分刷新间隔（text 3s / link 5s / file 10s）
-7. **Redis Stream 积压死循环** — 核心修复：
-   - processor `base.py`：失败后**强制 ack**（原代码不 ack 导致消息永久 pending）
-   - 消费者组创建从 `id="0"` 改为 `id="$"`（避免重启后重播所有历史）
-   - Stream 自动 trim（maxlen=5000）防止无限增长
-   - memory-service + processor 派生任务发布时均添加 maxlen=5000
-8. **文件记忆处理链路根因修复** — `minio-go/v7` 的 `PresignedGetObject` 第三个参数是 `time.Duration`（纳秒），传 `300` 被解释为 300 纳秒 → MinIO 拒绝 → `file:extract` 任务未发布。修复：`300` → `300*time.Second`
-9. **LLM 配置优先全链路审计** — 确认链路贯通：前端 → user-service 加密存储 → memory-service 读取传播 → processor-service 解密使用
-10. **file_consumer 派生任务补传 `include_note_in_analysis`** — 之前只传播了基础 LLM 配置，漏了用户偏好配置
-11. **LLM 协议根因治理** — 三层防线防 `Unknown LLM protocol`：
-    - user-service `UpdateSettings` 强制校验 `llm_protocol` 必填
-    - memory-service `getUserLLMConfig` 旧数据兜底推断（无 protocol 时按 provider 推断）
-    - processor-service LLMFactory 删除 `_openai_compatible` 隐式映射，恢复严格校验（只认 openai/anthropic）
+### ✅ Phase 14 — 记忆封面与编织（2026-05-09 全部完成）
 
-**时区统一** (2026-05-03):
-- 所有 11 个服务的 Docker 容器添加 `TZ=Asia/Shanghai`
-- Go zap logger 时间格式统一为本地时间（`time.Local`）
-- Python logging 统一为本地时间格式
-- Redis AOF 已启用（`appendonly yes`），确保数据持久化
+AI 生成封面图（DALL-E 3 → Pollinations → 纯色降级）、多条记忆编织成文章（4 种模式）、时间轴封面展示、多选交互。
 
-**核心方向**:
-1. **三栏自适应布局** — CSS Grid 桌面三栏 + 移动端底部导航（MobileDock）
-2. **设计系统 Tokens** — shared/design-tokens/ 统一颜色/间距/断点/排版
-3. **Provider 架构** — LayoutProvider / DensityProvider / ThemeColorProvider 管理全局状态
-4. **Command Palette** — Cmd+K 模糊搜索，支持 /prefix 和 >prefix 命令
-5. **AI 交互特征** — 生成式 UI、流式打字机、智能上下文面板
-
-**Plan 清单**（12 个，分 3 个 Wave）:
-| Plan | 目标 | Wave |
+| Plan | 目标 | 状态 |
 |------|------|------|
-| 11-01 | 安装 shadcn 组件 + 提取 design-tokens 到 shared/ | 1 |
-| 11-02 | CSS Grid 布局基础 + 主题过渡动画 + Tailwind preset 集成 | 1 |
-| 11-03 | 创建 LayoutProvider、DensityProvider、ThemeColorProvider | 1 |
-| 11-04 | Provider tree 接入 + AppShell 三栏 Grid 容器 | 2 |
-| 11-05 | 精简 Header (Logo + Search + Avatar) + UserMenu | 2 |
-| 11-06 | Sidebar 导航 (4 分类 9 项) + SidebarItem | 2 |
-| 11-07 | RightPanel (上下文面板) + RightPanelWidget + MobileDock | 2 |
-| 11-08 | Command Palette (Cmd+K, fuzzy search, /prefix, >prefix) | 3 |
-| 11-09 ~ 11-12 | 后续 plan（见 .planning/phases/11-ui-redesign/）| 3 |
-
-**涉及范围**: 前端（web/）+ shared/design-tokens/
-
-### 近期提交（全部 Phase 11 相关）
-
-| Commit | 描述 |
-|--------|------|
-| `5609f17` | docs: align PROGRESS.md and STATE.md with actual project status |
-| `f00a429` | fix(11): resolve three visual issues — layout center, header sticky, dropdown blue ring |
-| `ddb3d0d` | fix(11): viewport-center content and unify dropdown item focus styles |
-| `13c78d9` | fix(11): fix content centering and dropdown focus outline |
-| `4c4b8ae` | fix(11): remove active ring in collapsed sidebar, suppress dropdown outline, sticky header |
-| `d6ed5aa` | fix(11): fix homepage errors and blue focus outlines |
-| `7e04313` | fix(11): return 200 instead of 404 when serendipity has no match |
-| `4a38e43` | fix(11): resolve hydration error caused by nested button in UserMenu |
-| `7fd1655` | fix(11): suppress Chrome default blue focus-visible outline on navigation elements |
-| `00df083` | fix(11): fix focus ring and sidebar scroll behavior |
-| `fb9a1cd` | refactor(11): declutter timeline layout |
-
-### 已修复问题（2026-05-03）
-
-1. ~~首页报错（hydration 不匹配）~~ ✅ 已修复
-2. ~~内容偏左（关闭 right panel 后未居中）~~ ✅ 已修复
-3. ~~Header 滚动消失~~ ✅ 已修复
-4. ~~收缩 sidebar active item 蓝框~~ ✅ 已修复
-5. ~~Dropdown 聚焦蓝色边框~~ ✅ 已修复
-
-### 待解决问题 / 已知限制
-
-1. **Phase 12 状态（2026-05-09）**:
-   - ✅ 星标筛选 UI — 已完成（Switch toggle + URL 同步）
-   - ✅ 草稿自动保存 — 已完成（localStorage debounce 2s + 恢复 + 清除）
-   - ✅ 批量导入 — 已完成（多文件选择、逐个上传、50MB 总量限制）
-   - ✅ 智能粘贴识别 — 已完成（URL/代码/待办/读书笔记自动检测）
-   - ✅ 端到端验证 — 2026-05-09 全部通过
-
-2. **核心服务容器状态** (2026-05-08 已恢复):
-   - ✅ 全部 12 个容器已启动并运行
-   - Gateway 健康检查通过：`{"gateway":"ok","services":{"memory":"ok","user":"ok"}}`
-   - 前端 `localhost:3000/login` 返回 200
-   - 注意：Gateway 日志中有历史性的 `POST /api/v1/tags/categorize` 500 错误（30s 超时），非当前启动问题
-
-3. **WSL2 localhost:3000 转发残留** — Docker Desktop 重启后可能出现 WSL2 端口映射残留，导致 `localhost:3000` 无法访问前端。
-   - **Workaround**: 用 WSL2 IP 访问（如 `http://172.x.x.x:3000`），或重启 Docker Desktop
-   - **根本解决**: 重启 Docker Desktop + 清理 WSL 网络（`wsl --shutdown`）
-
-4. **vectorizer-service 重建超时** — `docker compose up -d --build` 因 torch 755MB 依赖下载超时，但容器仍健康运行。重建时建议单独处理或使用已有镜像。
-
-> 首页报错、布局居中、header sticky、dropdown 蓝框已全部修复。
-
-### 未跟踪文件
-
-> 无。所有文件已纳入版本控制。
+| 14-01 | Cover Consumer（DALL-E 3 + Pollinations 降级，Pillow 裁剪，MinIO 上传） | ✅ 已完成 |
+| 14-02 | Weave API + Domain 更新（content_type="weave"，编织端点，LLM prompt） | ✅ 已完成 |
+| 14-03 | 时间轴封面展示（MemoryCard 缩略图，响应式尺寸，标签 hash 降级） | ✅ 已完成 |
+| 14-04 | 多选状态（Ctrl/Shift 点击，长按，浮动操作栏） | ✅ 已完成 |
+| 14-05 | 编织页面与编辑器（/weave，模式选择，编辑，Markdown 导出） | ✅ 已完成 |
+| 14-06 | Command Palette + ExplorePanel 集成（/weave 命令，编织按钮） | ✅ 已完成 |
+| 14-07 | 端到端集成（cover 队列发布，构建验证，E2E 测试） | ✅ 已完成 |
 
 ---
 
-## 3. 关键规则速查（P0 不可违反）
+## 3. 关键 Bug 修复记录（2026-05-09 ~ 05-11）
 
-| 优先级 | 规则 | 说明 |
-|--------|------|------|
-| P0 | 交付质量我负责 | 任何改动必须端到端测试后才能声明完成 |
-| P0 | 闭环开发 | 写代码前想完整流程，写完测成功路径+边界 |
-| P0 | 默认中文输出 | 用户消息是中文 -> 回复中文 |
-| P0 | RTK 前缀命令 | 所有 Bash 命令前缀 `rtk` |
-| P1 | 动手验证优先 | 思考超 3 分钟无进展 -> curl/log/console |
-| P1 | Docker 不改不 rebuild | 改代码只重启容器，改 Dockerfile/依赖才 rebuild |
-| P1 | 小步快跑提交 | 完成一个独立修复点就 commit |
-| P1 | 检查活跃错题 | 动手前读 mistake-log.md，相似场景警觉 |
-| P2 | bool + omitempty | Go struct 中 bool 带 omitempty 会导致 false 被跳过 |
+### 3.1 Weave 返回 "LLM API returned 401"
+
+**现象**: 用户界面 LLM 配置测试连接成功，但 weave 生成报 401。
+
+**根因链**:
+1. **JWT Token 过期** → Gateway 直接返回 401（50µs，auth middleware 拦截），未到达 memory-service
+2. **用户数据库 settings = {}** → memory-service 回退到环境变量 `OPENAI_API_KEY`，该 key 已失效
+3. **memory-service 未解密 api_key** → `getUserLLMConfig` 直接从 DB 读取加密态的 api_key 传给 LLM，LLM 校验失败
+
+**修复**:
+- `memory-service/internal/service/memory_service.go:getUserLLMConfig` — 添加 `crypto.Decrypt()` 解密 api_key
+- 若解密失败则 fallback 使用原值（兼容明文/旧数据）
+
+```go
+if settings.APIKey != "" {
+    decrypted, err := crypto.Decrypt(settings.APIKey)
+    if err == nil && decrypted != "" {
+        config["api_key"] = decrypted
+    } else {
+        config["api_key"] = settings.APIKey
+    }
+}
+```
+
+### 3.2 AI 功能完全失效（tag/suggestion/file extraction/cover）
+
+**现象**: 保存记忆后标签、建议、封面图全部不生成。
+
+**根因**: `processor-service` 启动时崩溃 `ModuleNotFoundError: No module named 'PIL'`，因为 `openai_provider.py` 导入了 Pillow 但 `requirements.txt` 未包含。
+
+**修复**:
+- `services/processor-service/requirements.txt` — 添加 `Pillow>=10.0.0`
+- 重启 processor-service 容器
+
+### 3.3 Processor-Service 双解密 API Key
+
+**现象**: 修复 Pillow 后，processor 消费者仍报 LLM 401。
+
+**根因**: memory-service 在发布 Redis Stream 任务时已将 api_key 解密，但 processor-service 的 `_create_llm()` 仍尝试 `decrypt(encrypted_key)`，导致解密乱码。
+
+**修复**: 所有 processor consumer（tag_consumer.py / suggestion_consumer.py / link_consumer.py）添加 try/except fallback：
+
+```python
+api_key = None
+encrypted_key = fields.get("api_key")
+if encrypted_key:
+    try:
+        api_key = decrypt(encrypted_key)
+    except Exception:
+        # Memory-service now decrypts before publishing; use as-is
+        api_key = encrypted_key
+```
+
+### 3.4 Weave 时间轴不显示内容预览
+
+**根因**: `memory-card.tsx` 的 `getPreviewContent()` 没有处理 `content_type === 'weave'`。
+
+**修复**:
+```typescript
+if (memory.content_type === 'weave') {
+  return memory.text_content || ''
+}
+```
+
+### 3.5 导航栏 "记忆编织" 仍显示 "new" 星标
+
+**修复**: `web/components/layout/Sidebar.tsx` — `isNew: true` → `isNew: false`
 
 ---
 
@@ -181,12 +137,32 @@
 | 05-03 | localStorage 默认值 | `rightPanelVisible ?? true` 导致内容偏左 | localStorage 默认值必须与产品默认值一致 |
 | 05-03 | Go time.Duration | `PresignedGetObject(ctx, bucket, obj, 300, nil)` 传 300 被解释为 300 纳秒 | `time.Duration` 必须带单位：`300 * time.Second` |
 | 05-03 | Redis Stream | 失败后不 ack → 消息永久 pending → 死循环积压 | 消费者处理失败必须 ack（哪怕失败也要 ack），配合 maxlen trim |
-| 05-03 | LLM 协议传播 | 旧数据无 `llm_protocol` 字段 → processor `Unknown LLM protocol` | 上游（memory-service）兜底推断，下游严格校验，快速暴露 |
+| 05-03 | LLM 协议传播 | 旧数据无 `llm_protocol` 字段 → processor `Unknown LLM protocol` | 上游兜底推断，下游严格校验，快速暴露 |
 | 05-03 | 跨服务配置传播 | file_consumer 派生任务漏传 `include_note_in_analysis` | 派生任务需显式白名单传播所有相关配置字段 |
+| **05-09** | **Python 依赖缺失** | **processor-service 缺 Pillow，所有 async 消费者无法启动** | **Python 服务新增依赖必须同步 requirements.txt + Dockerfile，启动后立即验证容器日志** |
+| **05-09** | **API Key 解密链** | **user-service 加密 → memory-service 解密后传播 → processor 又解密一次** | **修改加密/解密逻辑时必须审计全链路：谁加密、谁解密、传播态是密文还是明文** |
+| **05-09** | **JWT Token 过期** | ** weave 401 被误判为 LLM 401，因为 gateway 返回 401 太快（50µs）** | **区分 "Gateway 401"（认证层，<1ms）和 "LLM 401"（业务层，>100ms）— 看响应时间** |
+| **05-09** | **Weave 预览遗漏** | **新增 content_type 时未同步更新 preview 逻辑** | **新增 content_type 必须检查：时间轴预览、搜索预览、分享预览、卡片渲染** |
 
 ---
 
-## 5. Docker 运维速查
+## 5. 关键规则速查（P0 不可违反）
+
+| 优先级 | 规则 | 说明 |
+|--------|------|------|
+| P0 | 交付质量我负责 | 任何改动必须端到端测试后才能声明完成 |
+| P0 | 闭环开发 | 写代码前想完整流程，写完测成功路径+边界 |
+| P0 | 默认中文输出 | 用户消息是中文 -> 回复中文 |
+| P0 | RTK 前缀命令 | 所有 Bash 命令前缀 `rtk` |
+| P1 | 动手验证优先 | 思考超 3 分钟无进展 -> curl/log/console |
+| P1 | Docker 不改不 rebuild | 改代码只重启容器，改 Dockerfile/依赖才 rebuild |
+| P1 | 小步快跑提交 | 完成一个独立修复点就 commit |
+| P1 | 检查活跃错题 | 动手前读 mistake-log.md，相似场景警觉 |
+| P2 | bool + omitempty | Go struct 中 bool 带 omitempty 会导致 false 被跳过 |
+
+---
+
+## 6. Docker 运维速查
 
 **容器名对照**:
 | 服务 | 容器名 |
@@ -199,6 +175,7 @@
 | Web (Next.js) | `echoes-web` |
 | PostgreSQL | `echoes-postgres` |
 | Redis | `echoes-redis` |
+| MinIO | `echoes-minio` |
 
 **常用运维命令**:
 ```bash
@@ -211,50 +188,29 @@
 
 **重要**: 开发环境修改代码只需 restart 容器，不需要 rebuild。只有改 Dockerfile/docker-compose.yml/依赖时才 rebuild。
 
-**时区配置**: 所有服务容器已统一注入 `TZ=Asia/Shanghai`，日志时间均为北京时间。如需修改时区，编辑 `docker-compose.yml` 中各服务的 `environment` 段落。
+**时区配置**: 所有服务容器已统一注入 `TZ=Asia/Shanghai`，日志时间均为北京时间。
 
 ---
 
-## 5.1 核心数据流速查
+## 7. 核心数据流速查
 
-### LLM 配置优先全链路
+### LLM 配置优先全链路（已修复，2026-05-09）
 
 ```
 前端设置面板
     ↓ POST /api/v1/users/settings
 user-service（AES-256-GCM 加密 api_key）
     ↓ 存入 PostgreSQL users.settings (JSONB)
-memory-service（读取时解密或透传加密态）
-    ↓ 发布 Redis Stream 任务时注入 llm_* 字段
-processor-service（_create_llm() 中解密 api_key）
+memory-service（读取时解密 api_key）
+    ↓ 发布 Redis Stream 任务时注入 llm_* 字段（api_key 为明文）
+processor-service（_create_llm() 中：先尝试解密，失败则用明文）
     ↓ LLMFactory.create(protocol, model, api_key...)
 OpenAIProvider / AnthropicProvider
 ```
 
 **优先级**: `fields["llm_protocol"]` > `fields["llm_provider"]` > `settings.llm_protocol` > `settings.llm_provider` > 环境变量。用户配置始终优先。
 
-**API key 加密链**: user-service `crypto.Encrypt()` → DB 存储 → memory-service 传播（加密态）→ processor-service 使用时 `decrypt()`。
-
-### 文件记忆处理链路
-
-```
-前端上传文件
-    ↓ POST /api/v1/memories (content_type=file)
-memory-service
-    → UploadFile() → MinIO bucket
-    → GetPresignedGetURL(300*time.Second) → presigned URL
-    → PublishFileTasks() → Redis Stream "tasks:file" (XADD)
-processor-service file_consumer
-    → MinIO 客户端直接下载（带认证，避免 presigned 过期）
-    → 提取文本（txt/md/docx）
-    → 更新 memory.content
-    → 派生任务：text:vectorize + tag:generate + suggestion:generate
-        （含完整 LLM 配置传播）
-vectorizer-service / processor tag_consumer / suggestion_consumer
-    → 各自处理，完成后 memory 状态更新
-```
-
-**关键坑**: `PresignedGetObject` 第三个参数是 `time.Duration`（纳秒），必须传 `300*time.Second`，不能裸传 `300`。
+**注意**: memory-service 现在负责解密 api_key，processor-service 做双解密兼容（try decrypt → fallback plaintext）。未来应统一为：memory-service 解密传播，processor-service 直接使用。
 
 ### Redis Stream 消费者安全模式
 
@@ -265,7 +221,7 @@ vectorizer-service / processor tag_consumer / suggestion_consumer
 
 ---
 
-## 6. 调试优先级
+## 8. 调试优先级
 
 | 优先级 | 方法 | 适用场景 |
 |--------|------|----------|
@@ -282,11 +238,16 @@ vectorizer-service / processor tag_consumer / suggestion_consumer
 4. 清 `.next` 目录 + 重启容器
 5. 最后用 Playwright 做回归截图
 
+**LLM 401 分层诊断法：**
+1. **响应时间 < 1ms** → Gateway JWT 认证失败（token 过期）→ 重新登录
+2. **响应时间 10-100ms** → memory-service 层（api_key 未解密或 settings 为空）→ 检查 user settings + 解密逻辑
+3. **响应时间 > 1s** → 实际 LLM API 返回 401（key 无效）→ 检查 api_key 有效性
+
 ---
 
-## 7. 记忆文件索引
+## 9. 记忆文件索引
 
-所有记忆存储于 `C:\Users\Yongbin\.claude\projects\D--xProjects-Vibe-Echoes\memory\`：
+所有记忆存储于 `C:\Users\Yongbin\.claude\projects\d--xProjects-Vibe-Echoes\memory\`：
 
 | 文件 | 内容 |
 |------|------|
@@ -299,6 +260,7 @@ vectorizer-service / processor tag_consumer / suggestion_consumer
 | `feedback_testing_expectation.md` | 主动端到端测试 |
 | `feedback_docker_nextjs_build.md` | host build 与容器 dev 冲突 |
 | `feedback_docker_devops.md` | Docker 运维脚本化 |
-| `feedback_debug_workflow.md` | 调试经验教训（含浏览器缓存、Playwright 局限） |
+| `feedback_debug_workflow.md` | 调试经验教训 |
 | `feedback_frontend_shadcn_tailwind.md` | 前端 shadcn/Tailwind/CSS 兼容性原则 |
+| `feedback_llm_propagation.md` | LLM 配置传播链审计（新增） |
 | `project_phase11_status.md` | Phase 11 当前状态 + 已修复问题 |
