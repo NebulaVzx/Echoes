@@ -594,22 +594,13 @@ COMMENT ON TABLE memory_emotions IS '记忆情绪分析结果，支持模型版�
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Batch backfill trigger mechanism**
-   - What we know: Need to analyze all existing memories. D-02 says "全量回溯".
-   - What's unclear: Should backfill be triggered automatically on deploy (migration script)? Or via a manual admin API?
-   - Recommendation: Add a one-time backfill script in `scripts/` that queries paginated memories and publishes to `mood:generate`. Run manually after deployment.
+1. **Batch backfill trigger mechanism** — RESOLVED: Manual script in `scripts/` directory (see Plan 15-07). Admin runs after deployment. Not auto-triggered to avoid unexpected LLM costs.
 
-2. **Echo generation latency budget**
-   - What we know: UI-SPEC says echo is generated when user opens DailyReview.
-   - What's unclear: Is 3-second LLM latency acceptable? Should we cache echo for the same day?
-   - Recommendation: Even though D-12 says "不存储回响历史", consider caching "today's echo" in memory-service for 1 hour to avoid repeated LLM calls. This is not "history" — it's a performance optimization.
+2. **Echo generation latency budget** — RESOLVED: Accept 3-second LLM latency per D-12 (不存储回响历史). No caching — each visit generates fresh echo. If latency becomes problematic in production, revisit as optimization (not scope of this phase).
 
-3. **Monthly insight generation frequency**
-   - What we know: UI-SPEC shows "本月情绪洞察" card.
-   - What's unclear: Generate on-demand when user views the month? Pre-generate and cache?
-   - Recommendation: Generate on-demand, cache in memory-service Redis for 24 hours keyed by `user_id:year:month`.
+3. **Monthly insight generation frequency** — RESOLVED: Generate on-demand when user views month detail, cache in Redis for 24 hours keyed by `user_id:year:month`. Simple stats-based insights for this phase (LLM-enhanced insights deferred to future phase per planner discretion).
 
 ---
 

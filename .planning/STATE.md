@@ -49,7 +49,7 @@ type: state
 - Phase 12 — 记忆捕获扩展（文件上传、记忆匣、快速模板）
 - Phase 13 — 记忆星图与探索（可视化关联网络、无限钻取）
 - Phase 14 — 记忆封面与编织（AI 封面、记忆编织文章）
-- Phase 15 — 情绪与回响 ✅ 讨论完成 + UI-SPEC 通过（2026-05-11），待规划
+- Phase 15 — 情绪与回响 ✅ 规划完成（2026-05-11），7 plans / 4 waves，待执行
 - Phase 16 — 用户管理中心（记忆 DNA、AI 人格、数据主权）
 - Phase 17 — 浏览器插件与桥梁（Web Clipper、记忆桥梁）
 - **新增需求来源**：用户反馈 + Flipbook 启发调研
@@ -194,6 +194,42 @@ type: state
 - 14-VALIDATION.md（验证策略）
 - 14-01~14-07-PLAN.md（7 个执行计划）
 
+### Phase 15 — 情绪与回响（2026-05-11 规划完成）
+
+**状态：** 📋 规划完成（7/7 plans，4 Waves），待执行
+
+**实事求是评估：**
+
+| 类别 | 状态 | 说明 |
+|------|------|------|
+| 讨论阶段 | ✅ 完成 | 16 个决策已锁定（D-01 ~ D-16） |
+| UI 设计合约 | ✅ 完成 | 15-UI-SPEC.md 通过验证（6/6 维度） |
+| 技术调研 | ✅ 完成 | 15-RESEARCH.md（含标准栈、架构模式、常见陷阱） |
+| 执行计划 | ✅ 完成 | 7 个 PLAN.md，4 个 Wave |
+| 验证策略 | ✅ 完成 | 15-VALIDATION.md（12 个 REQ-ID → 测试映射） |
+| 构建验证 | ⏳ 待执行 | 前端 `npm run build` + `tsc` |
+| Go 测试 | ⏳ 待执行 | `go test ./...` |
+| 端到端验证 | ⏳ 待执行 | 待 Wave 4 完成后 |
+
+**计划清单：**
+| Plan | 目标 | Wave | 状态 |
+|------|------|------|------|
+| 15-01 | 数据层：memory_emotions 表迁移 + 领域类型 + 仓库 + 队列集成 | 1 | 📋 已规划 |
+| 15-02 | AI 处理层：LLM analyze_sentiment + MoodConsumer + Prompt 模板 | 1 | 📋 已规划 |
+| 15-03 | 后端 API：Mood handler + DailyReview 回响扩展 + insight 端点 | 2 | 📋 已规划 |
+| 15-04 | Processor echo endpoint：POST /generate/echo | 2 | 📋 已规划 |
+| 15-05 | 前端日历：/mood 页面 + 自定义热力图 + 组件集 | 3 | 📋 已规划 |
+| 15-06 | Echo 卡片：DailyReview 扩展 + 风格选择 + 导航集成 | 3 | 📋 已规划 |
+| 15-07 | 批量回溯脚本 + Docker 配置 + E2E 验证 | 4 | 📋 已规划 |
+
+**文档产出：**
+- 15-CONTEXT.md（16 个锁定决策）
+- 15-DISCUSSION-LOG.md（讨论记录）
+- 15-RESEARCH.md（技术调研）
+- 15-UI-SPEC.md（UI 设计合约，6/6 维度通过）
+- 15-VALIDATION.md（验证策略）
+- 15-01~15-07-PLAN.md（7 个执行计划）
+
 ---
 
-*State tracking for Echoes project. Updated: 2026-05-09 — Phase 14 全部完成，7/7 plans 执行完毕，构建+测试通过*
+*State tracking for Echoes project. Updated: 2026-05-11 — Phase 15 规划完成，7/7 plans，4 Waves，待执行*
