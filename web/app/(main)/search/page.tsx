@@ -5,11 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { api, SearchResult } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
-import Logo from '@/components/logo'
-import Link from 'next/link'
 import MemoryCard from '@/components/memory/memory-card'
-import SearchInput from '@/components/search/search-input'
-import ThemeToggle from '@/components/theme-toggle'
 import EmptyState from '@/components/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -103,7 +99,7 @@ function SearchResults() {
   }, [query])
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="mx-auto max-w-content-timeline px-4 py-8">
       {/* Query display */}
       <div className="mb-6">
         <h1 className="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -164,26 +160,8 @@ function SearchResults() {
 
 export default function SearchPage() {
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Logo size={28} className="text-gray-900 dark:text-gray-100" />
-            <Link href="/" className="text-lg font-semibold text-gray-900 dark:text-gray-50 hover:opacity-80 transition-opacity">
-              Echoes
-            </Link>
-          </div>
-          <SearchInput />
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
-      <Suspense fallback={<SearchSkeleton />}>
-        <SearchResults />
-      </Suspense>
-    </main>
+    <Suspense fallback={<SearchSkeleton />}>
+      <SearchResults />
+    </Suspense>
   )
 }

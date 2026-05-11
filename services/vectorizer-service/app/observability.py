@@ -55,7 +55,8 @@ def setup_observability(app: FastAPI, service_name: str):
     log_level = os.getenv("LOG_LEVEL", "INFO")
     logging.basicConfig(
         level=getattr(logging, log_level, logging.INFO),
-        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
     )
 
     return provider

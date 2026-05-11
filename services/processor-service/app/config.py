@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     memory_service_url: str = "http://memory-service:8002"
     internal_api_token: str = ""
+    llm_protocol: str = "openai"
     llm_provider: str = "openai"
     llm_model: str = "gpt-4o-mini"
     llm_temperature: float = 0.7
@@ -16,6 +17,9 @@ class Settings(BaseSettings):
     enable_link_consumer: bool = True
     enable_tag_consumer: bool = True
     enable_suggestion_consumer: bool = True
+    enable_file_consumer: bool = True
+    enable_cover_consumer: bool = True
+    use_pollinations_fallback: bool = True
 
     class Config:
         env_file = ".env"

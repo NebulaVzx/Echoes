@@ -6,9 +6,6 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { api, TagInfo, TagCategory } from '@/lib/api'
 import { useAuth } from '@/app/providers/auth-provider'
-import Logo from '@/components/logo'
-import SearchInput from '@/components/search/search-input'
-import ThemeToggle from '@/components/theme-toggle'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
 import { getTagStyle, TAG_COLOR_PRESETS } from '@/components/memory/tag-filter-bar'
@@ -217,40 +214,20 @@ export default function TagsPage() {
 
   if (authLoading) {
     return (
-      <main className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="mx-auto max-w-content-timeline px-4 py-6 flex items-center justify-center min-h-[50vh]">
         <Skeleton className="h-8 w-32" />
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <>
       <ToastContainer>
         {toast && <Toast message={toast.message} type={toast.type} onClose={dismissToast} />}
       </ToastContainer>
 
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Logo size={28} className="text-gray-900 dark:text-gray-100" />
-            <Link href="/" className="text-lg font-semibold text-gray-900 dark:text-gray-50 hover:opacity-80 transition-opacity">
-              Echoes
-            </Link>
-          </div>
-          <SearchInput />
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <ThemeToggle />
-            {user && (
-              <span className="text-sm text-gray-600 dark:text-gray-300 hidden sm:inline max-w-[120px] truncate">
-                {user.username || user.email}
-              </span>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      {/* Content — Header/nav provided by AppShell */}
+      <div className="mx-auto max-w-content-timeline px-4 py-6">
         {/* Title & Controls */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -525,7 +502,7 @@ export default function TagsPage() {
           </motion.div>
         </div>
       )}
-    </main>
+    </>
   )
 }
 

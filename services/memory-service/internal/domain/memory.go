@@ -24,6 +24,11 @@ type Memory struct {
 	Vector           string    `gorm:"type:vector(1024);->:false;<-:false" json:"-"` // exclude from JSON, handled separately
 	Tags             pq.StringArray `gorm:"type:varchar(50)[]" json:"tags"`
 	Note             string    `gorm:"type:text" json:"note,omitempty"`
+	Source           string    `gorm:"type:text" json:"source,omitempty"`
+	IsStarred        bool      `gorm:"type:boolean;default:false" json:"is_starred"`
+	CoverURL         string    `gorm:"type:text" json:"cover_url,omitempty"`
+	FileName         string    `gorm:"type:text" json:"file_name,omitempty"`
+	FileSize         int64     `gorm:"type:bigint" json:"file_size,omitempty"`
 	Metadata         string    `gorm:"type:jsonb" json:"metadata,omitempty"`
 	ProcessingStatus string    `gorm:"type:varchar(20);default:'pending'" json:"processing_status"`
 	Visibility       string     `gorm:"type:varchar(20);default:'private'" json:"visibility"`
@@ -49,6 +54,11 @@ func (m Memory) SafeResponse() map[string]interface{} {
 		"link_summary":      m.LinkSummary,
 		"tags":              m.Tags,
 		"note":              m.Note,
+		"source":            m.Source,
+		"is_starred":        m.IsStarred,
+		"cover_url":         m.CoverURL,
+		"file_name":         m.FileName,
+		"file_size":         m.FileSize,
 		"processing_status": m.ProcessingStatus,
 		"visibility":        m.Visibility,
 		"sealed_until":      m.SealedUntil,
@@ -59,11 +69,13 @@ func (m Memory) SafeResponse() map[string]interface{} {
 
 // CreateMemoryRequest represents a request to create a new memory.
 type CreateMemoryRequest struct {
-	ContentType        string     `json:"content_type" binding:"required,oneof=text link"`
+	ContentType        string     `json:"content_type" binding:"required,oneof=text link file weave"`
 	TextContent        string     `json:"text_content" binding:"omitempty,max=10000"`
 	LinkURL            string     `json:"link_url" binding:"omitempty,url,max=2048"`
 	Tags               []string   `json:"tags" binding:"omitempty,dive,max=50"`
 	Note               string     `json:"note" binding:"omitempty,max=1000"`
+	Source             string     `json:"source" binding:"omitempty,max=500"`
+	IsStarred          bool       `json:"is_starred" binding:"omitempty"`
 	EnableAISuggestion bool       `json:"enable_ai_suggestion" binding:"omitempty"`
 	SealedUntil        *time.Time `json:"sealed_until,omitempty"`
 }
@@ -99,8 +111,10 @@ type SerendipityResponse struct {
 
 // UpdateMemoryRequest represents a request to update a memory.
 type UpdateMemoryRequest struct {
-	Tags []string `json:"tags" binding:"omitempty,dive,max=50"`
-	Note string   `json:"note" binding:"omitempty,max=1000"`
+	Tags      []string `json:"tags" binding:"omitempty,dive,max=50"`
+	Note      string   `json:"note" binding:"omitempty,max=1000"`
+	Source    string   `json:"source" binding:"omitempty,max=500"`
+	IsStarred *bool    `json:"is_starred,omitempty" binding:"omitempty"`
 }
 
 // ListMemoriesResponse represents a paginated list of memories.
@@ -179,10 +193,90 @@ type SuggestionResponse struct {
 
 // TaskStatusUpdate is the request body for the internal task status API.
 type TaskStatusUpdate struct {
-	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate suggestion:generate"`
+	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate suggestion:generate file:extract cover:generate"`
 	Status   string                 `json:"status" binding:"required,oneof=pending processing completed failed"`
 	Error    string                 `json:"error,omitempty"`
 	Result   map[string]interface{} `json:"result,omitempty"` // e.g., {"tags": [...]}, {"vector": [...]}, {"title": "...", "summary": "..."}
+}
+
+// ConstellationNode represents a single memory node in the graph.
+type ConstellationNode struct {
+	ID          uuid.UUID      `json:"id"`
+	UserID      uuid.UUID      `json:"user_id"`
+	ContentType string         `json:"content_type"`
+	TextContent string         `json:"text_content,omitempty"`
+	LinkTitle   string         `json:"link_title,omitempty"`
+	Tags        pq.StringArray `json:"tags"`
+	IsStarred   bool           `json:"is_starred"`
+	CreatedAt   time.Time      `json:"created_at"`
+}
+
+// ConstellationEdge represents a similarity connection between two memories.
+type ConstellationEdge struct {
+	Source     string  `json:"source"`
+	Target     string  `json:"target"`
+	Similarity float64 `json:"similarity"`
+}
+
+// ConstellationResponse is the response for GET /constellation.
+type ConstellationResponse struct {
+	Nodes   []ConstellationNode `json:"nodes"`
+	Edges   []ConstellationEdge `json:"edges"`
+	HasMore bool                `json:"has_more"`
+	Total   int64               `json:"total"`
+}
+
+// ExploreResult is a single related memory with its connection reason.
+type ExploreResult struct {
+	Memory     Memory  `json:"memory"`
+	Similarity float64 `json:"similarity"`
+	Reason     string  `json:"reason"`
+}
+
+// ExploreResponse is the response for GET /explore/:id.
+type ExploreResponse struct {
+	MemoryID   uuid.UUID        `json:"memory_id"`
+	Results    []ExploreResult  `json:"results"`
+	Breadcrumb []BreadcrumbItem `json:"breadcrumb"`
+}
+
+// BreadcrumbItem represents one step in the exploration path.
+type BreadcrumbItem struct {
+	ID    uuid.UUID `json:"id"`
+	Label string    `json:"label"`
+}
+
+// WeaveMode defines the available AI weaving modes.
+type WeaveMode string
+
+const (
+	WeaveModeArticle WeaveMode = "article"
+	WeaveModeStory   WeaveMode = "story"
+	WeaveModeSummary WeaveMode = "summary"
+	WeaveModeTodo    WeaveMode = "todo"
+)
+
+// WeaveRequest represents a request to weave multiple memories into a coherent piece.
+type WeaveRequest struct {
+	SourceIDs []string  `json:"source_ids" binding:"required,min=2,max=20"`
+	Mode      WeaveMode `json:"mode" binding:"required,oneof=article story summary todo"`
+	Title     string    `json:"title" binding:"omitempty,max=200"`
+}
+
+// Relation represents a cached association between two memories.
+type Relation struct {
+	ID         uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	SourceID   uuid.UUID `gorm:"type:uuid;not null" json:"source_id"`
+	TargetID   uuid.UUID `gorm:"type:uuid;not null" json:"target_id"`
+	Similarity float64   `gorm:"type:float;not null" json:"similarity"`
+	Reason     string    `gorm:"type:text;not null;default:''" json:"reason"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// TableName specifies the table name for Relation.
+func (Relation) TableName() string {
+	return "memory_relations"
 }
 
 // AggregateStatus computes overall processing_status from sub-task states.

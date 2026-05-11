@@ -2,16 +2,20 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
+	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/NebulaVzx/Echoes/services/memory-service/internal/crypto"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/domain"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/middleware"
 	"github.com/NebulaVzx/Echoes/services/memory-service/internal/repository"
@@ -76,9 +80,11 @@ func validateLinkURL(rawURL string) error {
 type MemoryService struct {
 	repo           repository.MemoryRepository
 	userRepo       repository.UserRepository
+	relationRepo   repository.RelationRepository
 	queue          TaskQueue
 	vectorizer     *VectorizerClient
 	suggestionRepo repository.SuggestionRepository
+	minioClient    *MinIOClient
 }
 
 // TaskQueue defines the interface for publishing async tasks.
@@ -87,17 +93,69 @@ type TaskQueue interface {
 	PublishTextVectorize(ctx context.Context, memoryID uuid.UUID, content string, llmConfig map[string]interface{}) error
 	PublishTagGenerate(ctx context.Context, memoryID uuid.UUID, content string, note string, llmConfig map[string]interface{}) error
 	PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, timeout int, maxRetries int, llmConfig map[string]interface{}) error
+	PublishFileExtract(ctx context.Context, memoryID uuid.UUID, fileName string, mediaURL string, llmConfig map[string]interface{}) error
+	PublishCoverGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, linkURL string, linkTitle string, tags []string, userID uuid.UUID, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
 // NewMemoryService creates a new memory service.
-func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, queue TaskQueue, vectorizer *VectorizerClient, suggestionRepo repository.SuggestionRepository) *MemoryService {
+func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, relationRepo repository.RelationRepository, queue TaskQueue, vectorizer *VectorizerClient, suggestionRepo repository.SuggestionRepository, minioClient *MinIOClient) *MemoryService {
 	return &MemoryService{
 		repo:           repo,
 		userRepo:       userRepo,
+		relationRepo:   relationRepo,
 		queue:          queue,
 		vectorizer:     vectorizer,
 		suggestionRepo: suggestionRepo,
+		minioClient:    minioClient,
+	}
+}
+
+// UpdateFileInfo updates the file-related fields of a memory after upload.
+func (s *MemoryService) UpdateFileInfo(ctx context.Context, memoryID uuid.UUID, mediaURL string, fileName string, fileSize int64) error {
+	memory, err := s.repo.GetByID(ctx, memoryID)
+	if err != nil {
+		return err
+	}
+	memory.MediaURL = mediaURL
+	memory.FileName = fileName
+	memory.FileSize = fileSize
+	return s.repo.Update(ctx, memory)
+}
+
+// UpdateTextContent updates the text_content field of a memory (used by file extraction).
+func (s *MemoryService) UpdateTextContent(ctx context.Context, memoryID uuid.UUID, textContent string) error {
+	memory, err := s.repo.GetByID(ctx, memoryID)
+	if err != nil {
+		return err
+	}
+	memory.TextContent = sanitizeText(textContent)
+	return s.repo.Update(ctx, memory)
+}
+
+// MinIOClient exposes the MinIO client for handler use.
+func (s *MemoryService) MinIOClient() *MinIOClient {
+	return s.minioClient
+}
+
+// GetUserLLMConfig fetches user LLM settings as a flat map.
+func (s *MemoryService) GetUserLLMConfig(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error) {
+	return s.getUserLLMConfig(ctx, userID)
+}
+
+// PublishFileTasks publishes file extraction task after upload is complete.
+// Uses presigned URL so the consumer can download without MinIO credentials.
+func (s *MemoryService) PublishFileTasks(ctx context.Context, memory *domain.Memory, llmConfig map[string]interface{}) {
+	if memory.ContentType == "file" && memory.MediaURL != "" && s.minioClient != nil {
+		objectPath := BuildObjectPath(memory.UserID.String(), memory.ID.String(), memory.FileName)
+		presignedURL, err := s.minioClient.GetPresignedGetURL(ctx, objectPath)
+		if err != nil {
+			zap.L().Error("failed to generate presigned URL", zap.Error(err), zap.String("memory_id", memory.ID.String()))
+			return
+		}
+		if err := s.queue.PublishFileExtract(ctx, memory.ID, memory.FileName, presignedURL, llmConfig); err != nil {
+			zap.L().Error("failed to publish file:extract task", zap.Error(err), zap.String("memory_id", memory.ID.String()))
+		}
 	}
 }
 
@@ -110,6 +168,10 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 	}
 	if req.ContentType == "link" && strings.TrimSpace(req.LinkURL) == "" {
 		return nil, "", errors.New("link URL is required for link memories")
+	}
+	if req.ContentType == "file" && strings.TrimSpace(req.TextContent) == "" {
+		// File memories have empty text_content initially — extraction is async
+		// The caller must provide file metadata separately
 	}
 	// Validate and sanitize link URL
 	if req.ContentType == "link" {
@@ -131,6 +193,8 @@ func (s *MemoryService) Create(ctx context.Context, userID uuid.UUID, req domain
 		LinkURL:          req.LinkURL,
 		Tags:             pq.StringArray(tags),
 		Note:             note,
+		Source:           sanitizeText(req.Source),
+		IsStarred:        req.IsStarred,
 		Metadata:         "{}",
 		ProcessingStatus: "pending",
 		Visibility:       "private",
@@ -198,6 +262,13 @@ func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) 
 	}
 	if settings.LLMProtocol != "" {
 		config["llm_protocol"] = settings.LLMProtocol
+	} else if settings.LLMProvider != "" {
+		// Fallback: infer protocol from provider (defense against legacy data)
+		if settings.LLMProvider == "anthropic" {
+			config["llm_protocol"] = "anthropic"
+		} else {
+			config["llm_protocol"] = "openai"
+		}
 	}
 	if settings.LLMModel != "" {
 		config["llm_model"] = settings.LLMModel
@@ -206,7 +277,14 @@ func (s *MemoryService) getUserLLMConfig(ctx context.Context, userID uuid.UUID) 
 		config["llm_temperature"] = settings.LLMTemperature
 	}
 	if settings.APIKey != "" {
-		config["api_key"] = settings.APIKey
+		// Try to decrypt the API key (user-service encrypts it before storage)
+		decrypted, err := crypto.Decrypt(settings.APIKey)
+		if err == nil && decrypted != "" {
+			config["api_key"] = decrypted
+		} else {
+			// Fallback: use as-is if decryption fails (plain text or legacy data)
+			config["api_key"] = settings.APIKey
+		}
 	}
 	if settings.BaseURL != "" {
 		config["base_url"] = settings.BaseURL
@@ -225,12 +303,26 @@ func (s *MemoryService) publishTasks(ctx context.Context, memory *domain.Memory,
 		_ = s.queue.PublishLinkFetch(ctx, memory.ID, memory.LinkURL, memory.Note, llmConfig)
 	}
 
-	// For all memories, publish text vectorization
+	// For file memories, publish file extraction task
+	if memory.ContentType == "file" && memory.MediaURL != "" {
+		_ = s.queue.PublishFileExtract(ctx, memory.ID, memory.FileName, memory.MediaURL, llmConfig)
+		return // File extraction will trigger vectorize + tag after text is extracted
+	}
+
+	// For text/link memories, publish text vectorization directly
 	content := s.extractContent(memory)
 	if content != "" {
 		_ = s.queue.PublishTextVectorize(ctx, memory.ID, content, llmConfig)
 		_ = s.queue.PublishTagGenerate(ctx, memory.ID, content, memory.Note, llmConfig)
 	}
+
+	// Publish cover generation task for all content types
+	// Cover generation is non-blocking; failure is handled gracefully by frontend fallback
+	coverContent := content
+	if memory.ContentType == "file" {
+		coverContent = memory.TextContent // file text may be empty initially (extracted async)
+	}
+	_ = s.queue.PublishCoverGenerate(ctx, memory.ID, memory.ContentType, coverContent, memory.LinkURL, memory.LinkTitle, []string(memory.Tags), memory.UserID, llmConfig)
 }
 
 // extractContent extracts the primary content for vectorization/tagging.
@@ -241,11 +333,14 @@ func (s *MemoryService) extractContent(memory *domain.Memory) string {
 	if memory.ContentType == "link" {
 		return memory.LinkURL
 	}
+	if memory.ContentType == "file" {
+		return memory.TextContent // Extracted text from file
+	}
 	return ""
 }
 
 // List returns paginated memories for a user.
-func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit int, tags []string) (*domain.ListMemoriesResponse, error) {
+func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, starredOnly bool) (*domain.ListMemoriesResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -253,7 +348,7 @@ func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit 
 		limit = 20
 	}
 
-	memories, total, err := s.repo.ListByUser(ctx, userID, page, limit, tags, true)
+	memories, total, err := s.repo.ListByUser(ctx, userID, page, limit, tags, true, starredOnly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list memories: %w", err)
 	}
@@ -272,6 +367,379 @@ func (s *MemoryService) List(ctx context.Context, userID uuid.UUID, page, limit 
 		Limit:    limit,
 		HasMore:  hasMore,
 	}, nil
+}
+
+// GetConstellation returns graph nodes and edges for the constellation view.
+// Per D-01: returns recent 100 memories + all starred memories.
+// Supports pagination via offset parameter for "探索更远" load-more.
+func (s *MemoryService) GetConstellation(ctx context.Context, userID uuid.UUID, offset int) (*domain.ConstellationResponse, error) {
+	// Fetch recent 100 memories (with offset for pagination)
+	recentNodes, total, err := s.repo.GetConstellationNodes(ctx, userID, 100, offset, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch constellation nodes: %w", err)
+	}
+
+	// Fetch all starred memories
+	starredNodes, err := s.repo.GetStarredMemories(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch starred memories: %w", err)
+	}
+
+	// Merge: recent first, then add starred that aren't already included
+	nodeMap := make(map[uuid.UUID]domain.ConstellationNode)
+	for _, n := range recentNodes {
+		nodeMap[n.ID] = n
+	}
+	for _, n := range starredNodes {
+		if _, exists := nodeMap[n.ID]; !exists {
+			nodeMap[n.ID] = n
+		}
+	}
+
+	nodes := make([]domain.ConstellationNode, 0, len(nodeMap))
+	for _, n := range nodeMap {
+		nodes = append(nodes, n)
+	}
+
+	// Build edges: for each node, find top-3 related memories above threshold 0.75
+	// Limit to avoid O(n^2) explosion — only connect within the returned node set
+	threshold := 0.75
+	nodeIDs := make(map[string]bool)
+	for _, n := range nodes {
+		nodeIDs[n.ID.String()] = true
+	}
+
+	var edges []domain.ConstellationEdge
+	for _, node := range nodes {
+		vector, err := s.repo.GetVectorByID(ctx, node.ID)
+		if err != nil || vector == "" {
+			continue
+		}
+		related, err := s.repo.FindRelated(ctx, userID, node.ID, vector, 3, threshold)
+		if err != nil {
+			continue
+		}
+		for _, r := range related {
+			// Only create edge if target is also in our node set
+			if nodeIDs[r.Memory.ID.String()] {
+				// Avoid duplicate edges: only add when source < target (string compare)
+				s1, s2 := node.ID.String(), r.Memory.ID.String()
+				if s1 < s2 {
+					edges = append(edges, domain.ConstellationEdge{
+						Source:     s1,
+						Target:     s2,
+						Similarity: r.Similarity,
+					})
+				}
+			}
+		}
+	}
+
+	// hasMore: total eligible memories > current offset + fetched recent nodes
+	hasMore := total > int64(offset+len(recentNodes))
+
+	return &domain.ConstellationResponse{
+		Nodes:   nodes,
+		Edges:   edges,
+		HasMore: hasMore,
+		Total:   total,
+	}, nil
+}
+
+// Explore returns related memories for a given memory with AI-generated connection reasons.
+// Per D-02: checks cache first, calls LLM on miss, saves result to cache.
+func (s *MemoryService) Explore(ctx context.Context, memoryID, userID uuid.UUID) (*domain.ExploreResponse, error) {
+	// Verify ownership
+	memory, err := s.Get(ctx, memoryID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch related memories (limit 8, threshold 0.75 per RESEARCH.md)
+	vector, err := s.repo.GetVectorByID(ctx, memoryID)
+	if err != nil || vector == "" {
+		return nil, fmt.Errorf("memory has no vector")
+	}
+	relatedResults, err := s.repo.FindRelated(ctx, userID, memoryID, vector, 8, 0.75)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find related memories: %w", err)
+	}
+
+	// Build explore results with reasons
+	results := make([]domain.ExploreResult, 0, len(relatedResults))
+	for _, r := range relatedResults {
+		reason, err := s.getRelationReason(ctx, memoryID, r.Memory.ID, memory, &r.Memory)
+		if err != nil {
+			// LLM failure is non-blocking — use default reason
+			reason = "这两段记忆在语义上有关联"
+		}
+		results = append(results, domain.ExploreResult{
+			Memory:     r.Memory,
+			Similarity: r.Similarity,
+			Reason:     reason,
+		})
+	}
+
+	return &domain.ExploreResponse{
+		MemoryID: memoryID,
+		Results:  results,
+		Breadcrumb: []domain.BreadcrumbItem{
+			{ID: memoryID, Label: s.extractLabel(memory)},
+		},
+	}, nil
+}
+
+// getRelationReason retrieves a cached reason or generates one via LLM.
+func (s *MemoryService) getRelationReason(ctx context.Context, sourceID, targetID uuid.UUID, sourceMemory, targetMemory *domain.Memory) (string, error) {
+	// 1. Check cache
+	reason, err := s.relationRepo.GetReason(ctx, sourceID, targetID)
+	if err == nil && reason != "" {
+		return reason, nil
+	}
+
+	// 2. Generate via LLM
+	reason, err = s.generateAssociationReason(ctx, sourceMemory, targetMemory)
+	if err != nil {
+		return "", err
+	}
+
+	// 3. Save to cache (best effort)
+	_ = s.relationRepo.Save(ctx, sourceID, targetID, 0.0, reason)
+
+	return reason, nil
+}
+
+// generateAssociationReason calls LLM to explain why two memories are related.
+func (s *MemoryService) generateAssociationReason(ctx context.Context, sourceMemory, targetMemory *domain.Memory) (string, error) {
+	llmConfig, err := s.getUserLLMConfig(ctx, sourceMemory.UserID)
+	if err != nil || len(llmConfig) == 0 {
+		return "", fmt.Errorf("LLM not configured")
+	}
+
+	sourceContent := s.extractContentForReason(sourceMemory)
+	targetContent := s.extractContentForReason(targetMemory)
+
+	prompt := fmt.Sprintf(`分析以下两段记忆内容的语义关联，用 1-2 句话解释它们为什么相关。
+
+记忆 A：
+%s
+
+记忆 B：
+%s
+
+请从主题、概念、情感或时间线等维度分析关联。只输出关联说明，不要额外解释。`,
+		truncateForPrompt(sourceContent, 500),
+		truncateForPrompt(targetContent, 500))
+
+	protocol := ""
+	if p, ok := llmConfig["llm_protocol"].(string); ok && p != "" {
+		protocol = p
+	} else if p, ok := llmConfig["llm_provider"].(string); ok && p != "" {
+		protocol = p
+	}
+	if protocol == "" {
+		protocol = "openai"
+	}
+
+	model := "gpt-4o-mini"
+	if m, ok := llmConfig["llm_model"].(string); ok && m != "" {
+		model = m
+	}
+
+	temperature := 0.5
+	if t, ok := llmConfig["llm_temperature"].(float64); ok && t != 0 {
+		temperature = t
+	}
+
+	apiKey := ""
+	if k, ok := llmConfig["api_key"].(string); ok {
+		apiKey = k
+	}
+
+	baseURL := ""
+	if u, ok := llmConfig["base_url"].(string); ok {
+		baseURL = u
+	}
+
+	switch protocol {
+	case "openai", "deepseek", "moonshot", "qwen":
+		return s.callOpenAIForReason(ctx, baseURL, apiKey, model, temperature, prompt)
+	case "anthropic":
+		return s.callAnthropicForReason(ctx, baseURL, apiKey, model, temperature, prompt)
+	default:
+		return s.callOpenAIForReason(ctx, baseURL, apiKey, model, temperature, prompt)
+	}
+}
+
+// extractContentForReason extracts the best content for LLM analysis.
+func (s *MemoryService) extractContentForReason(memory *domain.Memory) string {
+	if memory.ContentType == "text" {
+		return memory.TextContent
+	}
+	if memory.ContentType == "link" {
+		if memory.LinkTitle != "" {
+			return memory.LinkTitle + "\n" + memory.LinkSummary
+		}
+		return memory.LinkURL
+	}
+	if memory.ContentType == "file" {
+		if memory.TextContent != "" {
+			return memory.TextContent
+		}
+		return memory.FileName
+	}
+	return ""
+}
+
+// extractLabel creates a short label for breadcrumb display.
+func (s *MemoryService) extractLabel(memory *domain.Memory) string {
+	if memory.LinkTitle != "" {
+		return memory.LinkTitle
+	}
+	if memory.TextContent != "" {
+		if len(memory.TextContent) > 30 {
+			return memory.TextContent[:30] + "..."
+		}
+		return memory.TextContent
+	}
+	if memory.FileName != "" {
+		return memory.FileName
+	}
+	return "未命名记忆"
+}
+
+// truncateForPrompt truncates text to maxLen characters for LLM prompt.
+func truncateForPrompt(text string, maxLen int) string {
+	if len(text) <= maxLen {
+		return text
+	}
+	return text[:maxLen] + "..."
+}
+
+// callOpenAIForReason calls OpenAI-compatible API for association reason.
+func (s *MemoryService) callOpenAIForReason(ctx context.Context, baseURL, apiKey, model string, temperature float64, prompt string) (string, error) {
+	if apiKey == "" {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+	if apiKey == "" {
+		return "", fmt.Errorf("API Key not configured")
+	}
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"model":       model,
+		"temperature": temperature,
+		"max_tokens":  256,
+		"messages": []map[string]string{
+			{"role": "system", "content": "你是一个语义分析助手，擅长发现内容之间的隐藏联系。只输出关联说明，不要额外解释。"},
+			{"role": "user", "content": prompt},
+		},
+	})
+
+	base := strings.TrimSuffix(baseURL, "/")
+	if !strings.HasSuffix(base, "/v1") {
+		base = base + "/v1"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", base+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("LLM API returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("no response from LLM")
+	}
+
+	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+}
+
+// callAnthropicForReason calls Anthropic API for association reason.
+func (s *MemoryService) callAnthropicForReason(ctx context.Context, baseURL, apiKey, model string, temperature float64, prompt string) (string, error) {
+	if apiKey == "" {
+		apiKey = os.Getenv("ANTHROPIC_API_KEY")
+	}
+	if apiKey == "" {
+		return "", fmt.Errorf("API Key not configured")
+	}
+	if baseURL == "" {
+		baseURL = "https://api.anthropic.com/v1"
+	}
+	if model == "" {
+		model = "claude-sonnet-4-20250514"
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"model":       model,
+		"temperature": temperature,
+		"max_tokens":  256,
+		"system":      "你是一个语义分析助手，擅长发现内容之间的隐藏联系。只输出关联说明，不要额外解释。",
+		"messages": []map[string]string{
+			{"role": "user", "content": prompt},
+		},
+	})
+
+	base := strings.TrimSuffix(baseURL, "/")
+	if !strings.HasSuffix(base, "/v1") {
+		base = base + "/v1"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", base+"/messages", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("LLM API returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if len(result.Content) == 0 {
+		return "", fmt.Errorf("no response from LLM")
+	}
+
+	return strings.TrimSpace(result.Content[0].Text), nil
 }
 
 // GetStreak calculates the user's current and longest recording streaks.
@@ -503,6 +971,10 @@ func (s *MemoryService) Update(ctx context.Context, memoryID, userID uuid.UUID, 
 	// Sanitize user inputs
 	memory.Tags = pq.StringArray(sanitizeTags(req.Tags))
 	memory.Note = sanitizeText(req.Note)
+	memory.Source = sanitizeText(req.Source)
+	if req.IsStarred != nil {
+		memory.IsStarred = *req.IsStarred
+	}
 
 	if err := s.repo.Update(ctx, memory); err != nil {
 		return nil, fmt.Errorf("failed to update memory: %w", err)
@@ -726,7 +1198,7 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 	}
 
 	// Validate task type
-	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true}
+	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true, "file:extract": true, "cover:generate": true}
 	if !validTypes[taskType] {
 		return fmt.Errorf("invalid task_type: %s", taskType)
 	}
@@ -794,6 +1266,13 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 				data["link_summary"] = memory.LinkSummary
 			}
 		}
+	case "cover:generate":
+		content := s.extractContent(memory)
+		if memory.ContentType == "file" {
+			content = memory.TextContent
+		}
+		_ = s.queue.PublishCoverGenerate(ctx, memory.ID, memory.ContentType, content, memory.LinkURL, memory.LinkTitle, []string(memory.Tags), memory.UserID, llmConfig)
+		return nil // PublishCoverGenerate handles its own error; we return nil for retry flow
 	}
 
 	// Publish to Redis Stream
@@ -991,4 +1470,326 @@ func (s *MemoryService) ListSealedMemories(ctx context.Context, userID uuid.UUID
 func (s *MemoryService) GetRecentlyUnsealed(ctx context.Context, userID uuid.UUID) ([]domain.Memory, error) {
 	since := time.Now().Add(-24 * time.Hour)
 	return s.repo.GetRecentlyUnsealed(ctx, userID, since)
+}
+
+// weavePromptTemplates maps weave modes to their LLM prompt templates.
+var weavePromptTemplates = map[domain.WeaveMode]string{
+	domain.WeaveModeArticle: `将以下记忆编织成一篇连贯的文章。保持原文的核心观点和关键信息，但重新组织结构使其流畅易读。
+使用 [^1], [^2] 等格式标注来源。在文章末尾列出所有来源。
+
+记忆内容：
+%s
+
+请输出完整的文章。`,
+	domain.WeaveModeStory: `将以下记忆编织成一个连贯的故事。用叙事的方式串联这些记忆，保持情感温度。
+使用 [^1], [^2] 等格式标注来源。在故事末尾列出所有来源。
+
+记忆内容：
+%s
+
+请输出完整的故事。`,
+	domain.WeaveModeSummary: `将以下记忆总结成一份精炼的摘要。提取每条记忆的核心要点，按主题归类。
+使用 [^1], [^2] 等格式标注来源。在末尾列出所有来源。
+
+记忆内容：
+%s
+
+请输出完整的摘要。`,
+	domain.WeaveModeTodo: `基于以下记忆，生成一份可操作的任务清单。将每条记忆转化为具体的行动项。
+使用 [^1], [^2] 等格式标注来源。在末尾列出所有来源。
+
+记忆内容：
+%s
+
+请输出任务清单，格式为 Markdown 待办列表。`,
+}
+
+// WeaveMemories weaves multiple memories into a coherent piece using LLM.
+func (s *MemoryService) WeaveMemories(ctx context.Context, userID uuid.UUID, req domain.WeaveRequest) (*domain.Memory, error) {
+	// 1. Validate and fetch all source memories
+	sourceMemories := make([]*domain.Memory, 0, len(req.SourceIDs))
+	for _, idStr := range req.SourceIDs {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid source_id: %s", idStr)
+		}
+		mem, err := s.Get(ctx, id, userID)
+		if err != nil {
+			return nil, fmt.Errorf("source memory not found: %s", idStr)
+		}
+		sourceMemories = append(sourceMemories, mem)
+	}
+
+	// 2. Build LLM prompt
+	llmConfig, _ := s.getUserLLMConfig(ctx, userID)
+	prompt := s.buildWeavePrompt(sourceMemories, req.Mode, req.Title)
+
+	// 3. Call LLM
+	content, err := s.callLLMForWeave(ctx, llmConfig, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("weave generation failed: %w", err)
+	}
+
+	// 4. Append source list if not already present
+	content = s.appendSourceList(content, sourceMemories)
+
+	// 5. Create weave memory
+	metadata := map[string]interface{}{
+		"weave_source_ids": req.SourceIDs,
+		"weave_mode":       req.Mode,
+	}
+	metaJSON, _ := json.Marshal(metadata)
+
+	memory := &domain.Memory{
+		ID:               uuid.New(),
+		UserID:           userID,
+		ContentType:      "weave",
+		TextContent:      content,
+		Tags:             pq.StringArray{},
+		Metadata:         string(metaJSON),
+		ProcessingStatus: "completed",
+		Visibility:       "private",
+	}
+
+	if err := s.repo.Create(ctx, memory); err != nil {
+		return nil, fmt.Errorf("failed to create weave memory: %w", err)
+	}
+
+	// 6. Publish cover:generate task
+	s.publishTasks(ctx, memory, llmConfig)
+
+	return memory, nil
+}
+
+// buildWeavePrompt constructs the LLM prompt from source memories.
+func (s *MemoryService) buildWeavePrompt(sourceMemories []*domain.Memory, mode domain.WeaveMode, title string) string {
+	var sb strings.Builder
+	for i, mem := range sourceMemories {
+		sb.WriteString(fmt.Sprintf("[^%d] ", i+1))
+		sb.WriteString(s.extractWeaveContent(mem))
+		sb.WriteString("\n\n")
+	}
+
+	template, ok := weavePromptTemplates[mode]
+	if !ok {
+		template = weavePromptTemplates[domain.WeaveModeArticle]
+	}
+
+	prompt := fmt.Sprintf(template, sb.String())
+	if title != "" {
+		prompt = fmt.Sprintf("标题：%s\n\n%s", title, prompt)
+	}
+	return prompt
+}
+
+// extractWeaveContent extracts content for weave prompt from a memory.
+func (s *MemoryService) extractWeaveContent(memory *domain.Memory) string {
+	switch memory.ContentType {
+	case "text", "weave":
+		return truncateForPrompt(memory.TextContent, 500)
+	case "link":
+		content := memory.LinkTitle
+		if memory.LinkSummary != "" {
+			content += "\n" + memory.LinkSummary
+		}
+		if content == "" {
+			content = memory.LinkURL
+		}
+		return truncateForPrompt(content, 500)
+	case "file":
+		if memory.TextContent != "" {
+			return truncateForPrompt(memory.TextContent, 500)
+		}
+		return memory.FileName
+	default:
+		return truncateForPrompt(memory.TextContent, 500)
+	}
+}
+
+// appendSourceList appends a source list to the woven content if not already present.
+func (s *MemoryService) appendSourceList(content string, sourceMemories []*domain.Memory) string {
+	// If content already has a source section, skip
+	if strings.Contains(content, "来源：") || strings.Contains(content, "---") {
+		return content
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n\n---\n\n**来源：**\n")
+	for i, mem := range sourceMemories {
+		label := s.extractLabel(mem)
+		sb.WriteString(fmt.Sprintf("[^%d] %s\n", i+1, label))
+	}
+	return content + sb.String()
+}
+
+// callLLMForWeave calls the LLM API for weaving memories.
+func (s *MemoryService) callLLMForWeave(ctx context.Context, llmConfig map[string]interface{}, prompt string) (string, error) {
+	if len(llmConfig) == 0 {
+		return "", fmt.Errorf("LLM not configured")
+	}
+
+	protocol := ""
+	if p, ok := llmConfig["llm_protocol"].(string); ok && p != "" {
+		protocol = p
+	} else if p, ok := llmConfig["llm_provider"].(string); ok && p != "" {
+		protocol = p
+	}
+	if protocol == "" {
+		protocol = "openai"
+	}
+
+	model := "gpt-4o-mini"
+	if m, ok := llmConfig["llm_model"].(string); ok && m != "" {
+		model = m
+	}
+
+	temperature := 0.7
+	if t, ok := llmConfig["llm_temperature"].(float64); ok && t != 0 {
+		temperature = t
+	}
+
+	apiKey := ""
+	if k, ok := llmConfig["api_key"].(string); ok {
+		apiKey = k
+	}
+
+	baseURL := ""
+	if u, ok := llmConfig["base_url"].(string); ok {
+		baseURL = u
+	}
+
+	switch protocol {
+	case "openai", "deepseek", "moonshot", "qwen":
+		return s.callOpenAIForWeave(ctx, baseURL, apiKey, model, temperature, prompt)
+	case "anthropic":
+		return s.callAnthropicForWeave(ctx, baseURL, apiKey, model, temperature, prompt)
+	default:
+		return s.callOpenAIForWeave(ctx, baseURL, apiKey, model, temperature, prompt)
+	}
+}
+
+// callOpenAIForWeave calls OpenAI-compatible API for weave generation.
+func (s *MemoryService) callOpenAIForWeave(ctx context.Context, baseURL, apiKey, model string, temperature float64, prompt string) (string, error) {
+	if apiKey == "" {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+	if apiKey == "" {
+		return "", fmt.Errorf("API Key not configured")
+	}
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"model":       model,
+		"temperature": temperature,
+		"max_tokens":  2000,
+		"messages": []map[string]string{
+			{"role": "system", "content": "你是一位擅长整合与创作的写作助手。你将多条记忆编织成连贯的文章，保持原文的核心观点和情感温度。"},
+			{"role": "user", "content": prompt},
+		},
+	})
+
+	base := strings.TrimSuffix(baseURL, "/")
+	if !strings.HasSuffix(base, "/v1") {
+		base = base + "/v1"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", base+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("LLM API returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("no response from LLM")
+	}
+
+	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+}
+
+// callAnthropicForWeave calls Anthropic API for weave generation.
+func (s *MemoryService) callAnthropicForWeave(ctx context.Context, baseURL, apiKey, model string, temperature float64, prompt string) (string, error) {
+	if apiKey == "" {
+		apiKey = os.Getenv("ANTHROPIC_API_KEY")
+	}
+	if apiKey == "" {
+		return "", fmt.Errorf("API Key not configured")
+	}
+	if baseURL == "" {
+		baseURL = "https://api.anthropic.com/v1"
+	}
+	if model == "" {
+		model = "claude-sonnet-4-20250514"
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"model":       model,
+		"temperature": temperature,
+		"max_tokens":  2000,
+		"system":      "你是一位擅长整合与创作的写作助手。你将多条记忆编织成连贯的文章，保持原文的核心观点和情感温度。",
+		"messages": []map[string]string{
+			{"role": "user", "content": prompt},
+		},
+	})
+
+	base := strings.TrimSuffix(baseURL, "/")
+	if !strings.HasSuffix(base, "/v1") {
+		base = base + "/v1"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", base+"/messages", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("LLM API returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if len(result.Content) == 0 {
+		return "", fmt.Errorf("no response from LLM")
+	}
+
+	return strings.TrimSpace(result.Content[0].Text), nil
 }

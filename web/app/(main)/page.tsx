@@ -1,26 +1,26 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers/auth-provider'
 import { ChatProvider, useChat } from '@/app/providers/chat-provider'
 import { api, Memory } from '@/lib/api'
-import Logo from '@/components/logo'
-import Link from 'next/link'
-import ThemeToggle from '@/components/theme-toggle'
+// Logo, ThemeToggle, SearchInput, Link removed — now provided by AppShell Header/Sidebar
 import CreateMemoryForm from '@/components/memory/create-memory-form'
 import MemoryList from '@/components/memory/memory-list'
 import TagFilterBar from '@/components/memory/tag-filter-bar'
-import SearchInput from '@/components/search/search-input'
 import EmptyState from '@/components/empty-state'
 import ChatSidebar from '@/components/chat/chat-sidebar'
 import Pagination from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Toast, ToastContainer } from '@/components/ui/toast'
-import { Sparkles, Clock } from 'lucide-react'
+import { Sparkles, Star } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import UnlockCeremony from '@/components/warmth/unlock-ceremony'
 import SerendipityCard from '@/components/warmth/serendipity-card'
 import DailyReviewCard from '@/components/warmth/daily-review-card'
+import SelectionBar from '@/components/memory/selection-bar'
+import WeaveModal from '@/components/weave/weave-modal'
 
 function TimelineSkeleton() {
   return (
@@ -87,6 +87,15 @@ function HomePage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [tagColors, setTagColors] = useState<Record<string, string>>({})
 
+  // Starred filter state
+  const [starredOnly, setStarredOnly] = useState(false)
+
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [weaveModalOpen, setWeaveModalOpen] = useState(false)
+  const lastSelectedIndexRef = useRef<number | null>(null)
+
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const showToast = (message: string, type: 'success' | 'error') => setToast({ message, type })
@@ -101,6 +110,7 @@ function HomePage() {
         page: targetPage,
         limit,
         tags: selectedTags.length > 0 ? selectedTags : undefined,
+        starred: starredOnly ? true : undefined,
       })
       if (response.success && response.data) {
         const data = response.data
@@ -119,7 +129,7 @@ function HomePage() {
       setIsLoading(false)
       setIsLoadingMore(false)
     }
-  }, [limit, selectedTags])
+  }, [limit, selectedTags, starredOnly])
 
   // Load tags and tag colors
   const loadTags = useCallback(async () => {
@@ -144,10 +154,11 @@ function HomePage() {
     }
   }, [])
 
-  // Update URL to reflect current tag selection
-  const updateTagURL = useCallback((tags: string[]) => {
+  // Update URL to reflect current tag selection and starred filter
+  const updateURL = useCallback((tags: string[], starred: boolean) => {
     const params = new URLSearchParams()
     tags.forEach(t => params.append('tags', t))
+    if (starred) params.set('starred', 'true')
     const query = params.toString()
     router.replace(query ? `/?${query}` : '/', { scroll: false })
   }, [router])
@@ -155,26 +166,79 @@ function HomePage() {
   const handleTagToggle = useCallback((tag: string) => {
     setSelectedTags(prev => {
       const next = prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-      updateTagURL(next)
+      updateURL(next, starredOnly)
       return next
     })
-  }, [updateTagURL])
+  }, [updateURL, starredOnly])
 
   const handleClearAllTags = useCallback(() => {
     setSelectedTags([])
-    router.replace('/', { scroll: false })
-  }, [router])
+    updateURL([], starredOnly)
+  }, [updateURL, starredOnly])
 
   const handleTagClickFromCard = useCallback((tag: string) => {
     setSelectedTags(prev => {
       if (prev.includes(tag)) return prev
       const next = [...prev, tag]
-      updateTagURL(next)
+      updateURL(next, starredOnly)
       return next
     })
-  }, [updateTagURL])
+  }, [updateURL, starredOnly])
 
-  // Sync selectedTags from URL query params on mount / external navigation
+  const handleStarredToggle = useCallback(() => {
+    setStarredOnly(prev => {
+      const next = !prev
+      updateURL(selectedTags, next)
+      return next
+    })
+  }, [updateURL, selectedTags])
+
+  // Multi-select handlers
+  const handleSelectToggle = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+    setSelectionMode(true)
+  }, [])
+
+  const handleSelectRange = useCallback((startId: string, endId: string) => {
+    const startIdx = memories.findIndex(m => m.id === startId)
+    const endIdx = memories.findIndex(m => m.id === endId)
+    if (startIdx === -1 || endIdx === -1) return
+    const [min, max] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      for (let i = min; i <= max; i++) {
+        next.add(memories[i].id)
+      }
+      return next
+    })
+    setSelectionMode(true)
+  }, [memories])
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds(new Set())
+    setSelectionMode(false)
+    lastSelectedIndexRef.current = null
+  }, [])
+
+  const handleWeaveClick = useCallback(() => {
+    setWeaveModalOpen(true)
+  }, [])
+
+  const handleWeaveSuccess = useCallback(() => {
+    handleClearSelection()
+    showToast('编织完成', 'success')
+    loadMemories(1, false)
+  }, [handleClearSelection, loadMemories])
+
+  // Sync selectedTags and starred from URL query params on mount / external navigation
   useEffect(() => {
     const tagsParam = searchParams.getAll('tags')
     if (tagsParam.length > 0) {
@@ -185,6 +249,8 @@ function HomePage() {
         setSelectedTags([singleTag])
       }
     }
+    const starredParam = searchParams.get('starred')
+    setStarredOnly(starredParam === 'true')
   }, [searchParams])
 
   const handleLoadMore = useCallback(() => {
@@ -217,128 +283,105 @@ function HomePage() {
     loadMemories(1, false)
   }, [loadMemories])
 
-  // Poll for processing status updates — when any memory is pending/processing,
-  // refresh the list every 3 seconds until all are completed/failed.
+  // Poll for processing status updates — adaptive interval based on content type.
+  // text: 3s (fast), link: 5s (web fetch), file: 10s (download + extract + vectorize).
   useEffect(() => {
-    const hasProcessing = memories.some(
+    const processing = memories.filter(
       (m) => m.processing_status === 'pending' || m.processing_status === 'processing'
     )
-    if (!hasProcessing) return
+    if (processing.length === 0) return
+
+    const hasFile = processing.some((m) => m.content_type === 'file')
+    const hasLink = processing.some((m) => m.content_type === 'link')
+    const intervalMs = hasFile ? 10000 : hasLink ? 5000 : 3000
 
     const interval = setInterval(() => {
       loadMemories(page, false)
-    }, 3000)
+    }, intervalMs)
 
     return () => clearInterval(interval)
   }, [memories, page, loadMemories])
 
   if (authLoading) {
     return (
-      <main className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="mx-auto max-w-content-timeline px-4 py-6 flex items-center justify-center min-h-[50vh]">
         <div className="flex flex-col items-center gap-4">
           <Skeleton className="h-8 w-32" />
           <Skeleton className="h-4 w-48" />
         </div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Logo size={28} className="text-gray-900 dark:text-gray-100" />
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Echoes</h1>
-            <span className="text-xs text-gray-400 dark:text-gray-500">拾忆</span>
-          </div>
-          <SearchInput />
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {user && (
-              <button
-                onClick={toggleChat}
-                className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
-                title="Echo Assistant"
-                aria-label="AI 助手"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span className="hidden sm:inline">AI</span>
-              </button>
-            )}
-            <ThemeToggle />
-            {user && (
-              <div className="flex items-center gap-1 ml-1">
-                <Link
-                  href="/capsules"
-                  className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
-                  title="时间胶囊"
-                >
-                  <Clock className="w-4 h-4" />
-                  <span className="hidden sm:inline">胶囊</span>
-                </Link>
-                <Link
-                  href="/settings"
-                  className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors btn-scale"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span className="hidden sm:inline">设置</span>
-                </Link>
-                <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 mx-1" />
-                <span className="px-2 text-sm text-gray-600 dark:text-gray-300 hidden sm:inline max-w-[120px] truncate">
-                  {user.username || user.email}
-                </span>
-                <button
-                  onClick={logout}
-                  className="flex items-center px-2.5 h-9 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100 transition-colors btn-scale"
-                >
-                  <svg className="w-4 h-4 sm:mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                  </svg>
-                  <span className="hidden sm:inline">退出</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
+    <>
       <ToastContainer>
         {toast && (
           <Toast message={toast.message} type={toast.type} onClose={dismissToast} />
         )}
       </ToastContainer>
 
-      {/* Main content */}
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* Warmth cards */}
-        <UnlockCeremony />
-        <SerendipityCard />
-        <DailyReviewCard />
+      {/* Content — Header, nav, theme provided by AppShell */}
+      <div className="mx-auto max-w-content-timeline px-4 py-6">
+        {/* AI Chat — mobile floating button (desktop: use Cmd+K or sidebar) */}
+        {user && (
+          <button
+            onClick={toggleChat}
+            className="fixed bottom-6 right-6 z-40 md:hidden flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 btn-scale"
+            aria-label="AI 助手"
+          >
+            <Sparkles className="w-5 h-5" />
+            <span className="text-sm font-medium">AI</span>
+          </button>
+        )}
+
+        {/* Warmth cards — compact row */}
+        <div className="space-y-3 mb-8">
+          <UnlockCeremony />
+          <SerendipityCard />
+          <DailyReviewCard />
+        </div>
 
         {/* Create form */}
-        <div className="mb-10">
+        <div className="mb-6">
           <CreateMemoryForm onSuccess={() => loadMemories(1, false)} />
         </div>
 
-        {/* Tag Filter */}
-        {allTags.length > 0 && (
-          <TagFilterBar
-            tags={allTags}
-            selectedTags={selectedTags}
-            onTagToggle={handleTagToggle}
-            onClearAll={handleClearAllTags}
-          />
-        )}
+        {/* Tag Filter + Starred Filter */}
+        <div className="space-y-3 mb-4">
+          {allTags.length > 0 && (
+            <TagFilterBar
+              tags={allTags}
+              selectedTags={selectedTags}
+              onTagToggle={handleTagToggle}
+              onClearAll={handleClearAllTags}
+            />
+          )}
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={starredOnly}
+              onCheckedChange={handleStarredToggle}
+              size="sm"
+            />
+            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">只看星标</span>
+          </div>
+        </div>
+
+        {/* Selection bar */}
+        <SelectionBar
+          selectedCount={selectedIds.size}
+          onClear={handleClearSelection}
+          onWeave={handleWeaveClick}
+        />
 
         {/* Timeline */}
         <div>
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {selectedTags.length > 0 ? `已筛选: ${selectedTags.join(', ')}` : '时间轴'}
+              {starredOnly
+                ? (selectedTags.length > 0 ? `星标 + 标签: ${selectedTags.join(', ')}` : '星标记忆')
+                : (selectedTags.length > 0 ? `已筛选: ${selectedTags.join(', ')}` : '时间轴')}
             </h2>
             <span className="text-xs text-gray-400 dark:text-gray-500">
               {total > 0 ? `${total} 条记忆` : `${memories.length} 条记忆`}
@@ -354,7 +397,11 @@ function HomePage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               }
-              title={selectedTags.length > 0 ? '没有匹配该标签的记忆' : '还没有记忆，上方创建第一条吧'}
+              title={
+                starredOnly
+                  ? (selectedTags.length > 0 ? '没有匹配该标签的星标记忆' : '还没有星标记忆')
+                  : (selectedTags.length > 0 ? '没有匹配该标签的记忆' : '还没有记忆，上方创建第一条吧')
+              }
             />
           ) : (
             <MemoryList
@@ -364,6 +411,10 @@ function HomePage() {
               isLoadingMore={isLoadingMore}
               tagColors={tagColors}
               onTagClick={handleTagClickFromCard}
+              selectable={true}
+              selectedIds={selectedIds}
+              onSelectToggle={handleSelectToggle}
+              selectionMode={selectionMode}
             />
           )}
 
@@ -380,6 +431,15 @@ function HomePage() {
         </div>
       </div>
 
+      {/* Weave Modal */}
+      <WeaveModal
+        open={weaveModalOpen}
+        onClose={() => setWeaveModalOpen(false)}
+        selectedIds={Array.from(selectedIds)}
+        memories={memories.filter(m => selectedIds.has(m.id))}
+        onSuccess={handleWeaveSuccess}
+      />
+
       {user && (
         <ChatSidebar
           isOpen={isOpen}
@@ -394,6 +454,6 @@ function HomePage() {
           onDeleteConversation={deleteConversation}
         />
       )}
-    </main>
+    </>
   )
 }

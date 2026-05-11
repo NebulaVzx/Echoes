@@ -1,0 +1,17 @@
+{
+  "name": "echoes-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Echoes (拾忆) Desktop — Tauri 2.0 wrapper",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "preview": "tauri build --debug"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.0"
+  }
+}

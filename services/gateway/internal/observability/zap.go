@@ -3,6 +3,7 @@ package observability
 
 import (
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -23,7 +24,10 @@ func NewLogger(service string) (*zap.Logger, error) {
 	cfg.EncoderConfig.TimeKey = "timestamp"
 	cfg.EncoderConfig.MessageKey = "msg"
 	cfg.EncoderConfig.CallerKey = "caller"
-	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	// Use local timezone (Asia/Shanghai) for log timestamps, matching other services.
+	cfg.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString(t.Local().Format("2006-01-02 15:04:05"))
+	}
 
 	levelStr := os.Getenv("LOG_LEVEL")
 	if levelStr == "" {

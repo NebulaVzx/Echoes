@@ -1,0 +1,10 @@
+{
+  "body": { "size": "14px", "weight": "400", "lineHeight": "1.5", "tailwindClass": "text-sm" },
+  "label": { "size": "12px", "weight": "400", "lineHeight": "1.25", "tailwindClass": "text-xs" },
+  "heading": { "size": "20px", "weight": "600", "lineHeight": "1.2", "tailwindClass": "text-xl font-semibold" },
+  "display": { "size": "28px", "weight": "600", "lineHeight": "1.1", "tailwindClass": "text-3xl font-semibold" },
+  "fontFamily": {
+    "sans": ["Inter", "system-ui", "-apple-system", "sans-serif"],
+    "variable": ["Geist", "sans-serif"]
+  }
+}

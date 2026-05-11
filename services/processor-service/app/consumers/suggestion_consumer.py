@@ -17,14 +17,18 @@ logger = logging.getLogger(__name__)
 
 def _create_llm(fields: dict):
     """Create LLM provider with per-message overrides, decrypting API key if present."""
-    protocol = fields.get("llm_protocol") or fields.get("llm_provider") or settings.llm_provider
+    protocol = fields.get("llm_protocol") or fields.get("llm_provider") or settings.llm_protocol or settings.llm_provider
     model = fields.get("llm_model") or settings.llm_model
     temp_raw = fields.get("llm_temperature")
     temperature = float(temp_raw) if temp_raw is not None else settings.llm_temperature
     api_key = None
     encrypted_key = fields.get("api_key")
     if encrypted_key:
-        api_key = decrypt(encrypted_key)
+        try:
+            api_key = decrypt(encrypted_key)
+        except Exception:
+            # Memory-service now decrypts before publishing; use as-is
+            api_key = encrypted_key
     base_url = fields.get("base_url")
     return LLMFactory.create(protocol=protocol, model=model, temperature=temperature, api_key=api_key, base_url=base_url)
 
@@ -53,7 +57,8 @@ class SuggestionConsumer(RedisStreamConsumer):
         logger.info(f"[suggestion:generate] memory={memory_id} type={content_type} style={style}")
 
         # Build the appropriate prompt based on content type
-        if content_type == "text":
+        # File memories are treated as text after extraction
+        if content_type == "text" or content_type == "file":
             prompt = build_text_suggestion_prompt(content, note, style)
         elif content_type == "link":
             # For links, content is the URL; we don't have title/summary here

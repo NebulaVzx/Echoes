@@ -11,13 +11,18 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 import redis.asyncio as redis
 from app.config import settings
 from app.clients.memory_client import MemoryServiceClient
 from app.consumers.link_consumer import LinkConsumer
 from app.consumers.tag_consumer import TagConsumer
 from app.consumers.suggestion_consumer import SuggestionConsumer
+from app.consumers.file_consumer import FileConsumer
 from app.observability import setup_observability
 from opentelemetry import trace
 
@@ -26,6 +31,16 @@ from opentelemetry import trace
 async def lifespan(app: FastAPI):
     """Application lifespan manager - handles startup and shutdown."""
     print(f"{settings.service_name} v{settings.service_version} starting up...")
+
+    # Configure uvicorn loggers to use unified local-time format
+    formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    for uv_name in ['uvicorn', 'uvicorn.access', 'uvicorn.error']:
+        uv_logger = logging.getLogger(uv_name)
+        for handler in uv_logger.handlers:
+            handler.setFormatter(formatter)
 
     # Connect to Redis
     redis_client = redis.Redis.from_url(
@@ -60,6 +75,19 @@ async def lifespan(app: FastAPI):
         await suggestion_consumer.start()
         consumers.append(suggestion_consumer)
         print("Suggestion consumer started")
+
+    if settings.enable_file_consumer:
+        file_consumer = FileConsumer(redis_client, memory_client)
+        await file_consumer.start()
+        consumers.append(file_consumer)
+        print("File consumer started")
+
+    if settings.enable_cover_consumer:
+        from app.consumers.cover_consumer import CoverConsumer
+        cover_consumer = CoverConsumer(redis_client, memory_client)
+        await cover_consumer.start()
+        consumers.append(cover_consumer)
+        print("Cover consumer started")
 
     app.state.redis = redis_client
     app.state.memory_client = memory_client

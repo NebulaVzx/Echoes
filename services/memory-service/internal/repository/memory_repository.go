@@ -21,7 +21,7 @@ type MemoryRepository interface {
 	Create(ctx context.Context, memory *domain.Memory) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Memory, error)
 	GetVectorByID(ctx context.Context, id uuid.UUID) (string, error)
-	ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool) ([]domain.Memory, int64, error)
+	ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool, starredOnly bool) ([]domain.Memory, int64, error)
 	GetMemoriesByDateRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]domain.Memory, error)
 	GetRandomMemory(ctx context.Context, userID uuid.UUID, before time.Time) (domain.Memory, error)
 	GetMemoriesByDay(ctx context.Context, userID uuid.UUID, day time.Time) ([]domain.Memory, error)
@@ -32,6 +32,10 @@ type MemoryRepository interface {
 	Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
 	SearchByVector(ctx context.Context, userID uuid.UUID, vector string, limit int, threshold float64) ([]domain.SearchResult, error)
 	FindRelated(ctx context.Context, userID uuid.UUID, memoryID uuid.UUID, vector string, limit int, threshold float64) ([]domain.SearchResult, error)
+
+	// Constellation queries
+	GetConstellationNodes(ctx context.Context, userID uuid.UUID, limit int, offset int, includeStarred bool) ([]domain.ConstellationNode, int64, error)
+	GetStarredMemories(ctx context.Context, userID uuid.UUID) ([]domain.ConstellationNode, error)
 
 	// Time capsule operations
 	SealMemory(ctx context.Context, userID, memoryID uuid.UUID, sealedUntil time.Time) error
@@ -71,7 +75,7 @@ func (r *GormMemoryRepository) GetByID(ctx context.Context, id uuid.UUID) (*doma
 // ListByUser retrieves memories for a user with pagination and optional tag filter.
 // Supports multi-tag AND filtering using tags @> ARRAY[...].
 // When excludeSealed is true, filters out memories with sealed_until in the future.
-func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool) ([]domain.Memory, int64, error) {
+func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID, page, limit int, tags []string, excludeSealed bool, starredOnly bool) ([]domain.Memory, int64, error) {
 	var memories []domain.Memory
 	var total int64
 
@@ -81,6 +85,9 @@ func (r *GormMemoryRepository) ListByUser(ctx context.Context, userID uuid.UUID,
 	}
 	if excludeSealed {
 		query = query.Where("sealed_until IS NULL OR sealed_until <= ?", time.Now())
+	}
+	if starredOnly {
+		query = query.Where("is_starred = ?", true)
 	}
 
 	if err := query.Count(&total).Error; err != nil {
@@ -289,6 +296,86 @@ func (r *GormMemoryRepository) FindRelated(ctx context.Context, userID uuid.UUID
 		return nil, err
 	}
 	return results, nil
+}
+
+// GetConstellationNodes retrieves recent memories for the constellation graph.
+// Returns nodes and total count. Per D-01: first 100 recent + all starred.
+// Supports pagination via offset parameter for "探索更远" load-more.
+func (r *GormMemoryRepository) GetConstellationNodes(ctx context.Context, userID uuid.UUID, limit int, offset int, includeStarred bool) ([]domain.ConstellationNode, int64, error) {
+	var nodes []domain.ConstellationNode
+	var total int64
+
+	query := `
+		SELECT id, user_id, content_type, text_content, link_title, tags, is_starred, created_at
+		FROM memories
+		WHERE user_id = ?
+		  AND vector IS NOT NULL
+		  AND processing_status IN ('completed', 'partial_failed')
+		  AND (sealed_until IS NULL OR sealed_until <= NOW())
+	`
+	if !includeStarred {
+		query += ` AND is_starred = false `
+	}
+	query += ` ORDER BY created_at DESC LIMIT ? OFFSET ? `
+
+	rows, err := r.db.WithContext(ctx).Raw(query, userID, limit, offset).Rows()
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var n domain.ConstellationNode
+		err := rows.Scan(&n.ID, &n.UserID, &n.ContentType, &n.TextContent, &n.LinkTitle, &n.Tags, &n.IsStarred, &n.CreatedAt)
+		if err != nil {
+			return nil, 0, err
+		}
+		nodes = append(nodes, n)
+	}
+
+	// Count total eligible memories
+	countQuery := `
+		SELECT COUNT(*) FROM memories
+		WHERE user_id = ?
+		  AND vector IS NOT NULL
+		  AND processing_status IN ('completed', 'partial_failed')
+		  AND (sealed_until IS NULL OR sealed_until <= NOW())
+	`
+	if err := r.db.WithContext(ctx).Raw(countQuery, userID).Scan(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return nodes, total, rows.Err()
+}
+
+// GetStarredMemories retrieves all starred memories for a user.
+func (r *GormMemoryRepository) GetStarredMemories(ctx context.Context, userID uuid.UUID) ([]domain.ConstellationNode, error) {
+	var nodes []domain.ConstellationNode
+	query := `
+		SELECT id, user_id, content_type, text_content, link_title, tags, is_starred, created_at
+		FROM memories
+		WHERE user_id = ?
+		  AND is_starred = true
+		  AND vector IS NOT NULL
+		  AND processing_status IN ('completed', 'partial_failed')
+		  AND (sealed_until IS NULL OR sealed_until <= NOW())
+		ORDER BY created_at DESC
+	`
+	rows, err := r.db.WithContext(ctx).Raw(query, userID).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var n domain.ConstellationNode
+		err := rows.Scan(&n.ID, &n.UserID, &n.ContentType, &n.TextContent, &n.LinkTitle, &n.Tags, &n.IsStarred, &n.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, n)
+	}
+	return nodes, rows.Err()
 }
 
 // SealMemory sets the sealed_until field for a memory, ensuring it belongs to the user.

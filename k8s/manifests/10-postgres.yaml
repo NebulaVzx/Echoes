@@ -1,0 +1,105 @@
+# 10-postgres.yaml
+# PostgreSQL + pgvector：核心数据库，存储用户、记忆、向量数据
+# 使用 StatefulSet + PVC 保证数据持久化，配合 Headless Service 实现稳定 DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: echoes
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP           # 仅集群内部访问，不暴露到外部
+  clusterIP: None           # Headless Service：为 StatefulSet 提供稳定的网络标识
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  selector:
+    app: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: echoes
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres     # 必须与上面的 Headless Service 名称一致
+  replicas: 1               # 数据库单实例（学习环境）
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: ankane/pgvector:v0.5.1   # pgvector 扩展已预装
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: echoes-secrets
+                  key: POSTGRES_PASSWORD
+            # 初始化时创建 pgvector 扩展
+            - name: POSTGRES_INITDB_ARGS
+              value: "--encoding=UTF8"
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            # 挂载初始化 SQL（创建扩展、表结构）
+            - name: migrations
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - echoes_user
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - echoes_user
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: migrations
+          configMap:
+            name: postgres-migrations
+            # 可选：如果你有 migrations SQL 文件，可以挂载
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]   # 单节点读写
+        resources:
+          requests:
+            storage: 10Gi                  # 根据实际需求调整

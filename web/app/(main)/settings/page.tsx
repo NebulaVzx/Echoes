@@ -394,18 +394,13 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
-          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Link href="/" className="text-lg font-semibold text-gray-900 dark:text-gray-50 hover:opacity-80">
-                Echoes
-              </Link>
-              <span className="text-xs text-gray-400 dark:text-gray-500">设置</span>
-            </div>
-          </div>
-        </header>
-        <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+      <div className="mx-auto max-w-content-timeline px-4 py-6 min-h-[50vh]">
+        <div className="flex items-center gap-2 mb-6">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-50">
+            设置
+          </h1>
+        </div>
+        <div className="space-y-8">
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
             <Skeleton className="h-6 w-32 mb-2" />
             <Skeleton className="h-4 w-64 mb-6" />
@@ -421,23 +416,12 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Link href="/" className="text-lg font-semibold text-gray-900 dark:text-gray-50 hover:opacity-80">
-              Echoes
-            </Link>
-            <span className="text-xs text-gray-400 dark:text-gray-500">设置</span>
-          </div>
-        </div>
-      </header>
-
+    <>
       <ToastContainer>
         {toast && (
           <Toast
@@ -449,7 +433,10 @@ export default function SettingsPage() {
         )}
       </ToastContainer>
 
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+      <div className="mx-auto max-w-content-timeline px-4 py-6 space-y-8">
+        <div className="flex items-center gap-2 mb-2">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-50">设置</h1>
+        </div>
         {/* Section 0: Memory Stats */}
         <section className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-1">
@@ -988,6 +975,6 @@ export default function SettingsPage() {
           </Link>
         </div>
       </div>
-    </main>
+    </>
   )
 }

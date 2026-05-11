@@ -14,6 +14,8 @@ services:
       POSTGRES_DB: echoes
       POSTGRES_USER: echoes_user
       POSTGRES_PASSWORD: echoes_password
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
     ports:
       - "5432:5432"
     volumes:
@@ -32,6 +34,7 @@ services:
     image: redis:7-alpine
     container_name: echoes-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes --save "3600 1 300 100 60 10000"
     ports:
       - "6379:6379"
     volumes:
@@ -52,6 +55,7 @@ services:
     environment:
       MINIO_ROOT_USER: echoes_minio
       MINIO_ROOT_PASSWORD: echoes_minio_secret
+      TZ: Asia/Shanghai
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -83,6 +87,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - LOG_LEVEL=info
       - SERVICE_VERSION=0.2.0
+      - TZ=Asia/Shanghai
     ports:
       - "8088:8080"
     volumes:
@@ -100,6 +105,8 @@ services:
     image: prom/prometheus:v3.0.0
     container_name: echoes-prometheus
     restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
@@ -114,6 +121,7 @@ services:
     restart: unless-stopped
     environment:
       - COLLECTOR_OTLP_ENABLED=true
+      - TZ=Asia/Shanghai
     ports:
       - "16686:16686"
       - "4317:4317"
@@ -135,6 +143,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - TZ=Asia/Shanghai
     networks:
       - echoes-network
 
@@ -158,6 +167,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - LOG_LEVEL=info
       - SERVICE_VERSION=0.2.0
+      - TZ=Asia/Shanghai
     volumes:
       - ./services/user-service:/app
     depends_on:
@@ -192,6 +202,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - LOG_LEVEL=info
       - SERVICE_VERSION=0.2.0
+      - TZ=Asia/Shanghai
     ports:
       - "8002:8002"
     volumes:
@@ -230,6 +241,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - LOG_LEVEL=info
       - SERVICE_VERSION=0.2.0
+      - TZ=Asia/Shanghai
     ports:
       - "8003:8003"
     volumes:
@@ -268,6 +280,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - LOG_LEVEL=info
       - SERVICE_VERSION=0.2.0
+      - TZ=Asia/Shanghai
     ports:
       - "8004:8004"
     depends_on:
@@ -298,11 +311,14 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8088
       - API_URL=http://gateway:8080
+      - TZ=Asia/Shanghai
     ports:
       - "3000:3000"
+    command: ["sh", "-c", "TZ=Asia/Shanghai npm run dev 2>&1 | while IFS= read -r line; do printf '[%s] %s\\n' \"$$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')\" \"$$line\"; done"]
     volumes:
       - ./web:/app
       - /app/node_modules
+      - /app/.next
     depends_on:
       - gateway
     networks:

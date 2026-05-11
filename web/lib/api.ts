@@ -6,6 +6,7 @@ import {
   ListConversationsResponse,
   ListMessagesResponse,
 } from '@/types/chat'
+import { ConstellationResponse, ExploreResponse } from '@/types/constellation'
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8088'
 
@@ -94,13 +95,18 @@ export interface AuthResponse {
 export interface Memory {
   id: string
   user_id: string
-  content_type: 'text' | 'link'
+  content_type: 'text' | 'link' | 'file' | 'weave'
   text_content?: string
   link_url?: string
   link_title?: string
   link_summary?: string
   tags: string[]
   note?: string
+  source?: string
+  is_starred?: boolean
+  cover_url?: string
+  file_name?: string
+  file_size?: number
   processing_status: 'pending' | 'processing' | 'completed' | 'failed'
   visibility: 'private' | 'public'
   sealed_until?: string
@@ -239,11 +245,14 @@ class ApiClient {
     method: string,
     path: string,
     body?: unknown,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    isFormData?: boolean
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${path}`
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+    const headers: Record<string, string> = {}
+
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json'
     }
 
     const token = this.getToken()
@@ -258,11 +267,32 @@ class ApiClient {
     }
 
     if (body) {
-      options.body = JSON.stringify(body)
+      if (isFormData && body instanceof FormData) {
+        options.body = body
+      } else {
+        options.body = JSON.stringify(body)
+      }
     }
 
     const response = await fetch(url, options)
-    const data = await response.json() as ApiResponse<T>
+
+    // DEBUG: Log raw response for weave endpoint
+    if (path.includes('/weave')) {
+      const rawText = await response.clone().text()
+      console.log('[DEBUG weave] status:', response.status, 'url:', url)
+      console.log('[DEBUG weave] raw response (first 500 chars):', rawText.slice(0, 500))
+    }
+
+    let data: ApiResponse<T>
+    try {
+      data = await response.json() as ApiResponse<T>
+    } catch (parseErr) {
+      const rawText = await response.clone().text()
+      console.error('[DEBUG weave] JSON parse failed! status:', response.status, 'url:', url)
+      console.error('[DEBUG weave] Raw response body:', rawText)
+      console.error('[DEBUG weave] Response headers:', Object.fromEntries(response.headers.entries()))
+      throw new Error(`API returned non-JSON (status ${response.status}): ${rawText.slice(0, 100)}`)
+    }
 
     if (!response.ok && !data.success) {
       throw new Error(data.error?.message || 'Request failed')
@@ -275,10 +305,11 @@ class ApiClient {
     method: string,
     path: string,
     body?: unknown,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    isFormData?: boolean
   ): Promise<ApiResponse<T>> {
     try {
-      return await this.requestWithToken<T>(method, path, body, signal)
+      return await this.requestWithToken<T>(method, path, body, signal, isFormData)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : ''
       // Check if this is an auth error (401 / TOKEN_EXPIRED / UNAUTHORIZED)
@@ -302,7 +333,7 @@ class ApiClient {
       try {
         await this.refreshPromise
         // Retry original request
-        return await this.requestWithToken<T>(method, path, body, signal)
+        return await this.requestWithToken<T>(method, path, body, signal, isFormData)
       } catch {
         // Refresh failed — clear auth state and notify
         this.setToken(null)
@@ -358,18 +389,21 @@ class ApiClient {
   }
 
   // Memory endpoints
-  async createMemory(data: {
-    content_type: 'text' | 'link'
+  async createMemory(data: FormData | {
+    content_type: 'text' | 'link' | 'file' | 'weave'
     text_content?: string
     link_url?: string
     tags?: string[]
     note?: string
+    source?: string
+    is_starred?: boolean
     enable_ai_suggestion?: boolean
   }): Promise<ApiResponse<CreateMemoryResponse>> {
-    return this.request<CreateMemoryResponse>('POST', '/api/v1/memories', data)
+    const isFormData = data instanceof FormData
+    return this.request<CreateMemoryResponse>('POST', '/api/v1/memories', data, undefined, isFormData)
   }
 
-  async listMemories(params?: { page?: number; limit?: number; tag?: string; tags?: string[] }): Promise<ApiResponse<ListMemoriesResponse>> {
+  async listMemories(params?: { page?: number; limit?: number; tag?: string; tags?: string[]; starred?: boolean }): Promise<ApiResponse<ListMemoriesResponse>> {
     const searchParams = new URLSearchParams()
     if (params?.page) searchParams.set('page', String(params.page))
     if (params?.limit) searchParams.set('limit', String(params.limit))
@@ -377,6 +411,7 @@ class ApiClient {
     if (params?.tags) {
       params.tags.forEach(tag => searchParams.append('tags', tag))
     }
+    if (params?.starred) searchParams.set('starred', 'true')
     const query = searchParams.toString()
     return this.request<ListMemoriesResponse>('GET', `/api/v1/memories${query ? '?' + query : ''}`)
   }
@@ -385,7 +420,7 @@ class ApiClient {
     return this.request<Memory>('GET', `/api/v1/memories/${id}`)
   }
 
-  async updateMemory(id: string, data: { tags?: string[]; note?: string }): Promise<ApiResponse<Memory>> {
+  async updateMemory(id: string, data: { tags?: string[]; note?: string; source?: string; is_starred?: boolean; text_content?: string }): Promise<ApiResponse<Memory>> {
     return this.request<Memory>('PUT', `/api/v1/memories/${id}`, data)
   }
 
@@ -491,6 +526,20 @@ class ApiClient {
 
   async getMessages(conversationId: string): Promise<ApiResponse<ListMessagesResponse>> {
     return this.request<ListMessagesResponse>('GET', `/api/v1/chat/conversations/${conversationId}/messages`)
+  }
+
+  // Weave endpoint
+  async weaveMemories(params: { source_ids: string[]; mode: string }): Promise<ApiResponse<CreateMemoryResponse>> {
+    return this.request<CreateMemoryResponse>('POST', '/api/v1/memories/weave', params)
+  }
+
+  // Constellation endpoints
+  async getConstellation(offset: number = 0): Promise<ApiResponse<ConstellationResponse>> {
+    return this.request<ConstellationResponse>('GET', `/api/v1/constellation?offset=${offset}`)
+  }
+
+  async exploreMemory(id: string): Promise<ApiResponse<ExploreResponse>> {
+    return this.request<ExploreResponse>('GET', `/api/v1/memories/${id}/explore`)
   }
 }
 

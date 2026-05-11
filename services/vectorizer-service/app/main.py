@@ -18,12 +18,26 @@ from app.consumers.vectorize_consumer import VectorizeConsumer
 from app.observability import setup_observability
 from opentelemetry import trace
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"{settings.service_name} v{settings.service_version} starting up...")
+
+    # Configure uvicorn loggers to use unified local-time format
+    formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    for uv_name in ['uvicorn', 'uvicorn.access', 'uvicorn.error']:
+        uv_logger = logging.getLogger(uv_name)
+        for handler in uv_logger.handlers:
+            handler.setFormatter(formatter)
 
     # Connect to Redis
     redis_client = redis.Redis.from_url(

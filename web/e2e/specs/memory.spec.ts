@@ -5,7 +5,7 @@ test.describe('Memory Management', () => {
     await page.goto('/')
 
     // Ensure we're on the home page
-    await expect(page.getByText('时间轴')).toBeVisible()
+    await expect(page.getByText('时间轴').first()).toBeVisible()
 
     // Fill create form with unique content
     const content = `E2E test memory ${Date.now()}`
@@ -64,6 +64,6 @@ test.describe('Memory Management', () => {
 
     // Should redirect back to home
     await page.waitForURL('/')
-    await expect(page.getByText('时间轴')).toBeVisible()
+    await expect(page.getByText('时间轴').first()).toBeVisible()
   })
 })

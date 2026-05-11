@@ -298,11 +298,13 @@
 - [x] 状态流转管理：`pending -> processing -> completed/failed`
 - [x] 重试机制：失败任务可手动重试
 
-**Per-user LLM 配置：**
-- [x] User Service：`users.settings` JSONB 存储 per-user LLM 配置
-- [x] Memory Service：publish 时附加用户 LLM 配置到 Redis Stream
-- [x] Processor Service：消费时从消息读取配置覆盖环境变量默认值
-- [x] 前端 Settings 页面：provider/protocol/model/temperature 配置 + 测试连接
+**Per-user LLM 配置（⚠️ 部分就绪，未完全实现）：**
+- [x] User Service：`users.settings` JSONB 字段已创建（数据库就绪）
+- [ ] Memory Service：publish 时附加用户 LLM 配置到 Redis Stream（未实现）
+- [ ] Processor Service：消费时从消息读取配置覆盖环境变量默认值（未实现）
+- [ ] 前端 Settings 页面：provider/protocol/model/temperature 配置 + 测试连接（未实现）
+
+> **注：** PROGRESS.md 原始记录标记为"已完成"，但实际仅数据库字段就绪。前后端逻辑均未实现，该能力待后续 phase 补充。
 
 **文档：**
 - [x] 更新 docs/ARCHITECTURE.md（LLM Provider 模块、异步任务流）
@@ -525,4 +527,35 @@ Sprint 5 与 Sprint 2-4 集中完成，最终于 2026-04-22 发布 v1.0 MVP。
 
 ---
 
-*PROGRESS.md 最后更新：2026-04-26 — v1.2 里程碑已完成*
+---
+
+## v1.3 "记忆的回响"（进行中 — 2026-05-03）
+
+### Phase 11 — UI 架构重设计
+
+**状态：** 进行中
+
+**目标：** 构建三栏自适应工作台、Command Palette、AI 时代交互特征
+
+**已完成：**
+- [x] shadcn 组件安装 + design-tokens 提取到 shared/
+- [x] CSS Grid 三栏布局基础 + 主题过渡动画
+- [x] LayoutProvider / DensityProvider / ThemeColorProvider
+- [x] AppShell 三栏容器 + Header + Sidebar + RightPanel
+
+**已修复问题（2026-05-03）：**
+- [x] 首页 hydration 错误（layout-provider.tsx SSR 不一致）
+- [x] 关闭 right panel 后内容偏左（padding-right 补偿 + 默认值修正）
+- [x] Header 滚动消失（position: sticky）
+- [x] 收缩 sidebar active item 蓝框（移除 ring-1 ring-primary/30）
+- [x] Dropdown 聚焦蓝色边框（ring-foreground/10 → border border-border）
+
+**待办：**
+- [ ] Command Palette（Cmd+K 模糊搜索）
+- [ ] MobileDock（移动端底部导航）
+- [ ] RightPanelWidget（上下文面板）
+- [ ] 生成式 UI / 流式打字机
+
+---
+
+*PROGRESS.md 最后更新：2026-05-03 — v1.3 Phase 11 进行中*

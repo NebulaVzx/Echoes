@@ -1,0 +1,88 @@
+# 25-web.yaml
+# Web Frontend：Next.js 14 前端应用
+# 这是用户直接访问的面，通过 Ingress 暴露到 80/443 端口
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: echoes
+  labels:
+    app: web
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      name: http
+  selector:
+    app: web
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: echoes
+  labels:
+    app: web
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: echoes/web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: NODE_ENV
+            - name: NEXT_TELEMETRY_DISABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: NEXT_TELEMETRY_DISABLED
+            # === API 地址 ===
+            # 浏览器端调用（NEXT_PUBLIC_ 前缀的变量会打包到前端代码中）
+            - name: NEXT_PUBLIC_API_URL
+              value: "/api/v1"   # 通过 Ingress 路径重写，前端只写相对路径
+            # 服务端调用（SSR 时直接访问 Gateway Service）
+            - name: API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: echoes-config
+                  key: GATEWAY_URL
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
