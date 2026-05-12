@@ -1964,7 +1964,7 @@ func (s *MemoryService) callProcessorForEcho(ctx context.Context, memoryContent 
 
 	processorURL := os.Getenv("PROCESSOR_SERVICE_URL")
 	if processorURL == "" {
-		processorURL = "http://processor-service:8001"
+		processorURL = "http://processor-service:8003"
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", processorURL+"/api/v1/generate/echo", bytes.NewReader(body))
