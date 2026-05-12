@@ -1,6 +1,8 @@
 import base64
 import io
+import json
 import os
+import re
 from typing import List
 import asyncio
 from openai import AsyncOpenAI, RateLimitError
@@ -80,6 +82,74 @@ Content: {content[:2000]}"""
         # Suggestions should be warm and slightly creative; use temperature 0.8 default
         temp = temperature if temperature is not None else 0.8
         return await self.generate(prompt, temperature=temp, max_tokens=max_tokens, timeout=timeout)
+
+    async def analyze_sentiment(self, content: str, content_type: str = "text") -> dict:
+        """Analyze sentiment of content using LLM.
+
+        Returns:
+            Dict with keys: sentiment (positive|neutral|negative), score (1-10), reason (str).
+        """
+        from .prompts.sentiment_prompts import build_sentiment_prompt
+        prompt = build_sentiment_prompt(content, content_type)
+        result = await self.generate(prompt, temperature=0.3, max_tokens=200, timeout=15.0)
+        return self._parse_sentiment_result(result)
+
+    async def generate_echo(self, memory_content: str, style: str, years_ago: int) -> str:
+        """Generate an echo message for a memory.
+
+        Returns:
+            Echo message string (80-150 Chinese characters).
+        """
+        from .prompts.echo_prompts import build_echo_prompt
+        prompt = build_echo_prompt(memory_content, style, years_ago)
+        return await self.generate(prompt, temperature=0.8, max_tokens=300, timeout=15.0)
+
+    def _parse_sentiment_result(self, result: str) -> dict:
+        """Parse sentiment analysis result from LLM output.
+        Handles both JSON and plain text formats with fallback.
+        """
+        # Try to extract JSON from the response
+        try:
+            # Look for JSON object in the response
+            json_match = re.search(r'\{[^}]*"sentiment"[^}]*\}', result)
+            if json_match:
+                data = json.loads(json_match.group())
+                sentiment = data.get("sentiment", "neutral")
+                score = int(data.get("score", 5))
+                reason = data.get("reason", "")
+            else:
+                # Try parsing the whole response as JSON
+                data = json.loads(result)
+                sentiment = data.get("sentiment", "neutral")
+                score = int(data.get("score", 5))
+                reason = data.get("reason", "")
+        except (json.JSONDecodeError, ValueError):
+            # Fallback: parse from text
+            sentiment = "neutral"
+            if "积极" in result or "positive" in result.lower():
+                sentiment = "positive"
+            elif "消极" in result or "negative" in result.lower():
+                sentiment = "negative"
+
+            score = 5
+            score_match = re.search(r'(\d+)', result)
+            if score_match:
+                score = max(1, min(10, int(score_match.group(1))))
+
+            reason = result[:100] if len(result) > 100 else result
+
+        # Validate sentiment
+        if sentiment not in ("positive", "neutral", "negative"):
+            sentiment = "neutral"
+
+        # Validate score
+        score = max(1, min(10, score))
+
+        return {
+            "sentiment": sentiment,
+            "score": score,
+            "reason": reason,
+        }
 
     async def generate_image(self, prompt: str, size: str = "1024x1024", quality: str = "standard") -> Image.Image:
         """Generate image using DALL-E 3. Returns PIL Image.

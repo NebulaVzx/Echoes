@@ -40,3 +40,30 @@ class LLMProvider(ABC):
             The generated suggestion text.
         """
         pass
+
+    @abstractmethod
+    async def analyze_sentiment(self, content: str, content_type: str = "text") -> dict:
+        """Analyze sentiment of content.
+
+        Args:
+            content: The memory content to analyze.
+            content_type: Type of content (text, link, file, weave).
+
+        Returns:
+            Dict with keys: sentiment (positive|neutral|negative), score (1-10), reason (str).
+        """
+        pass
+
+    @abstractmethod
+    async def generate_echo(self, memory_content: str, style: str, years_ago: int) -> str:
+        """Generate an echo message for a memory.
+
+        Args:
+            memory_content: The memory content to echo.
+            style: Echo style (warm, humorous, concise, poetic).
+            years_ago: Number of years since the memory was created.
+
+        Returns:
+            Echo message string (80-150 Chinese characters).
+        """
+        pass
