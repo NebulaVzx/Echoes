@@ -24,6 +24,7 @@ from app.consumers.tag_consumer import TagConsumer
 from app.consumers.suggestion_consumer import SuggestionConsumer
 from app.consumers.file_consumer import FileConsumer
 from app.consumers.mood_consumer import MoodConsumer
+from app.routers.generate import router as generate_router
 from app.observability import setup_observability
 from opentelemetry import trace
 
@@ -127,6 +128,9 @@ app = FastAPI(
 # Setup observability at module level (NOT inside lifespan)
 # Per RESEARCH.md Pitfall 6: FastAPIInstrumentor must be called after app creation
 provider = setup_observability(app, "processor-service")
+
+# Register routers
+app.include_router(generate_router, prefix="/api/v1")
 
 
 @app.get("/health")
