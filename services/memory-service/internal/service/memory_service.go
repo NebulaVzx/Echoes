@@ -95,6 +95,7 @@ type TaskQueue interface {
 	PublishSuggestionGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, style string, timeout int, maxRetries int, llmConfig map[string]interface{}) error
 	PublishFileExtract(ctx context.Context, memoryID uuid.UUID, fileName string, mediaURL string, llmConfig map[string]interface{}) error
 	PublishCoverGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, linkURL string, linkTitle string, tags []string, userID uuid.UUID, llmConfig map[string]interface{}) error
+	PublishMoodGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, llmConfig map[string]interface{}) error
 	PublishTask(ctx context.Context, stream string, data map[string]interface{}) error
 }
 
@@ -323,6 +324,18 @@ func (s *MemoryService) publishTasks(ctx context.Context, memory *domain.Memory,
 		coverContent = memory.TextContent // file text may be empty initially (extracted async)
 	}
 	_ = s.queue.PublishCoverGenerate(ctx, memory.ID, memory.ContentType, coverContent, memory.LinkURL, memory.LinkTitle, []string(memory.Tags), memory.UserID, llmConfig)
+
+	// Publish mood analysis task for all content types (text/link/file/weave)
+	moodContent := content
+	if memory.ContentType == "link" && memory.LinkTitle != "" {
+		moodContent = memory.LinkTitle + "\n" + memory.LinkSummary
+	}
+	if memory.ContentType == "file" {
+		moodContent = memory.TextContent
+	}
+	if moodContent != "" {
+		_ = s.queue.PublishMoodGenerate(ctx, memory.ID, memory.ContentType, moodContent, memory.Note, llmConfig)
+	}
 }
 
 // extractContent extracts the primary content for vectorization/tagging.
@@ -1198,7 +1211,7 @@ func (s *MemoryService) RetryTask(ctx context.Context, memoryID uuid.UUID, taskT
 	}
 
 	// Validate task type
-	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true, "file:extract": true, "cover:generate": true}
+	validTypes := map[string]bool{"link:fetch": true, "text:vectorize": true, "tag:generate": true, "suggestion:generate": true, "file:extract": true, "cover:generate": true, "mood:generate": true}
 	if !validTypes[taskType] {
 		return fmt.Errorf("invalid task_type: %s", taskType)
 	}

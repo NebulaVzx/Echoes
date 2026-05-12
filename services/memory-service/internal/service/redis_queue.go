@@ -135,6 +135,22 @@ func (q *RedisTaskQueue) PublishCoverGenerate(ctx context.Context, memoryID uuid
 	return q.PublishTask(ctx, "cover:generate", fields)
 }
 
+// PublishMoodGenerate publishes a mood sentiment analysis task to Redis Stream.
+// The processor-service MoodConsumer will analyze the content's emotional tone
+// and write the result (sentiment, score, reason) back via the internal API.
+func (q *RedisTaskQueue) PublishMoodGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, llmConfig map[string]interface{}) error {
+	fields := map[string]interface{}{
+		"memory_id":    memoryID.String(),
+		"content_type": contentType,
+		"content":      content,
+	}
+	if note != "" {
+		fields["note"] = note
+	}
+	mergeLLMConfig(fields, llmConfig)
+	return q.PublishTask(ctx, "mood:generate", fields)
+}
+
 // mergeLLMConfig merges LLM settings into the message fields if present.
 func mergeLLMConfig(fields map[string]interface{}, llmConfig map[string]interface{}) {
 	if llmConfig == nil {

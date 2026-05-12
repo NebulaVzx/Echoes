@@ -193,7 +193,7 @@ type SuggestionResponse struct {
 
 // TaskStatusUpdate is the request body for the internal task status API.
 type TaskStatusUpdate struct {
-	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate suggestion:generate file:extract cover:generate"`
+	TaskType string                 `json:"task_type" binding:"required,oneof=link:fetch text:vectorize tag:generate suggestion:generate file:extract cover:generate mood:generate"`
 	Status   string                 `json:"status" binding:"required,oneof=pending processing completed failed"`
 	Error    string                 `json:"error,omitempty"`
 	Result   map[string]interface{} `json:"result,omitempty"` // e.g., {"tags": [...]}, {"vector": [...]}, {"title": "...", "summary": "..."}

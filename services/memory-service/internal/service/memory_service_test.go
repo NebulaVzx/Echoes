@@ -318,6 +318,15 @@ func (m *mockTaskQueue) PublishCoverGenerate(ctx context.Context, memoryID uuid.
 	return nil
 }
 
+func (m *mockTaskQueue) PublishMoodGenerate(ctx context.Context, memoryID uuid.UUID, contentType string, content string, note string, llmConfig map[string]interface{}) error {
+	m.published = append(m.published, map[string]interface{}{
+		"type":         "mood:generate",
+		"memory":       memoryID,
+		"content_type": contentType,
+	})
+	return nil
+}
+
 func (m *mockTaskQueue) PublishTask(ctx context.Context, stream string, data map[string]interface{}) error {
 	m.published = append(m.published, data)
 	return nil
