@@ -183,6 +183,34 @@ export interface MemoryWithSuggestion extends Memory {
   suggestion?: AISuggestion
 }
 
+
+export interface MoodDayData {
+  date: string
+  score: number
+  memory_count: number
+  dominant_sentiment: 'positive' | 'neutral' | 'negative'
+}
+
+export interface MoodInsightData {
+  insight: string
+  stats: {
+    positive_days: number
+    negative_days: number
+    neutral_days: number
+    average_score: number
+    most_active_day: string
+  }
+}
+
+export interface DailyReviewWithEcho {
+  today_count: number
+  top_tags: string[]
+  worth_reviewing?: Memory
+  echo_message?: string
+  echo_style?: string
+}
+
+
 class ApiClient {
   private baseURL: string
   private token: string | null = null
@@ -507,8 +535,19 @@ class ApiClient {
     return this.request<{ memory: Memory; memories_since: number; years_ago: number }>('GET', '/api/v1/memories/serendipity')
   }
 
-  async getDailyReview(): Promise<ApiResponse<{ today_count: number; top_tags: string[]; worth_reviewing?: Memory }>> {
-    return this.request<{ today_count: number; top_tags: string[]; worth_reviewing?: Memory }>('GET', '/api/v1/memories/daily-review')
+  async getDailyReview(style?: string): Promise<ApiResponse<DailyReviewWithEcho>> {
+    const query = style ? `?style=${encodeURIComponent(style)}` : ''
+    return this.request<DailyReviewWithEcho>('GET', `/api/v1/memories/daily-review${query}`)
+  }
+
+
+  // Mood endpoints
+  async getMoodCalendar(year: number): Promise<ApiResponse<{ days: MoodDayData[] }>> {
+    return this.request<{ days: MoodDayData[] }>('GET', `/api/v1/mood/calendar?year=${year}`)
+  }
+
+  async getMoodInsight(year: number, month: number): Promise<ApiResponse<MoodInsightData>> {
+    return this.request<MoodInsightData>('GET', `/api/v1/mood/insight?year=${year}&month=${month}`)
   }
 
   // Chat endpoints
