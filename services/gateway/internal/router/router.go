@@ -86,6 +86,14 @@ func Setup(logger *zap.Logger, db *gorm.DB) *gin.Engine {
 		memoryProxy.ServeHTTP(c.Writer, c.Request)
 	})
 
+	// Mood routes → Memory Service
+	protected.Any("/mood", func(c *gin.Context) {
+		memoryProxy.ServeHTTP(c.Writer, c.Request)
+	})
+	protected.Any("/mood/*path", func(c *gin.Context) {
+		memoryProxy.ServeHTTP(c.Writer, c.Request)
+	})
+
 	// Constellation route → Memory Service
 	protected.Any("/constellation", func(c *gin.Context) {
 		memoryProxy.ServeHTTP(c.Writer, c.Request)

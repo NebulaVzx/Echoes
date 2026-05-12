@@ -48,7 +48,6 @@ func (h *MoodHandler) GetMoodCalendar(c *gin.Context) {
 		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":   gin.H{"days": days},
@@ -83,6 +82,7 @@ func (h *MoodHandler) GetMoodInsight(c *gin.Context) {
 		respondWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 		return
 	}
+
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

@@ -8,6 +8,8 @@ WORKDIR /app
 
 # Install dependencies
 RUN apk add --no-cache git
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOSUMDB=off
 
 # Allow automatic Go toolchain download
 ENV GOTOOLCHAIN=auto
@@ -46,6 +48,8 @@ FROM golang:alpine AS development
 WORKDIR /app
 
 RUN apk add --no-cache git
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOSUMDB=off
 
 COPY go.mod ./
 RUN go mod download

@@ -7,6 +7,8 @@ FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
 RUN apk add --no-cache git
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOSUMDB=off
 
 COPY go.mod ./
 RUN go mod download
@@ -35,6 +37,8 @@ FROM golang:1.25-alpine AS development
 WORKDIR /app
 
 RUN apk add --no-cache git
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOSUMDB=off
 
 COPY go.mod ./
 RUN go mod download

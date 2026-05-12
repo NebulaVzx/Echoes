@@ -89,7 +89,7 @@ services:
       - SERVICE_VERSION=0.2.0
       - TZ=Asia/Shanghai
     ports:
-      - "8088:8080"
+      - "8188:8080"
     volumes:
       - ./services/gateway:/app
     depends_on:
@@ -204,7 +204,7 @@ services:
       - SERVICE_VERSION=0.2.0
       - TZ=Asia/Shanghai
     ports:
-      - "8002:8002"
+      - "8102:8002"
     volumes:
       - ./services/memory-service:/app
     depends_on:
@@ -244,7 +244,7 @@ services:
       - SERVICE_VERSION=0.2.0
       - TZ=Asia/Shanghai
     ports:
-      - "8003:8003"
+      - "8103:8003"
     volumes:
       - ./services/processor-service:/app
     command: ["sh", "-c", "pip install -r requirements.txt -q && uvicorn app.main:app --host 0.0.0.0 --port 8003"]
@@ -283,7 +283,7 @@ services:
       - SERVICE_VERSION=0.2.0
       - TZ=Asia/Shanghai
     ports:
-      - "8004:8004"
+      - "8104:8004"
     depends_on:
       redis:
         condition: service_healthy
@@ -310,7 +310,7 @@ services:
     container_name: echoes-web
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8088
+      - NEXT_PUBLIC_API_URL=http://localhost:8188
       - API_URL=http://gateway:8080
       - TZ=Asia/Shanghai
     ports:

@@ -1832,7 +1832,14 @@ func (s *MemoryService) callAnthropicForWeave(ctx context.Context, baseURL, apiK
 
 // GetMoodCalendar returns aggregated mood data for a calendar year.
 func (s *MemoryService) GetMoodCalendar(ctx context.Context, userID uuid.UUID, year int) ([]domain.MoodDayData, error) {
-	return s.emotionRepo.GetCalendarData(ctx, userID, year)
+	days, err := s.emotionRepo.GetCalendarData(ctx, userID, year)
+	if err != nil {
+		return nil, err
+	}
+	if days == nil {
+		return []domain.MoodDayData{}, nil
+	}
+	return days, nil
 }
 
 // GetMoodInsight generates a monthly mood insight based on calendar data.
