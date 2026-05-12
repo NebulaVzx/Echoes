@@ -14,9 +14,9 @@ sleep 10
 # 2. Check health endpoints
 echo ""
 echo "[2/7] Checking health endpoints..."
-HEALTH_MEMORY=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8002/health || echo "000")
-HEALTH_PROCESSOR=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8003/health || echo "000")
-HEALTH_VECTORIZER=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8004/health || echo "000")
+HEALTH_MEMORY=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8102/health || echo "000")
+HEALTH_PROCESSOR=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8103/health || echo "000")
+HEALTH_VECTORIZER=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8104/health || echo "000")
 
 echo "  Memory Service:     HTTP $HEALTH_MEMORY"
 echo "  Processor Service:  HTTP $HEALTH_PROCESSOR"
@@ -33,7 +33,7 @@ echo ""
 echo "[3/7] Verifying Gateway internal route isolation..."
 GATEWAY_INTERNAL_TEST=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "Authorization: Bearer dev-internal-token" \
-  http://localhost:8088/api/v1/internal/memories/00000000-0000-0000-0000-000000000000/tasks || echo "000")
+  http://localhost:8188/api/v1/internal/memories/00000000-0000-0000-0000-000000000000/tasks || echo "000")
 
 if [ "$GATEWAY_INTERNAL_TEST" = "404" ] || [ "$GATEWAY_INTERNAL_TEST" = "403" ] || [ "$GATEWAY_INTERNAL_TEST" = "000" ]; then
     echo "  PASS: Gateway does not expose internal routes (HTTP $GATEWAY_INTERNAL_TEST)"

@@ -67,7 +67,7 @@ Write-Host "  Echoes Environment Ready!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Web Frontend:   http://localhost:3000" -ForegroundColor Cyan
-Write-Host "  API Gateway:    http://localhost:8088" -ForegroundColor Cyan
+Write-Host "  API Gateway:    http://localhost:8188" -ForegroundColor Cyan
 Write-Host "  PostgreSQL:     localhost:5432" -ForegroundColor Cyan
 Write-Host "  Redis:          localhost:6379" -ForegroundColor Cyan
 Write-Host "  MinIO Console:  http://localhost:9001" -ForegroundColor Cyan

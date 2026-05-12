@@ -14,9 +14,9 @@ FAIL_COUNT=0
 TOTAL_SECTIONS=8
 
 # Base URLs
-BASE_URL="http://localhost:8088"
-VECTORIZER_URL="http://localhost:8004"
-MEMORY_URL="http://localhost:8002"
+BASE_URL="http://localhost:8188"
+VECTORIZER_URL="http://localhost:8104"
+MEMORY_URL="http://localhost:8102"
 
 # Test data
 TEST_EMAIL="e2e_search_test_$(date +%s)@echoes.test"

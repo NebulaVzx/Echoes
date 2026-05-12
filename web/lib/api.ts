@@ -8,7 +8,7 @@ import {
 } from '@/types/chat'
 import { ConstellationResponse, ExploreResponse } from '@/types/constellation'
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8088'
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8188'
 
 export interface ApiResponse<T> {
   success: boolean

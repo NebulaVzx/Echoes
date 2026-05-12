@@ -529,7 +529,7 @@ func (s *AuthService) GetGitHubAuthURL(state string) (string, error) {
 	}
 	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
 	if redirectURI == "" {
-		redirectURI = "http://localhost:8088/api/v1/auth/github/callback"
+		redirectURI = "http://localhost:8188/api/v1/auth/github/callback"
 	}
 	return fmt.Sprintf(
 		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=user:email&state=%s",
@@ -553,7 +553,7 @@ func (s *AuthService) HandleGitHubCallback(ctx context.Context, code string) (*d
 	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
 	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
 	if redirectURI == "" {
-		redirectURI = "http://localhost:8088/api/v1/auth/github/callback"
+		redirectURI = "http://localhost:8188/api/v1/auth/github/callback"
 	}
 
 	// 1. Exchange code for access token

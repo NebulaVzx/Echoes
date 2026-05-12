@@ -80,7 +80,7 @@ func NewChatService(repo repository.ConversationRepository, memoryURL, processor
 		memoryURL = "http://memory-service:8002"
 	}
 	if processorURL == "" {
-		processorURL = "http://processor-service:8001"
+		processorURL = "http://processor-service:8003"
 	}
 	if userServiceURL == "" {
 		userServiceURL = "http://user-service:8001"
