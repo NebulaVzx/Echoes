@@ -237,6 +237,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-echoes_dev_secret_key_change_in_production}
       - ENABLE_LINK_CONSUMER=true
       - ENABLE_TAG_CONSUMER=true
+      - ENABLE_MOOD_CONSUMER=true
       - ENV=development
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - LOG_LEVEL=info
