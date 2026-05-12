@@ -49,6 +49,7 @@ func main() {
 	suggestionRepo := repository.NewGormSuggestionRepository(db)
 	tagRepo := repository.NewGormTagRepository(db)
 	relationRepo := repository.NewGormRelationRepository(db)
+	emotionRepo := repository.NewGormEmotionRepository(db)
 
 	// Initialize Redis task queue
 	taskQueue := service.NewRedisTaskQueue()
@@ -66,11 +67,12 @@ func main() {
 	}
 
 	// Initialize services
-	memoryService := service.NewMemoryService(memoryRepo, userRepo, relationRepo, taskQueue, vectorizerClient, suggestionRepo, minioClient)
+	memoryService := service.NewMemoryService(memoryRepo, userRepo, relationRepo, emotionRepo, taskQueue, vectorizerClient, suggestionRepo, minioClient)
 	tagService := service.NewTagService(tagRepo, userRepo)
 
 	// Initialize handlers
 	memoryHandler := transport.NewMemoryHandler(memoryService)
+	moodHandler := transport.NewMoodHandler(memoryService)
 	tagHandler := transport.NewTagHandler(tagService)
 
 	// Setup router with observability middleware
@@ -96,6 +98,7 @@ func main() {
 	// API routes
 	v1 := router.Group("/api/v1")
 	memoryHandler.RegisterRoutes(v1)
+	moodHandler.RegisterRoutes(v1)
 	tagHandler.RegisterRoutes(v1)
 
 	logger.Info("memory-service starting", zap.String("port", port))

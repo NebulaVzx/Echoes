@@ -889,6 +889,11 @@ func (h *MemoryHandler) GetDailyReview(c *gin.Context) {
 		return
 	}
 
+	style := c.Query("style")
+	if style == "" {
+		style = "warm"
+	}
+
 	review, err := h.memoryService.GetDailyReview(c.Request.Context(), userID)
 	if err != nil {
 		zap.L().Error("failed to get daily review", zap.Error(err), zap.String("user_id", userID.String()))
@@ -902,6 +907,17 @@ func (h *MemoryHandler) GetDailyReview(c *gin.Context) {
 	}
 	if review.WorthReviewing != nil {
 		data["worth_reviewing"] = review.WorthReviewing.SafeResponse()
+	}
+
+	// Generate echo message if worth_reviewing exists
+	if review.WorthReviewing != nil {
+		echoMessage, err := h.memoryService.GenerateEcho(c.Request.Context(), userID, review.WorthReviewing, style)
+		if err != nil {
+			zap.L().Warn("failed to generate echo", zap.Error(err), zap.String("user_id", userID.String()))
+		} else if echoMessage != "" {
+			data["echo_message"] = echoMessage
+			data["echo_style"] = style
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": data})

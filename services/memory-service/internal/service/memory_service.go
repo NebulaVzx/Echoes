@@ -85,6 +85,7 @@ type MemoryService struct {
 	vectorizer     *VectorizerClient
 	suggestionRepo repository.SuggestionRepository
 	minioClient    *MinIOClient
+	emotionRepo    repository.EmotionRepository
 }
 
 // TaskQueue defines the interface for publishing async tasks.
@@ -100,11 +101,12 @@ type TaskQueue interface {
 }
 
 // NewMemoryService creates a new memory service.
-func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, relationRepo repository.RelationRepository, queue TaskQueue, vectorizer *VectorizerClient, suggestionRepo repository.SuggestionRepository, minioClient *MinIOClient) *MemoryService {
+func NewMemoryService(repo repository.MemoryRepository, userRepo repository.UserRepository, relationRepo repository.RelationRepository, emotionRepo repository.EmotionRepository, queue TaskQueue, vectorizer *VectorizerClient, suggestionRepo repository.SuggestionRepository, minioClient *MinIOClient) *MemoryService {
 	return &MemoryService{
 		repo:           repo,
 		userRepo:       userRepo,
 		relationRepo:   relationRepo,
+		emotionRepo:    emotionRepo,
 		queue:          queue,
 		vectorizer:     vectorizer,
 		suggestionRepo: suggestionRepo,
@@ -1114,6 +1116,27 @@ func (s *MemoryService) UpdateTaskStatus(ctx context.Context, memoryID uuid.UUID
 		}
 	}
 
+			if update.TaskType == "mood:generate" {
+				if update.Result != nil {
+					sentiment, _ := update.Result["sentiment"].(string)
+					scoreFloat, _ := update.Result["score"].(float64)
+					score := int(scoreFloat)
+					reason, _ := update.Result["reason"].(string)
+					
+					emotion := &domain.Emotion{
+						MemoryID:     memoryID,
+						Sentiment:    sentiment,
+						Score:        score,
+						Reason:       reason,
+						ModelVersion: "v1",
+						AnalyzedAt:   time.Now(),
+					}
+					if err := s.emotionRepo.Create(ctx, emotion); err != nil {
+						zap.L().Error("failed to save emotion", zap.Error(err), zap.String("memory_id", memoryID.String()))
+					}
+				}
+			}
+
 	return s.repo.Update(ctx, memory)
 }
 
@@ -1806,3 +1829,170 @@ func (s *MemoryService) callAnthropicForWeave(ctx context.Context, baseURL, apiK
 
 	return strings.TrimSpace(result.Content[0].Text), nil
 }
+
+// GetMoodCalendar returns aggregated mood data for a calendar year.
+func (s *MemoryService) GetMoodCalendar(ctx context.Context, userID uuid.UUID, year int) ([]domain.MoodDayData, error) {
+	return s.emotionRepo.GetCalendarData(ctx, userID, year)
+}
+
+// GetMoodInsight generates a monthly mood insight based on calendar data.
+func (s *MemoryService) GetMoodInsight(ctx context.Context, userID uuid.UUID, year int, month int) (*domain.MoodInsight, error) {
+	calendarData, err := s.emotionRepo.GetCalendarData(ctx, userID, year)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch calendar data: %w", err)
+	}
+
+	var stats domain.MoodStats
+	var monthData []domain.MoodDayData
+	for _, d := range calendarData {
+		t, _ := time.Parse("2006-01-02", d.Date)
+		if t.Month() == time.Month(month) {
+			monthData = append(monthData, d)
+			switch d.DominantSentiment {
+			case "positive":
+				stats.PositiveDays++
+			case "negative":
+				stats.NegativeDays++
+			default:
+				stats.NeutralDays++
+			}
+			stats.AverageScore += d.Score
+		}
+	}
+
+	if len(monthData) > 0 {
+		stats.AverageScore = stats.AverageScore / float64(len(monthData))
+	}
+
+	if len(monthData) > 0 {
+		mostActive := monthData[0]
+		for _, d := range monthData {
+			if d.MemoryCount > mostActive.MemoryCount {
+				mostActive = d
+			}
+		}
+		stats.MostActiveDay = mostActive.Date
+	}
+
+	insight := s.generateSimpleInsight(stats, monthData)
+
+	return &domain.MoodInsight{
+		Insight: insight,
+		Stats:   stats,
+	}, nil
+}
+
+func (s *MemoryService) generateSimpleInsight(stats domain.MoodStats, monthData []domain.MoodDayData) string {
+	if len(monthData) == 0 {
+		return "这个月还没有情绪数据，保存更多记忆来生成洞察吧。"
+	}
+
+	var parts []string
+	if stats.PositiveDays > stats.NegativeDays {
+		parts = append(parts, "这个月整体情绪偏向积极")
+	} else if stats.NegativeDays > stats.PositiveDays {
+		parts = append(parts, "这个月经历了一些低谷，但也记录了成长的痕迹")
+	} else {
+		parts = append(parts, "这个月的情绪比较平稳")
+	}
+
+	if stats.MostActiveDay != "" {
+		parts = append(parts, fmt.Sprintf("%s 是最活跃的一天", stats.MostActiveDay))
+	}
+
+	return strings.Join(parts, "，") + "。"
+}
+
+// GenerateEcho generates an echo message for a memory using the processor service LLM.
+func (s *MemoryService) GenerateEcho(ctx context.Context, userID uuid.UUID, memory *domain.Memory, style string) (string, error) {
+	if memory == nil {
+		return "", nil
+	}
+
+	validStyles := map[string]bool{"warm": true, "humorous": true, "concise": true, "poetic": true}
+	if !validStyles[style] {
+		style = "warm"
+	}
+
+	yearsAgo := 0
+	if !memory.CreatedAt.IsZero() {
+		yearsAgo = int(time.Since(memory.CreatedAt).Hours() / 24 / 365)
+		if yearsAgo < 1 {
+			yearsAgo = 0
+		}
+	}
+
+	memoryContent := s.extractContent(memory)
+	if memory.ContentType == "link" && memory.LinkTitle != "" {
+		memoryContent = memory.LinkTitle + "\n" + memory.LinkSummary
+	}
+	if memoryContent == "" {
+		memoryContent = memory.Note
+	}
+	if memoryContent == "" {
+		return "", fmt.Errorf("memory has no content for echo generation")
+	}
+
+	llmConfig, err := s.getUserLLMConfig(ctx, userID)
+	if err != nil {
+		llmConfig = nil
+	}
+
+	echoMessage, err := s.callProcessorForEcho(ctx, memoryContent, style, yearsAgo, llmConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate echo: %w", err)
+	}
+
+	return echoMessage, nil
+}
+
+// callProcessorForEcho calls the processor service to generate an echo message.
+func (s *MemoryService) callProcessorForEcho(ctx context.Context, memoryContent string, style string, yearsAgo int, llmConfig map[string]interface{}) (string, error) {
+	payload := map[string]interface{}{
+		"memory_content": memoryContent,
+		"style":          style,
+		"years_ago":      yearsAgo,
+	}
+	if llmConfig != nil {
+		payload["llm_config"] = llmConfig
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	processorURL := os.Getenv("PROCESSOR_SERVICE_URL")
+	if processorURL == "" {
+		processorURL = "http://processor-service:8001"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", processorURL+"/api/v1/generate/echo", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("INTERNAL_API_TOKEN"))
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("processor service returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		EchoMessage string `json:"echo_message"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	return result.EchoMessage, nil
+}
+
+// extractContent extracts the primary content from a memory for echo generation.
