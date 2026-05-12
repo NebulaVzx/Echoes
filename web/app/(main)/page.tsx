@@ -18,7 +18,7 @@ import { Sparkles, Star } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import UnlockCeremony from '@/components/warmth/unlock-ceremony'
 import SerendipityCard from '@/components/warmth/serendipity-card'
-import DailyReviewCard from '@/components/warmth/daily-review-card'
+import EchoCard from '@/components/echo/echo-card'
 import SelectionBar from '@/components/memory/selection-bar'
 import WeaveModal from '@/components/weave/weave-modal'
 
@@ -339,7 +339,7 @@ function HomePage() {
         <div className="space-y-3 mb-8">
           <UnlockCeremony />
           <SerendipityCard />
-          <DailyReviewCard />
+          <EchoCard />
         </div>
 
         {/* Create form */}
