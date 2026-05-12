@@ -28,7 +28,7 @@ type VectorizerClient struct {
 func NewVectorizerClient() *VectorizerClient {
 	baseURL := os.Getenv("VECTORIZER_SERVICE_URL")
 	if baseURL == "" {
-		baseURL = "http://vectorizer-service:8003"
+		baseURL = "http://vectorizer-service:8004"
 	}
 
 	redisAddr := os.Getenv("REDIS_URL")

@@ -1,0 +1,66 @@
+# Echoes (拾忆) - 统一端口与地址配置
+# 单一真相源：所有服务端口、映射端口、内部通信地址
+# 修改此文件后，需同步检查 docker-compose.yml、.env.example 及各服务代码中的 fallback 值
+
+services:
+  gateway:
+    container_port: 8080
+    host_port: 8188
+    internal_url: http://gateway:8080
+    public_url: http://localhost:8188
+
+  user-service:
+    container_port: 8001
+    internal_url: http://user-service:8001
+
+  memory-service:
+    container_port: 8002
+    host_port: 8102
+    internal_url: http://memory-service:8002
+
+  processor-service:
+    container_port: 8003
+    host_port: 8103
+    internal_url: http://processor-service:8003
+
+  vectorizer-service:
+    container_port: 8004
+    host_port: 8104
+    internal_url: http://vectorizer-service:8004
+
+  web:
+    container_port: 3000
+    host_port: 3000
+    public_url: http://localhost:3000
+
+infrastructure:
+  postgres:
+    container_port: 5432
+    host_port: 5432
+  redis:
+    container_port: 6379
+    host_port: 6379
+  minio:
+    api_port: 9000
+    console_port: 9001
+  prometheus:
+    container_port: 9090
+    host_port: 9090
+  jaeger:
+    ui_port: 16686
+    otlp_grpc: 4317
+    otlp_http: 4318
+  grafana:
+    container_port: 3000
+    host_port: 3001
+
+public_endpoints:
+  api_base: http://localhost:8188/api/v1
+  github_callback: http://localhost:8188/api/v1/auth/github/callback
+  next_public_api_url: http://localhost:8188
+
+inter_service:
+  user_service_url: http://user-service:8001
+  memory_service_url: http://memory-service:8002
+  processor_service_url: http://processor-service:8003
+  vectorizer_service_url: http://vectorizer-service:8004
