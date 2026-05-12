@@ -23,6 +23,7 @@ from app.consumers.link_consumer import LinkConsumer
 from app.consumers.tag_consumer import TagConsumer
 from app.consumers.suggestion_consumer import SuggestionConsumer
 from app.consumers.file_consumer import FileConsumer
+from app.consumers.mood_consumer import MoodConsumer
 from app.observability import setup_observability
 from opentelemetry import trace
 
@@ -88,6 +89,12 @@ async def lifespan(app: FastAPI):
         await cover_consumer.start()
         consumers.append(cover_consumer)
         print("Cover consumer started")
+
+    if settings.enable_mood_consumer:
+        mood_consumer = MoodConsumer(redis_client, memory_client)
+        await mood_consumer.start()
+        consumers.append(mood_consumer)
+        print("Mood consumer started")
 
     app.state.redis = redis_client
     app.state.memory_client = memory_client

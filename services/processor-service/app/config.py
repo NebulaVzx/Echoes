@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     enable_suggestion_consumer: bool = True
     enable_file_consumer: bool = True
     enable_cover_consumer: bool = True
+    enable_mood_consumer: bool = True
     use_pollinations_fallback: bool = True
 
     class Config:
