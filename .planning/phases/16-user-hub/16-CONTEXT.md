@@ -114,11 +114,139 @@ depends_on: [15-mood-echo]
 - 数据导出需要考虑大数据量（分页/流式）
 - 头像上传复用 MinIO 已有基础设施
 
+## 实现决策
+
+### 记忆 DNA 生成策略（D-01）
+
+- **D-01-01:** 触发方式：每周日凌晨自动生成 + 用户手动刷新按钮
+- **D-01-02:** 计算方式：全量重算（非增量），领域分布/标签演化等统计需要全量数据
+- **D-01-03:** 结果存储：新增 `user_insights` 表（非 JSONB），便于查询历史趋势和对比上期
+- **D-01-04:** 缓存策略：结果写入表后前端缓存 1 小时
+- **D-01-05:** 首次生成门槛：用户达到 10 条记忆后触发，避免空状态尴尬
+- **D-01-06:** 异步队列：新增 `dna:generate` Redis Stream，consumer 在 processor-service 中
+
+### AI 助手人格与现有风格的关系（D-02）
+
+- **D-02-01:** 人格是"建议风格"的超集（扩展而非替换）
+- **D-02-02:** 现有风格映射：gentle→温柔学姐、practical→极简主义者、inspiring→好奇探索者
+- **D-02-03:** Phase 16 实现 4 种人格：温柔学姐、极简主义者、好奇探索者、老朋友（最具 Echoes 特色）
+- **D-02-04:** 毒舌导师延后到 P1：需要更精细的 prompt 工程避免冒犯
+- **D-02-05:** 自定义人格（P1）：用户输入描述 → AI 生成对应 system prompt
+- **D-02-06:** 影响范围：所有 AI 交互统一注入（建议、Echo Assistant、编织、回响、DNA 洞察）
+- **D-02-07:** 存储：`users.settings.echo_persona`，processor-service LLM Provider 调用前注入人格 system prompt 前缀
+- **D-02-08:** 每种人格独立 prompt 模板文件：`personas/{name}.txt`
+
+### 数据导出实现方式（D-03）
+
+- **D-03-01:** < 1000 条记忆：前端直接生成 Markdown/JSON，浏览器自动下载
+- **D-03-02:** >= 1000 条记忆：后端异步生成 → MinIO 存储 → 前端轮询下载链接
+- **D-03-03:** 格式优先级：Markdown 第一（Obsidian/Notion 兼容）、JSON 第二
+- **D-03-04:** Obsidian/Notion 专用格式为 P1（复用 Markdown + frontmatter）
+- **D-03-05:** Markdown 导出：每条记忆 = 一个文件，frontmatter 包含标签/来源/创建时间，可选按标签分文件夹
+
+### Profile 页与设置页的边界（D-04）
+
+- **D-04-01:** `/profile`（我的画像）= 展示 + 发现：记忆 DNA 可视化、学习路径、AI 人格选择、数据仪表盘、记忆统计
+- **D-04-02:** `/settings`（设置）= 配置 + 控制：LLM 连接、处理偏好、搜索偏好、界面偏好、隐私开关、账户安全、数据导出、注销
+- **D-04-03:** 记忆统计从 `/settings` Section 0 迁移到 `/profile`
+- **D-04-04:** AI 人格选择放在 `/profile`（"我是谁"的展示，不是配置）
+- **D-04-05:** 数据导出放在 `/settings`（工具性行为）
+- **D-04-06:** 隐私开关放在 `/settings`（控制行为）
+- **D-04-07:** 导航新增"我的画像"入口，与"设置"并列
+
+### Claude's Discretion
+
+- 记忆 DNA 可视化组件选型（雷达图/饼图/折线图库选择）
+- 学习路径知识地图的具体可视化方式
+- 头像上传裁剪组件的交互细节
+- 数据导出进度条/通知的 UI 设计
+
+---
+
 ## 关键文件
 - `services/user-service/internal/domain/user.go` — User 结构扩展
 - `services/memory-service/internal/repository/memory_repository.go` — 统计查询
 - `web/app/(main)/settings/page.tsx` — 设置页扩展
 - `web/app/(main)/profile/page.tsx` — 新增用户画像页
+
+## Canonical References
+
+**Downstream agents MUST read these before planning or implementing.**
+
+### 需求与边界
+- `.planning/ROADMAP.md` §Phase 16 — Phase goal and scope
+- `CLAUDE.md` §Technology Stack — 技术栈和架构模式
+- `CLAUDE.md` §Async Task Flow — Redis Stream 消费者模式
+
+### 后端集成点
+- `services/user-service/internal/domain/user.go` — User 模型（已含 Username/AvatarURL/Settings JSONB）
+- `services/user-service/internal/service/auth_service.go` — 用户认证逻辑
+- `services/memory-service/internal/repository/memory_repository.go` — 记忆查询与统计
+- `services/processor-service/app/consumers/` — 现有消费者模式（file/link/suggestion/tag/cover/mood）
+- `services/processor-service/app/services/llm/` — LLM Provider 工厂模式
+- `shared/migrations/` — 数据库迁移目录
+
+### 前端集成点
+- `web/app/(main)/settings/page.tsx` — 现有设置页（6 个 section，需调整边界）
+- `web/app/(main)/profile/page.tsx` — 现有占位页面（需实现画像功能）
+- `web/lib/api.ts` — API 客户端模式
+
+### 已有 Phase 上下文
+- `.planning/phases/15-mood-echo/15-CONTEXT.md` — DailyReview/情绪分析模式可参考
+- `.planning/phases/14-memory-covers-weaving/14-CONTEXT.md` — 异步消费者模式（cover_consumer）
+
+---
+
+## Existing Code Insights
+
+### Reusable Assets
+- **LLM Provider 工厂** (`processor-service/app/services/llm/`): 注入人格 system prompt 前缀
+- **Redis Stream Consumer 基类** (`processor-service/app/consumers/base.py`): 新增 `DNAConsumer` 继承基类
+- **MinIO Client** (`memory-service/internal/service/memory_service.go`): 复用上传导出文件
+- **Settings JSONB** (`user-service` users 表): 人格选择、隐私开关直接存入 settings 字段
+- **Streaks API** (`services/memory-service`): 已有连续记录统计，复用模式扩展为 DNA 统计
+
+### Established Patterns
+- **异步任务流**: 保存/触发 → 发布 Redis Stream → Consumer 处理 → 回写数据库。DNA 分析完全遵循此模式。
+- **消费者模式**: processor-service 中每个 consumer 独立文件，继承 BaseConsumer，处理特定 queue。
+- **API 响应封装**: 后端使用统一 JSON 封装，前端使用 `api.ts` 中的 `SafeResponse()`。
+- **数据库迁移**: 新表通过 `shared/migrations/` 添加，命名格式 `00X_description.sql`。
+
+### Integration Points
+- **新增 Redis Stream queue**: `dna:generate`
+- **新增 processor-service consumer**: `dna_consumer.py`
+- **新增数据库表**: `user_insights`
+- **扩展 user-service API**: 头像上传、密码修改、邮箱变更、账户注销
+- **扩展 memory-service API**: 统计聚合查询（领域分布、标签演化、记录节奏）
+- **新增前端页面**: `/profile` 画像页（记忆 DNA、学习路径、AI 人格、数据仪表盘）
+- **调整前端页面**: `/settings` 移除记忆统计，新增隐私开关、数据导出、账户安全
+
+---
+
+## Specific Ideas
+
+- 记忆 DNA 卡片分享时生成精美图片（类似 GitHub Unwrapped），可用 html-to-image 库
+- "老朋友"人格的 prompt 中可注入用户最近 5 条记忆作为上下文，让 AI 像真的认识你一样交流
+- 学习路径的知识地图可复用 Phase 13 的 ConstellationGraph 组件，节点 = 知识领域
+- 头像上传复用 MinIO 已有基础设施，裁剪用 `react-cropper`，存储路径 `avatars/{user_id}.jpg`
+- 数据导出 Markdown 的 frontmatter 格式兼容 Obsidian：`---
+tags: [tag1, tag2]
+source: url
+created: 2026-01-01
+---`
+
+---
+
+## Deferred Ideas
+
+- **毒舌导师人格** — 需要更精细的 prompt 工程，P1 阶段评估
+- **自定义人格** — 用户输入描述生成 system prompt，P1 阶段实现
+- **Obsidian/Notion 专用导出格式** — 复用 Markdown + frontmatter，P1 阶段
+- **系统钥匙串集成**（macOS Keychain / Windows Credential）— v1.4+ 安全增强
+- **生物识别登录**（Face ID / Touch ID / Windows Hello）— 需要原生模块，Expo 阶段
+- **跨设备同步设置** — 依赖 v1.4+ 的同步协议
+
+---
 
 ## 验收标准
 - 用户可在"我的画像"页面看到记忆 DNA 分析
