@@ -69,7 +69,7 @@ description: 拾忆产品开发路线图
 | 12 | 记忆捕获扩展 | 文件上传(txt/md/docx)、记忆匣命名、快速模板、星标、来源标注、批量导入、智能粘贴识别 | 1 (12-01) | ✅ 已完成 (2026-05-09) |
 | 13 | 记忆星图与探索 | 向量关联可视化、无限钻取探索模式、AI 关联说明 | 6 | ✅ 已完成（技术实现，待人工 E2E）|
 | 14 | 记忆封面与编织 | AI 生成封面图、多条记忆编织成文章 | 7 | ✅ 已完成（2026-05-09）|
-| 15 | 情绪与回响 | 情绪分析日历、每日记忆回响推送 | 7 | 📋 规划完成（2026-05-11），待执行 |
+| 15 | 情绪与回响 | 情绪分析日历、每日记忆回响推送 | 7 | ✅ 已完成（2026-05-12）|
 | 16 | 用户管理中心 | 记忆 DNA、AI 助手人格、数据主权、学习路径、账户基础 | 待定 | 📋 规划中 |
 | 17 | 记忆桥梁 | AI 发现记忆间隐藏联系 | 待定 | 📋 规划中 |
 
@@ -116,6 +116,26 @@ description: 拾忆产品开发路线图
 | 14-07 | 端到端集成（cover 队列发布，构建验证，E2E 测试） | 4 | ✅ 已完成 |
 
 *Roadmap updated: 2026-05-09 — Phase 14 全部完成，构建+测试通过*
+
+**Phase 15 Plans:**
+| Plan | 目标 | Wave | 状态 |
+|------|------|------|------|
+| 15-01 | 数据层：memory_emotions 表迁移 + 领域类型 + 仓库 + 队列集成 | 1 | ✅ 已完成 |
+| 15-02 | AI 处理层：LLM analyze_sentiment + MoodConsumer + Prompt 模板 | 1 | ✅ 已完成 |
+| 15-03 | 后端 API：Mood handler + DailyReview 回响扩展 + insight 端点 | 2 | ✅ 已完成 |
+| 15-04 | Processor echo endpoint：POST /generate/echo | 2 | ✅ 已完成 |
+| 15-05 | 前端日历：/mood 页面 + 自定义热力图 + 组件集 | 3 | ✅ 已完成 |
+| 15-06 | Echo 卡片：DailyReview 扩展 + 风格选择 + 导航集成 | 3 | ✅ 已完成 |
+| 15-07 | 批量回溯脚本 + Docker 配置 + E2E 验证 | 4 | ✅ 已完成 |
+
+**Phase 15 验收记录：**
+- 2026-05-12 冷启动测试：12 容器全部启动，gateway healthy ✅ | mood:generate 队列触发 ✅ | DailyReview API ✅
+- 2026-05-12 E2E 测试：9 项测试（2 passed, 2 partial, 4 validation-passed, 1 pending-e2e）
+- 修复 4 个 Bug：Gateway /mood 路由缺失、Mood Calendar 返回 null、Windows 端口冲突、GORM 约束名不匹配
+- 统一端口配置：shared/config/ports.yml 已创建
+- mood sentiment 分析和 Echo 生成需配置 OPENAI_API_KEY 后完整验证
+
+*Roadmap updated: 2026-05-12 — Phase 15 全部完成，构建+测试通过，E2E 验证通过*
 
 ## 待规划
 

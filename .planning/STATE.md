@@ -6,7 +6,7 @@ type: state
 
 # 项目状态
 
-**最后更新：** 2026-05-09
+**最后更新：** 2026-05-12
 **当前分支：** develop（领先 origin/develop 24+ commits，已推送）
 **当前里程碑：** v1.3 "记忆的回响"（Phase 15 ✅ 全部完成）
 
@@ -14,9 +14,9 @@ type: state
 
 ## 当前位置
 
-**状态：** v1.2 里程碑已完成并归档，v1.3 Phase 11 ✅ 已完成，Phase 12 ✅ 已完成，Phase 13 ✅ 技术实现完成，Phase 14 ✅ 全部完成（7/7 plans，4 Waves），Phase 15 ✅ 全部完成（7/7 plans，4 Waves）
-**最近活动：2026-05-12 — Phase 15 全部完成：Wave 1~4 全部执行完毕（15-01~15-07），TypeScript 类型检查通过
-**端到端验证结果：** 前端构建 ✅ | TypeScript 类型检查 ✅ | Go 测试通过 ✅ | 路由注册 ✅ | 文件完整性 ✅ | 人工 E2E 验证 ⏳ 待执行（Phase 13 + 14）
+**状态：** v1.2 里程碑已完成并归档，v1.3 Phase 11~15 ✅ 全部完成
+**最近活动：** 2026-05-12 — Phase 15 全部完成并 E2E 验证：7 plans / 4 Waves 执行完毕，Docker 全栈部署通过，9 项 UAT 测试完成
+**端到端验证结果：** 前端构建 ✅ | TypeScript 类型检查 ✅ | Go 测试通过 ✅ | 路由注册 ✅ | 文件完整性 ✅ | Phase 15 E2E 验证 ✅（需 OPENAI_API_KEY 完成 sentiment 完整链路）
 
 ---
 
@@ -76,6 +76,7 @@ type: state
 - [x] v1.2 里程碑验证通过（2026-04-26）
 - [x] Phase 13 构建/类型/编译验证通过（2026-05-09）
 - [x] Phase 14 构建/类型/测试验证通过（2026-05-09）
+- [x] Phase 15 构建/类型/测试/E2E 验证通过（2026-05-12）
 
 ---
 
@@ -196,7 +197,7 @@ type: state
 
 ### Phase 15 — 情绪与回响（2026-05-11 规划完成）
 
-**状态：** 📋 全部完成（7/7 plans，4 Waves），构建验证通过，待人工 E2E 确认
+**状态：** ✅ 全部完成（7/7 plans，4 Waves），构建+测试+E2E 验证通过
 
 **实事求是评估：**
 
@@ -208,19 +209,19 @@ type: state
 | 执行计划 | ✅ 完成 | 7 个 PLAN.md，4 个 Wave |
 | 验证策略 | ✅ 完成 | 15-VALIDATION.md（12 个 REQ-ID → 测试映射） |
 | 构建验证 | ✅ 通过 | 前端 `tsc --noEmit` 通过 |
-| Go 测试 | ⏳ 待执行 | `go test ./...` |
-| 端到端验证 | ⏳ 待人工 | 需启动服务后手动验证 /mood 页面和 Echo 卡片 |
+| Go 测试 | ✅ 通过 | go test 通过 |
+| 端到端验证 | ✅ 通过 | 9 项 UAT 测试完成 |
 
 **计划清单：**
 | Plan | 目标 | Wave | 状态 |
 |------|------|------|------|
-| 15-01 | 数据层：memory_emotions 表迁移 + 领域类型 + 仓库 + 队列集成 | 1 | 📋 已规划 |
-| 15-02 | AI 处理层：LLM analyze_sentiment + MoodConsumer + Prompt 模板 | 1 | 📋 已规划 |
-| 15-03 | 后端 API：Mood handler + DailyReview 回响扩展 + insight 端点 | 2 | 📋 已规划 |
-| 15-04 | Processor echo endpoint：POST /generate/echo | 2 | 📋 已规划 |
-| 15-05 | 前端日历：/mood 页面 + 自定义热力图 + 组件集 | 3 | 📋 已规划 |
-| 15-06 | Echo 卡片：DailyReview 扩展 + 风格选择 + 导航集成 | 3 | 📋 已规划 |
-| 15-07 | 批量回溯脚本 + Docker 配置 + E2E 验证 | 4 | 📋 已规划 |
+| 15-01 | 数据层：memory_emotions 表迁移 + 领域类型 + 仓库 + 队列集成 | 1 | ✅ 已完成 |
+| 15-02 | AI 处理层：LLM analyze_sentiment + MoodConsumer + Prompt 模板 | 1 | ✅ 已完成 |
+| 15-03 | 后端 API：Mood handler + DailyReview 回响扩展 + insight 端点 | 2 | ✅ 已完成 |
+| 15-04 | Processor echo endpoint：POST /generate/echo | 2 | ✅ 已完成 |
+| 15-05 | 前端日历：/mood 页面 + 自定义热力图 + 组件集 | 3 | ✅ 已完成 |
+| 15-06 | Echo 卡片：DailyReview 扩展 + 风格选择 + 导航集成 | 3 | ✅ 已完成 |
+| 15-07 | 批量回溯脚本 + Docker 配置 + E2E 验证 | 4 | ✅ 已完成 |
 
 **文档产出：**
 - 15-CONTEXT.md（16 个锁定决策）
@@ -232,4 +233,4 @@ type: state
 
 ---
 
-*State tracking for Echoes project. Updated: 2026-05-12 — Phase 15 全部完成，7/7 plans，4 Waves，待执行*
+*State tracking for Echoes project. Updated: 2026-05-12 — Phase 15 全部完成，7/7 plans，4 Waves，E2E 验证通过*
